@@ -1,0 +1,234 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 25% 94%;
+    --foreground: 30 10% 15%;
+
+    --card: 40 40% 98%;
+    --card-foreground: 30 10% 15%;
+
+    --popover: 40 40% 98%;
+    --popover-foreground: 30 10% 15%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 30% 90%;
+    --secondary-foreground: 30 10% 25%;
+
+    --muted: 40 20% 92%;
+    --muted-foreground: 30 10% 45%;
+
+    --accent: 30 80% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 40 25% 88%;
+    --input: 40 25% 88%;
+    --ring: 38 92% 50%;
+
+    --radius: 1rem;
+
+    /* Custom Heritage Colors */
+    --gold: 38 92% 50%;
+    --gold-light: 40 85% 65%;
+    --gold-dark: 35 90% 40%;
+    --saffron: 30 95% 55%;
+    --cream: 40 33% 96%;
+    --cream-light: 40 40% 98%;
+    --heritage-brown: 30 25% 25%;
+    --temple-orange: 25 90% 50%;
+
+    /* Gradients */
+    --gradient-gold: linear-gradient(135deg, hsl(38, 92%, 50%) 0%, hsl(30, 95%, 55%) 100%);
+    --gradient-gold-soft: linear-gradient(135deg, hsl(40, 85%, 65%) 0%, hsl(38, 92%, 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(40, 33%, 96%) 0%, hsl(40, 40%, 92%) 100%);
+
+    /* Shadows */
+    --shadow-card: 0 4px 20px -2px hsl(30 25% 25% / 0.08);
+    --shadow-card-hover: 0 8px 30px -4px hsl(30 25% 25% / 0.15);
+    --shadow-gold: 0 4px 20px -2px hsl(38 92% 50% / 0.35);
+    --shadow-glow: 0 0 20px hsl(38 92% 50% / 0.4);
+
+    --sidebar-background: 40 40% 98%;
+    --sidebar-foreground: 30 10% 25%;
+    --sidebar-primary: 38 92% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 30% 92%;
+    --sidebar-accent-foreground: 30 10% 25%;
+    --sidebar-border: 40 25% 88%;
+    --sidebar-ring: 38 92% 50%;
+  }
+
+  .dark {
+    --background: 30 15% 10%;
+    --foreground: 40 30% 95%;
+
+    --card: 30 15% 12%;
+    --card-foreground: 40 30% 95%;
+
+    --popover: 30 15% 12%;
+    --popover-foreground: 40 30% 95%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 30 15% 10%;
+
+    --secondary: 30 15% 18%;
+    --secondary-foreground: 40 30% 90%;
+
+    --muted: 30 15% 20%;
+    --muted-foreground: 40 20% 65%;
+
+    --accent: 30 80% 55%;
+    --accent-foreground: 30 15% 10%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 15% 20%;
+    --input: 30 15% 20%;
+    --ring: 38 92% 50%;
+
+    --sidebar-background: 30 15% 12%;
+    --sidebar-foreground: 40 30% 95%;
+    --sidebar-primary: 38 92% 50%;
+    --sidebar-primary-foreground: 30 15% 10%;
+    --sidebar-accent: 30 15% 18%;
+    --sidebar-accent-foreground: 40 30% 90%;
+    --sidebar-border: 30 15% 20%;
+    --sidebar-ring: 38 92% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer utilities {
+  .gradient-gold {
+    background: var(--gradient-gold);
+  }
+
+  .gradient-gold-soft {
+    background: var(--gradient-gold-soft);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-card-hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .shadow-gold {
+    box-shadow: var(--shadow-gold);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .text-gradient-gold {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px hsl(38 92% 50% / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px hsl(38 92% 50% / 0.6);
+  }
+}
+
+@keyframes color-blink {
+  0%, 100% {
+    background: linear-gradient(135deg, hsl(38, 92%, 50%) 0%, hsl(30, 95%, 55%) 100%);
+    box-shadow: 0 0 20px hsl(38 92% 50% / 0.6);
+  }
+  25% {
+    background: linear-gradient(135deg, hsl(142, 76%, 45%) 0%, hsl(160, 84%, 39%) 100%);
+    box-shadow: 0 0 20px hsl(142 76% 45% / 0.6);
+  }
+  50% {
+    background: linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(199, 89%, 48%) 100%);
+    box-shadow: 0 0 20px hsl(217 91% 60% / 0.6);
+  }
+  75% {
+    background: linear-gradient(135deg, hsl(280, 87%, 55%) 0%, hsl(262, 83%, 58%) 100%);
+    box-shadow: 0 0 20px hsl(280 87% 55% / 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-color-blink {
+  animation: color-blink 3s ease-in-out infinite;
+}
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 8px hsl(40 85% 65% / 0.6);
+  }
+  50% {
+    opacity: 0.85;
+    text-shadow: 0 0 12px hsl(40 85% 65% / 0.9);
+  }
+}
+
+.animate-subtle-pulse {
+  animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+/* Hide scrollbar for horizontal galleries */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}

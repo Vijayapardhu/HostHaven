@@ -1,0 +1,52 @@
+import { z } from 'zod';
+
+export const updateUserStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
+export const propertyApprovalSchema = z.object({
+  status: z.enum(['ACTIVE', 'INACTIVE', 'REJECTED']),
+  reason: z.string().max(500).optional(),
+});
+
+export const systemStatsSchema = z.object({
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+});
+
+export const adminFilterSchema = z.object({
+  status: z.enum(['ACTIVE', 'INACTIVE', 'REJECTED', 'PENDING', 'DRAFT']).optional(),
+  type: z.enum(['HOTEL', 'HOME', 'TEMPLE']).optional(),
+  search: z.string().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(50).default(10),
+});
+
+export const payoutProcessingSchema = z.object({
+  payoutId: z.string().uuid(),
+  action: z.enum(['approve', 'reject']),
+  notes: z.string().max(500).optional(),
+});
+
+export const bookingRefundSchema = z.object({
+  amount: z.coerce.number().positive().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export const markPayoutPaidSchema = z.object({
+  transactionId: z.string().min(3).max(120),
+  notes: z.string().max(500).optional(),
+});
+
+export const inventoryOverrideSchema = z.object({
+  availableRooms: z.coerce.number().int().nonnegative(),
+});
+
+export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>;
+export type PropertyApprovalInput = z.infer<typeof propertyApprovalSchema>;
+export type SystemStatsInput = z.infer<typeof systemStatsSchema>;
+export type AdminFilterInput = z.infer<typeof adminFilterSchema>;
+export type PayoutProcessingInput = z.infer<typeof payoutProcessingSchema>;
+export type BookingRefundInput = z.infer<typeof bookingRefundSchema>;
+export type MarkPayoutPaidInput = z.infer<typeof markPayoutPaidSchema>;
+export type InventoryOverrideInput = z.infer<typeof inventoryOverrideSchema>;
