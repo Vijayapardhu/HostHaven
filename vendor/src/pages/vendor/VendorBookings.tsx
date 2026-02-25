@@ -23,7 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { bookingsService } from "@/lib/bookings";
+import LoadingState from "@/components/states/LoadingState";
+import EmptyState from "@/components/states/EmptyState";
+import ErrorState from "@/components/states/ErrorState";
 
 interface Booking {
   id: string;
@@ -48,6 +51,7 @@ const VendorBookings = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBookings();
@@ -55,6 +59,7 @@ const VendorBookings = () => {
 
   const fetchBookings = async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       const params: Record<string, string> = {
         page: currentPage.toString(),
@@ -63,11 +68,12 @@ const VendorBookings = () => {
       if (statusFilter !== "all") {
         params.status = statusFilter;
       }
-      const response = await api.vendor.getBookings(params);
+      const response = await bookingsService.getBookings(params);
       setBookings(response.bookings || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (error) {
       console.error("Failed to fetch bookings:", error);
+      setErrorMessage("Failed to retrieve bookings. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -173,9 +179,14 @@ const VendorBookings = () => {
       <Card className="border-0 shadow-lg">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-            </div>
+            <LoadingState className="p-8" message="Loading bookings..." />
+          ) : errorMessage ? (
+            <ErrorState
+              className="p-8"
+              title="Unable to load bookings"
+              description={errorMessage}
+              onRetry={fetchBookings}
+            />
           ) : filteredBookings.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -239,10 +250,12 @@ const VendorBookings = () => {
               </table>
             </div>
           ) : (
-            <div className="text-center py-12">
-              <CalendarDays className="w-12 h-12 text-muted mx-auto mb-4" />
-              <p className="text-muted-foreground">No bookings found</p>
-            </div>
+            <EmptyState
+              className="py-12"
+              icon={<CalendarDays className="w-12 h-12 text-muted" />}
+              title="No bookings found"
+              description="Try changing filters or check back later."
+            />
           )}
 
           {/* Pagination */}

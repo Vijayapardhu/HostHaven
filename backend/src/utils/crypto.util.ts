@@ -4,16 +4,6 @@ export const generateSecureToken = (bytes: number = 32): string => {
   return crypto.randomBytes(bytes).toString('hex');
 };
 
-export const generateOtp = (length: number = 6): string => {
-  const digits = '0123456789';
-  let otp = '';
-  for (let i = 0; i < length; i++) {
-    const randomIndex = crypto.randomInt(0, digits.length);
-    otp += digits[randomIndex];
-  }
-  return otp;
-};
-
 export const generateSlug = (text: string): string => {
   return text
     .toLowerCase()

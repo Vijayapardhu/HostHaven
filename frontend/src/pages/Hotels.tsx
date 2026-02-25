@@ -1,104 +1,80 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Star, MapPin, Search } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import WishlistButton from "@/components/WishlistButton";
+import api from "@/lib/api";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Hotel {
   id: string;
   name: string;
-  location: string;
-  price: number;
+  city: string;
+  basePrice: number;
   rating: number;
-  reviews: number;
-  image: string;
+  reviewCount: number;
+  images: Array<string | { url?: string; isPrimary?: boolean }>;
   amenities: string[];
-  roomTypes: string[];
 }
 
-const hotels: Hotel[] = [
-  {
-    id: "1",
-    name: "Hotel Minerva Grand",
-    location: "Vijayawada",
-    price: 6500,
-    rating: 4.7,
-    reviews: 256,
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
-    amenities: ["Pool", "Restaurant", "WiFi", "Gym"],
-    roomTypes: ["Deluxe", "Suite", "Premium"],
-  },
-  {
-    id: "2",
-    name: "Fortune Murali Park",
-    location: "Vijayawada",
-    price: 7200,
-    rating: 4.8,
-    reviews: 312,
-    image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800",
-    amenities: ["Pool", "Spa", "Restaurant", "WiFi"],
-    roomTypes: ["Standard", "Deluxe", "Suite"],
-  },
-  {
-    id: "3",
-    name: "Sri Sai Residency",
-    location: "Nandyala",
-    price: 3200,
-    rating: 4.5,
-    reviews: 145,
-    image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800",
-    amenities: ["Restaurant", "WiFi", "Parking"],
-    roomTypes: ["Standard", "Deluxe"],
-  },
-  {
-    id: "4",
-    name: "Hotel Raj Mahal",
-    location: "Nandyala",
-    price: 2800,
-    rating: 4.3,
-    reviews: 98,
-    image: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800",
-    amenities: ["Restaurant", "WiFi", "AC"],
-    roomTypes: ["Standard", "Deluxe"],
-  },
-  {
-    id: "5",
-    name: "Beach View Resort",
-    location: "Vetapalem",
-    price: 4800,
-    rating: 4.6,
-    reviews: 178,
-    image: "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800",
-    amenities: ["Beach Access", "Restaurant", "WiFi"],
-    roomTypes: ["Sea View", "Deluxe", "Suite"],
-  },
-  {
-    id: "6",
-    name: "Coastal Inn",
-    location: "Vetapalem",
-    price: 3500,
-    rating: 4.4,
-    reviews: 89,
-    image: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800",
-    amenities: ["Beach Nearby", "Restaurant", "Parking"],
-    roomTypes: ["Standard", "Deluxe"],
-  },
-];
-
 const Hotels = () => {
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sortBy, setSortBy] = useState("popularity");
 
-  const locations = ["all", ...new Set(hotels.map((h) => h.location))];
+  useEffect(() => {
+    const fetchHotels = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await api.properties.getAll({
+          type: "HOTEL",
+          page: page.toString(),
+          limit: "12",
+          search: searchQuery || undefined,
+          city: selectedLocation !== "all" ? selectedLocation : undefined,
+          sortBy: sortBy === "newest" ? "createdAt" : sortBy,
+        });
+        setHotels(result.properties || []);
+        setTotalPages(result.meta?.totalPages || 1);
+      } catch (err: any) {
+        setError(err?.message || "Failed to load hotels");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const filteredHotels = hotels.filter((hotel) => {
-    const matchesSearch = hotel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      hotel.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesLocation = selectedLocation === "all" || hotel.location === selectedLocation;
-    return matchesSearch && matchesLocation;
-  });
+    fetchHotels();
+  }, [page, searchQuery, selectedLocation, sortBy]);
+
+  const locations = useMemo(() => {
+    const uniqueCities = new Set(hotels.map((hotel) => hotel.city));
+    return ["all", ...Array.from(uniqueCities)];
+  }, [hotels]);
+
+  const filteredHotels = useMemo(() => hotels, [hotels]);
+
+  const getHotelImage = (images: Hotel["images"]) => {
+    if (!images?.length) return "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800";
+    const primary = images.find((image) => typeof image !== "string" && image.isPrimary);
+    const selected = primary || images[0];
+    if (typeof selected === "string") return selected;
+    return selected.url || "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800";
+  };
 
   return (
     <Layout>
@@ -123,15 +99,35 @@ const Hotels = () => {
                   type="text"
                   placeholder="Search hotels..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setPage(1);
+                    setSearchQuery(e.target.value);
+                  }}
                   className="pl-10 h-12 bg-muted border-0 rounded-xl"
                 />
               </div>
               <div className="flex gap-2 flex-wrap">
+                <select
+                  value={sortBy}
+                  onChange={(event) => {
+                    setPage(1);
+                    setSortBy(event.target.value);
+                  }}
+                  className="h-12 rounded-xl bg-muted px-3 text-sm text-muted-foreground"
+                >
+                  <option value="popularity">Most booked</option>
+                  <option value="rating">Top rated</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                  <option value="newest">Newest</option>
+                </select>
                 {locations.map((loc) => (
                   <button
                     key={loc}
-                    onClick={() => setSelectedLocation(loc)}
+                    onClick={() => {
+                      setPage(1);
+                      setSelectedLocation(loc);
+                    }}
                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                       selectedLocation === loc
                         ? "gradient-gold text-primary-foreground shadow-gold"
@@ -146,71 +142,126 @@ const Hotels = () => {
           </div>
 
           {/* Hotels Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredHotels.map((hotel) => (
-              <Link
-                key={hotel.id}
-                to={`/hotels/${hotel.id}`}
-                className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
-              >
-                <div className="relative h-52 overflow-hidden">
-                  <img
-                    src={hotel.image}
-                    alt={hotel.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <WishlistButton
-                    variant="card"
-                    item={{
-                      id: hotel.id,
-                      type: "hotel",
-                      name: hotel.name,
-                      location: hotel.location,
-                      image: hotel.image,
-                      price: hotel.price,
-                      rating: hotel.rating,
-                    }}
-                  />
-                  <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
-                    <Star className="w-4 h-4 text-primary fill-primary" />
-                    <span className="text-sm font-medium">{hotel.rating}</span>
-                    <span className="text-xs text-muted-foreground">({hotel.reviews})</span>
-                  </div>
-                </div>
-                <div className="p-5">
-                  <h3 className="font-serif font-semibold text-xl text-foreground group-hover:text-primary transition-colors">
-                    {hotel.name}
-                  </h3>
-                  <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
-                    <MapPin className="w-4 h-4" />
-                    {hotel.location}
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {hotel.amenities.slice(0, 3).map((amenity) => (
-                      <span
-                        key={amenity}
-                        className="px-2 py-1 bg-muted rounded-lg text-xs text-muted-foreground"
-                      >
-                        {amenity}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Starting from</p>
-                      <p className="text-xl font-semibold text-foreground">
-                        ₹{hotel.price.toLocaleString()}
-                        <span className="text-muted-foreground font-normal text-sm">/night</span>
-                      </p>
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground">Loading hotels...</div>
+          ) : error ? (
+            <div className="py-12 text-center">
+              <p className="text-lg font-semibold">Unable to load hotels</p>
+              <p className="text-sm text-muted-foreground mt-2">{error}</p>
+            </div>
+          ) : filteredHotels.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">No hotels match your filters.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredHotels.map((hotel) => {
+                const image = getHotelImage(hotel.images);
+                return (
+                  <Link
+                    key={hotel.id}
+                    to={`/hotels/${hotel.id}`}
+                    className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
+                  >
+                    <div className="relative h-52 overflow-hidden">
+                      <img
+                        src={image}
+                        alt={hotel.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      <WishlistButton
+                        variant="card"
+                        item={{
+                          id: hotel.id,
+                          type: "hotel",
+                          name: hotel.name,
+                          location: hotel.city,
+                          image: image,
+                          price: hotel.basePrice,
+                          rating: hotel.rating,
+                        }}
+                      />
+                      <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                        <Star className="w-4 h-4 text-primary fill-primary" />
+                        <span className="text-sm font-medium">{hotel.rating}</span>
+                        <span className="text-xs text-muted-foreground">({hotel.reviewCount})</span>
+                      </div>
                     </div>
-                    <Button variant="gold" size="sm">
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                    <div className="p-5">
+                      <h3 className="font-serif font-semibold text-xl text-foreground group-hover:text-primary transition-colors">
+                        {hotel.name}
+                      </h3>
+                      <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
+                        <MapPin className="w-4 h-4" />
+                        {hotel.city}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {hotel.amenities.slice(0, 3).map((amenity) => (
+                          <span
+                            key={amenity}
+                            className="px-2 py-1 bg-muted rounded-lg text-xs text-muted-foreground"
+                          >
+                            {amenity}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Starting from</p>
+                          <p className="text-xl font-semibold text-foreground">
+                            ₹{hotel.basePrice.toLocaleString()}
+                            <span className="text-muted-foreground font-normal text-sm">/night</span>
+                          </p>
+                        </div>
+                        <Button variant="gold" size="sm">
+                          View Details
+                        </Button>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {!isLoading && !error && totalPages > 1 ? (
+            <div className="mt-8">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.max(1, prev - 1));
+                      }}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                    <PaginationItem key={pageNumber}>
+                      <PaginationLink
+                        href="#"
+                        isActive={page === pageNumber}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setPage(pageNumber);
+                        }}
+                      >
+                        {pageNumber}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.min(totalPages, prev + 1));
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          ) : null}
         </div>
       </div>
     </Layout>

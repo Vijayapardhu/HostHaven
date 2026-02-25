@@ -5,8 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import api from "@/lib/api";
+import { notificationsService } from "@/lib/notifications";
 import { useToast } from "@/hooks/use-toast";
+import LoadingState from "@/components/states/LoadingState";
+import EmptyState from "@/components/states/EmptyState";
+import ErrorState from "@/components/states/ErrorState";
 
 interface Notification {
   id: string;
@@ -22,6 +25,7 @@ const VendorNotifications = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState("all");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -30,15 +34,17 @@ const VendorNotifications = () => {
 
   const fetchNotifications = async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       const params: Record<string, string> = {};
       if (filter === "unread") params.isRead = "false";
-      const response = await api.vendor.getNotifications(params);
+      const response = await notificationsService.getNotifications(params);
       setNotifications(response || []);
       const meta = response?.meta || {};
       setUnreadCount(meta?.unreadCount || 0);
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
+      setErrorMessage("Failed to load notifications. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +52,7 @@ const VendorNotifications = () => {
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await api.vendor.markNotificationRead(id);
+      await notificationsService.markRead(id);
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
       setUnreadCount((prev) => Math.max(0, prev - 1));
       toast({ title: "Notification marked as read" });
@@ -57,7 +63,7 @@ const VendorNotifications = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await api.vendor.markAllNotificationsRead();
+      await notificationsService.markAllRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
       toast({ title: "All notifications marked as read" });
@@ -118,7 +124,14 @@ const VendorNotifications = () => {
       <Card className="border-0 shadow-lg">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+            <LoadingState className="p-8" message="Loading notifications..." />
+          ) : errorMessage ? (
+            <ErrorState
+              className="p-8"
+              title="Unable to load notifications"
+              description={errorMessage}
+              onRetry={fetchNotifications}
+            />
           ) : notifications.length > 0 ? (
             <div className="divide-y">
               {notifications.map((notification, index) => (
@@ -139,11 +152,12 @@ const VendorNotifications = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <Bell className="w-12 h-12 text-muted mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Notifications</h3>
-              <p className="text-muted-foreground">{filter === "unread" ? "You have read all your notifications" : "You don't have any notifications yet"}</p>
-            </div>
+            <EmptyState
+              className="py-12"
+              icon={<Bell className="w-12 h-12 text-muted" />}
+              title="No Notifications"
+              description={filter === "unread" ? "You have read all your notifications" : "You don't have any notifications yet"}
+            />
           )}
         </CardContent>
       </Card>

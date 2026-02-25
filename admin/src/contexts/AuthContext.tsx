@@ -1,10 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { authService } from '../lib/auth'
 
 interface Admin {
   id: string
   email: string
   name: string
-  role: 'ADMIN'
+  role: 'ADMIN' | 'admin'
   isVerified: boolean
 }
 
@@ -24,14 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
-    if (token) {
+    const adminData = localStorage.getItem('admin_data')
+    if (token && adminData) {
       try {
-        const adminData = localStorage.getItem('admin_data')
-        if (adminData) {
-          setAdmin(JSON.parse(adminData))
-        }
-      } catch (error) {
-        console.error('Failed to parse admin data', error)
+        setAdmin(JSON.parse(adminData))
+      } catch {
         localStorage.removeItem('admin_token')
         localStorage.removeItem('admin_data')
       }
@@ -40,20 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
+    const data = await authService.login({ email, password })
 
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.message || 'Invalid credentials')
-    }
-
-    const data = await response.json()
-
-    if (data.user.role !== 'ADMIN') {
+    if (String(data.user.role).toLowerCase() !== 'admin') {
       throw new Error('Access denied. Admin accounts only.')
     }
 
@@ -63,16 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    localStorage.removeItem('admin_token')
-    localStorage.removeItem('admin_data')
+    authService.logout()
     setAdmin(null)
   }
+
+  const isAuthenticated = useMemo(() => {
+    const token = localStorage.getItem('admin_token')
+    return Boolean(token && admin)
+  }, [admin])
 
   return (
     <AuthContext.Provider
       value={{
         admin,
-        isAuthenticated: !!admin,
+        isAuthenticated,
         isLoading,
         login,
         logout,

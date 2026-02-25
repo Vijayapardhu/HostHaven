@@ -1,333 +1,285 @@
-import { useEffect, useState } from 'react'
-import { Search, DollarSign, CreditCard, RefreshCw, CheckCircle, Clock, Banknote, TrendingUp } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { paymentsService, type Payment, type Payout } from '../lib/payments'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface Transaction {
-  id: string
-  type: 'booking_payment' | 'refund' | 'payout'
-  bookingId?: string
-  vendorName?: string
-  userName?: string
-  amount: number
-  commission: number
-  status: 'completed' | 'pending' | 'failed'
-  paymentMethod: string
-  createdAt: string
-}
-
-interface Payout {
-  id: string
-  vendorName: string
-  amount: number
-  status: 'pending' | 'processing' | 'paid'
-  bankDetails: string
-  createdAt: string
-}
+type Tab = 'payments' | 'payouts'
 
 export default function Payments() {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [activeTab, setActiveTab] = useState<Tab>('payments')
+  const [payments, setPayments] = useState<Payment[]>([])
   const [payouts, setPayouts] = useState<Payout[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'transactions' | 'payouts'>('transactions')
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmRefund, setConfirmRefund] = useState<{ paymentId: string } | null>(null)
+
+  const fetchPayments = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await paymentsService.getPayments({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+      })
+      setPayments(data.data ?? data.payments ?? [])
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load payments.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchPayouts = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await paymentsService.getPayouts({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+      })
+      setPayouts(data.data ?? data.payouts ?? [])
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load payouts.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        
-        const [transactionsRes, payoutsRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/admin/transactions`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          }),
-          fetch(`${import.meta.env.VITE_API_URL}/admin/payouts`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-        ])
-
-        if (transactionsRes.ok) {
-          const data = await transactionsRes.json()
-          setTransactions(data.transactions || [])
-        } else {
-          setTransactions([
-            { id: 'TXN001', type: 'booking_payment', bookingId: 'BK001', userName: 'Rahul Sharma', amount: 25000, commission: 2500, status: 'completed', paymentMethod: 'Razorpay', createdAt: '2024-03-15' },
-            { id: 'TXN002', type: 'booking_payment', bookingId: 'BK002', userName: 'Priya Patel', amount: 40000, commission: 4000, status: 'completed', paymentMethod: 'Razorpay', createdAt: '2024-03-16' },
-            { id: 'TXN003', type: 'refund', bookingId: 'BK003', userName: 'Amit Kumar', amount: 7500, commission: 0, status: 'completed', paymentMethod: 'Razorpay', createdAt: '2024-03-17' },
-            { id: 'TXN004', type: 'booking_payment', bookingId: 'BK004', userName: 'Sneha Gupta', amount: 15000, commission: 1500, status: 'pending', paymentMethod: 'Razorpay', createdAt: '2024-03-18' },
-          ])
-        }
-
-        if (payoutsRes.ok) {
-          const data = await payoutsRes.json()
-          setPayouts(data.payouts || [])
-        } else {
-          setPayouts([
-            { id: 'P001', vendorName: 'John Doe', amount: 50000, status: 'paid', bankDetails: 'HDFC Bank ****1234', createdAt: '2024-03-10' },
-            { id: 'P002', vendorName: 'Sarah Smith', amount: 35000, status: 'pending', bankDetails: 'ICICI Bank ****5678', createdAt: '2024-03-15' },
-            { id: 'P003', vendorName: 'Mike Johnson', amount: 20000, status: 'processing', bankDetails: 'SBI Bank ****9012', createdAt: '2024-03-18' },
-          ])
-        }
-      } catch (error) {
-        setTransactions([
-          { id: 'TXN001', type: 'booking_payment', bookingId: 'BK001', userName: 'Rahul Sharma', amount: 25000, commission: 2500, status: 'completed', paymentMethod: 'Razorpay', createdAt: '2024-03-15' },
-          { id: 'TXN002', type: 'booking_payment', bookingId: 'BK002', userName: 'Priya Patel', amount: 40000, commission: 4000, status: 'completed', paymentMethod: 'Razorpay', createdAt: '2024-03-16' },
-          { id: 'TXN003', type: 'refund', bookingId: 'BK003', userName: 'Amit Kumar', amount: 7500, commission: 0, status: 'completed', paymentMethod: 'Razorpay', createdAt: '2024-03-17' },
-          { id: 'TXN004', type: 'booking_payment', bookingId: 'BK004', userName: 'Sneha Gupta', amount: 15000, commission: 1500, status: 'pending', paymentMethod: 'Razorpay', createdAt: '2024-03-18' },
-        ])
-        setPayouts([
-          { id: 'P001', vendorName: 'John Doe', amount: 50000, status: 'paid', bankDetails: 'HDFC Bank ****1234', createdAt: '2024-03-10' },
-          { id: 'P002', vendorName: 'Sarah Smith', amount: 35000, status: 'pending', bankDetails: 'ICICI Bank ****5678', createdAt: '2024-03-15' },
-          { id: 'P003', vendorName: 'Mike Johnson', amount: 20000, status: 'processing', bankDetails: 'SBI Bank ****9012', createdAt: '2024-03-18' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
+    if (activeTab === 'payments') {
+      fetchPayments()
+    } else {
+      fetchPayouts()
     }
+  }, [activeTab, page, pageSize, searchTerm])
 
-    fetchData()
-  }, [])
-
-  const filteredTransactions = transactions.filter(txn =>
-    txn.userName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    txn.vendorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    txn.id.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const filteredPayouts = payouts.filter(payout =>
-    payout.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    payout.id.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const handleMarkAsPaid = async (payoutId: string) => {
+  const confirmRefundAction = async () => {
+    if (!confirmRefund) return
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/payouts/${payoutId}/mark-paid`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      setPayouts(payouts.map(p => p.id === payoutId ? { ...p, status: 'paid' } : p))
-    } catch (error) {
-      console.error('Failed to mark payout as paid')
+      await paymentsService.refundPayment(confirmRefund.paymentId, 'Admin initiated')
+      setPayments((prev) =>
+        prev.map((payment) =>
+          payment.id === confirmRefund.paymentId ? { ...payment, status: 'refunded' } : payment
+        )
+      )
+      toast.success('Refund processed successfully.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to process refund.')
+    } finally {
+      setConfirmRefund(null)
     }
   }
 
-  const totalRevenue = transactions.filter(t => t.type === 'booking_payment' && t.status === 'completed').reduce((sum, t) => sum + t.commission, 0)
-  const totalRefunds = transactions.filter(t => t.type === 'refund' && t.status === 'completed').reduce((sum, t) => sum + t.amount, 0)
-  const pendingPayouts = payouts.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0)
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
+  const hasFilters = useMemo(() => searchTerm.length > 0, [searchTerm])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
-        <p className="text-gray-600 mt-1">Manage transactions and payouts</p>
+      <PageHeader
+        title="Payments"
+        description="Track transactions, refunds, and vendor payouts."
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('payments')
+            setPage(1)
+          }}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            activeTab === 'payments'
+              ? 'bg-slate-900 text-white'
+              : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          Payments
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('payouts')
+            setPage(1)
+          }}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            activeTab === 'payouts'
+              ? 'bg-slate-900 text-white'
+              : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          Payouts
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">₹{totalRevenue.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <RefreshCw className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Refunds</p>
-              <p className="text-2xl font-bold text-gray-900">₹{totalRefunds.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <Clock className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Pending Payouts</p>
-              <p className="text-2xl font-bold text-gray-900">₹{pendingPayouts.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <FiltersBar>
+        <SearchInput
+          placeholder={`Search ${activeTab}`}
+          value={searchTerm}
+          onChange={(event) => {
+            setPage(1)
+            setSearchTerm(event.target.value)
+          }}
+        />
+      </FiltersBar>
 
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="border-b">
-          <div className="flex gap-4 p-4">
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title={`Unable to load ${activeTab}`}
+          description={error}
+          action={
             <button
-              onClick={() => setActiveTab('transactions')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'transactions'
-                  ? 'bg-primary text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
+              type="button"
+              onClick={activeTab === 'payments' ? fetchPayments : fetchPayouts}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              Transactions
+              Retry
             </button>
-            <button
-              onClick={() => setActiveTab('payouts')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'payouts'
-                  ? 'bg-primary text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Payouts
-            </button>
-          </div>
-        </div>
+          }
+        />
+      ) : activeTab === 'payments' ? (
+        payments.length === 0 ? (
+          <EmptyState
+            title={hasFilters ? 'No payments match your search' : 'No payments yet'}
+            description={hasFilters ? 'Try adjusting your search.' : 'Payments will appear here.'}
+          />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Transaction</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map((payment) => (
+                <TableRow key={payment.id}>
+                  <TableCell>
+                    <div>
+                      <p className="font-semibold text-slate-900">{payment.transactionId}</p>
+                      <p className="text-xs text-slate-500">Booking {payment.bookingId || payment.serviceBookingId || '—'}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm font-semibold text-slate-900">₹{payment.amount.toLocaleString()}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-slate-600">{payment.method}</span>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge
+                      label={payment.status}
+                      variant={payment.status === 'completed' ? 'success' : payment.status === 'pending' ? 'warning' : payment.status === 'refunded' ? 'neutral' : 'danger'}
+                      className="capitalize"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-slate-600">{new Date(payment.createdAt).toLocaleDateString()}</span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {payment.status === 'completed' ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRefund({ paymentId: payment.id })}
+                        className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                      >
+                        Refund
+                      </button>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )
+      ) : payouts.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No payouts match your search' : 'No payouts yet'}
+          description={hasFilters ? 'Try adjusting your search.' : 'Payouts will appear here.'}
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Payout</TableHead>
+              <TableHead>Vendor</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {payouts.map((payout) => (
+              <TableRow key={payout.id}>
+                <TableCell>
+                  <p className="font-semibold text-slate-900">{payout.referenceId || payout.id}</p>
+                </TableCell>
+                <TableCell>
+                  <p className="text-sm text-slate-700">{payout.vendorName}</p>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-semibold text-slate-900">₹{payout.amount.toLocaleString()}</span>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge
+                    label={payout.status}
+                    variant={payout.status === 'completed' ? 'success' : payout.status === 'processing' ? 'info' : payout.status === 'failed' ? 'danger' : 'warning'}
+                    className="capitalize"
+                  />
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-600">{new Date(payout.createdAt).toLocaleDateString()}</span>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-        <div className="p-4 border-b">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder={`Search ${activeTab}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-          </div>
-        </div>
+      {!isLoading && !error && (activeTab === 'payments' ? payments.length > 0 : payouts.length > 0) ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
 
-        {activeTab === 'transactions' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User/Vendor</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commission</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredTransactions.map((txn) => (
-                  <tr key={txn.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-sm text-gray-900">#{txn.id}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        txn.type === 'booking_payment' 
-                          ? 'bg-green-100 text-green-700'
-                          : txn.type === 'refund'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {txn.type.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-900">
-                      {txn.userName || txn.vendorName || '-'}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      ₹{txn.amount.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      ₹{txn.commission.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        txn.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : txn.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {txn.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(txn.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {activeTab === 'payouts' && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payout ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank Details</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredPayouts.map((payout) => (
-                  <tr key={payout.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-sm text-gray-900">#{payout.id}</span>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {payout.vendorName}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      ₹{payout.amount.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {payout.bankDetails}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        payout.status === 'paid'
-                          ? 'bg-green-100 text-green-700'
-                          : payout.status === 'processing'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {payout.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(payout.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {payout.status === 'pending' && (
-                        <button
-                          onClick={() => handleMarkAsPaid(payout.id)}
-                          className="text-sm text-primary hover:underline font-medium"
-                        >
-                          Mark as Paid
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <ConfirmDialog
+        open={Boolean(confirmRefund)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmRefund(null)
+        }}
+        title="Process refund?"
+        description="This will trigger a Razorpay refund for the payment."
+        confirmText="Process refund"
+        variant="danger"
+        onConfirm={confirmRefundAction}
+      />
     </div>
   )
 }

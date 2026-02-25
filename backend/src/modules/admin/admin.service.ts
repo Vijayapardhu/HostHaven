@@ -2,8 +2,73 @@ import prisma from '../../config/database';
 import { logger } from '../../utils/logger.util';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
+import type { PlatformSettingsInput } from './admin-settings.schema';
 
 export class AdminService {
+  async getPlatformSettings() {
+    const settings = await prisma.platformSetting.findFirst();
+
+    if (!settings) {
+      const created = await prisma.platformSetting.create({
+        data: {
+          platformName: 'HostHaven',
+          commissionRate: new Prisma.Decimal(15),
+          supportEmail: 'support@hosthaven.com',
+          supportPhone: '+91 1800 123 4567',
+          emailNotifications: true,
+          pushNotifications: true,
+          minPayoutAmount: new Prisma.Decimal(1000),
+          payoutFrequency: 'WEEKLY',
+          emailTemplates: [],
+          featureFlags: [],
+        },
+      });
+
+      return {
+        ...created,
+        commissionRate: created.commissionRate.toNumber(),
+        minPayoutAmount: created.minPayoutAmount.toNumber(),
+      };
+    }
+
+    return {
+      ...settings,
+      commissionRate: settings.commissionRate.toNumber(),
+      minPayoutAmount: settings.minPayoutAmount.toNumber(),
+    };
+  }
+
+  async updatePlatformSettings(data: PlatformSettingsInput) {
+    const existing = await prisma.platformSetting.findFirst();
+
+    const payload = {
+      platformName: data.platformName,
+      commissionRate: new Prisma.Decimal(data.commissionRate),
+      supportEmail: data.supportEmail,
+      supportPhone: data.supportPhone,
+      emailNotifications: data.emailNotifications,
+      pushNotifications: data.pushNotifications,
+      minPayoutAmount: new Prisma.Decimal(data.minPayoutAmount),
+      payoutFrequency: data.payoutFrequency,
+      emailTemplates: data.emailTemplates ?? [],
+      featureFlags: data.featureFlags ?? [],
+    };
+
+    const updated = existing
+      ? await prisma.platformSetting.update({
+          where: { id: existing.id },
+          data: payload,
+        })
+      : await prisma.platformSetting.create({ data: payload });
+
+    logger.info({ settingsId: updated.id }, 'Platform settings updated');
+
+    return {
+      ...updated,
+      commissionRate: updated.commissionRate.toNumber(),
+      minPayoutAmount: updated.minPayoutAmount.toNumber(),
+    };
+  }
   async getDashboard() {
     const [
       totalUsers,
@@ -15,7 +80,7 @@ export class AdminService {
       pendingProperties,
     ] = await Promise.all([
       prisma.user.count(),
-      prisma.property.count({ where: { status: 'ACTIVE' } }),
+      prisma.property.count(),
       prisma.booking.count(),
       prisma.payment.aggregate({
         where: { status: 'COMPLETED' },
@@ -453,7 +518,6 @@ export class AdminService {
         where: { id: booking.payment.id },
         data: {
           status: 'REFUNDED',
-          refundAmount: new Prisma.Decimal(refundAmount),
           refundedAt: new Date(),
         },
       }),
@@ -461,9 +525,16 @@ export class AdminService {
         where: { id: bookingId },
         data: {
           status: 'REFUNDED',
-          refundAmount: new Prisma.Decimal(refundAmount),
           cancellationReason: reason,
           cancelledAt: new Date(),
+        },
+      }),
+      prisma.refund.create({
+        data: {
+          paymentId: booking.payment.id,
+          amount: new Prisma.Decimal(refundAmount),
+          reason,
+          status: 'processed',
         },
       }),
     ]);
@@ -472,7 +543,6 @@ export class AdminService {
 
     return {
       bookingId,
-      refundAmount,
       message: 'Refund marked successfully',
     };
   }
@@ -528,6 +598,110 @@ export class AdminService {
       totalRooms: updated.totalRooms,
       availableRooms: updated.availableRooms,
       message: 'Inventory updated',
+    };
+  }
+
+  async getAnalytics(range: '7d' | '30d' | '3m') {
+    const daysMap = { '7d': 7, '30d': 30, '3m': 90 } as const;
+    const days = daysMap[range] ?? 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const [totalUsers, totalProperties, totalBookings, totalRevenue] = await Promise.all([
+      prisma.user.count(),
+      prisma.property.count({ where: { status: 'ACTIVE' } }),
+      prisma.booking.count({ where: { createdAt: { gte: startDate } } }),
+      prisma.payment.aggregate({
+        where: { status: 'COMPLETED', createdAt: { gte: startDate } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const months: { month: string; start: Date; end: Date }[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      months.push({
+        month: date.toLocaleString('en-US', { month: 'short' }),
+        start: date,
+        end,
+      });
+    }
+
+    const bookingsByMonth = await Promise.all(
+      months.map(async (month) => {
+        const count = await prisma.booking.count({
+          where: { createdAt: { gte: month.start, lte: month.end } },
+        });
+        return { month: month.month, count };
+      })
+    );
+
+    const revenueByMonth = await Promise.all(
+      months.map(async (month) => {
+        const revenue = await prisma.payment.aggregate({
+          where: { status: 'COMPLETED', createdAt: { gte: month.start, lte: month.end } },
+          _sum: { amount: true },
+        });
+        return { month: month.month, amount: revenue._sum.amount?.toNumber() || 0 };
+      })
+    );
+
+    const topPropertiesRaw = await prisma.property.findMany({
+      where: { status: 'ACTIVE' },
+      take: 5,
+      orderBy: { bookingCount: 'desc' },
+      select: {
+        name: true,
+        bookingCount: true,
+        bookings: {
+          select: {
+            totalAmount: true,
+          },
+        },
+      },
+    });
+
+    const topProperties = topPropertiesRaw.map((property) => ({
+      name: property.name,
+      bookings: property.bookingCount,
+      revenue: property.bookings.reduce((sum, booking) => sum + booking.totalAmount.toNumber(), 0),
+    }));
+
+    const previousStart = new Date(startDate);
+    previousStart.setDate(previousStart.getDate() - days);
+    const previousEnd = new Date(startDate);
+
+    const [prevUsers, prevProperties, prevBookings, prevRevenue] = await Promise.all([
+      prisma.user.count({ where: { createdAt: { gte: previousStart, lte: previousEnd } } }),
+      prisma.property.count({ where: { createdAt: { gte: previousStart, lte: previousEnd } } }),
+      prisma.booking.count({ where: { createdAt: { gte: previousStart, lte: previousEnd } } }),
+      prisma.payment.aggregate({
+        where: { status: 'COMPLETED', createdAt: { gte: previousStart, lte: previousEnd } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const prevRevenueAmount = prevRevenue._sum.amount?.toNumber() || 0;
+
+    const growth = (current: number, previous: number) => {
+      if (previous === 0) return current === 0 ? 0 : 100;
+      return Number((((current - previous) / previous) * 100).toFixed(1));
+    };
+
+    return {
+      totalUsers,
+      userGrowth: growth(totalUsers, prevUsers),
+      totalProperties,
+      propertyGrowth: growth(totalProperties, prevProperties),
+      totalBookings,
+      bookingGrowth: growth(totalBookings, prevBookings),
+      totalRevenue: totalRevenue._sum.amount?.toNumber() || 0,
+      revenueGrowth: growth(totalRevenue._sum.amount?.toNumber() || 0, prevRevenueAmount),
+      bookingsByMonth,
+      revenueByMonth,
+      topProperties,
     };
   }
 }

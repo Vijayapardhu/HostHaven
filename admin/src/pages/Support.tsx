@@ -1,236 +1,254 @@
-import { useEffect, useState } from 'react'
-import { Search, User, MessageSquare, Phone, Mail, Clock, CheckCircle, AlertCircle, MoreVertical } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { supportService, type SupportTicket } from '../lib/support'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface Ticket {
-  id: string
-  userName: string
-  userEmail: string
-  category: string
-  subject: string
-  message: string
-  bookingReference?: string
-  status: 'open' | 'in_progress' | 'resolved'
-  priority: 'low' | 'medium' | 'high'
-  createdAt: string
+type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+
+const statusLabels: Record<TicketStatus, string> = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  resolved: 'Resolved',
+  closed: 'Closed',
+}
+
+const statusVariants: Record<TicketStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
+  open: 'danger',
+  in_progress: 'info',
+  resolved: 'success',
+  closed: 'neutral',
 }
 
 export default function Support() {
-  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | TicketStatus>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [noteInputs, setNoteInputs] = useState<Record<string, string>>({})
+  const [confirmClose, setConfirmClose] = useState<string | null>(null)
+
+  const fetchTickets = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await supportService.getTickets({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      })
+      setTickets(data.data ?? data.tickets ?? [])
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load tickets.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchTickets = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/support/tickets`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setTickets(data.tickets || [])
-        } else {
-          setTickets([
-            { id: 'TKT001', userName: 'Rahul Sharma', userEmail: 'rahul@example.com', category: 'Booking Issue', subject: 'Unable to modify booking', message: 'I tried to modify my booking but the website is not allowing me to do so.', bookingReference: 'BK001', status: 'open', priority: 'high', createdAt: '2024-03-18' },
-            { id: 'TKT002', userName: 'Priya Patel', userEmail: 'priya@example.com', category: 'Payment', subject: 'Payment failed but amount deducted', message: 'My payment failed but the amount was deducted from my account.', bookingReference: 'BK002', status: 'in_progress', priority: 'high', createdAt: '2024-03-17' },
-            { id: 'TKT003', userName: 'Amit Kumar', userEmail: 'amit@example.com', category: 'General Inquiry', subject: 'Question about cancellation policy', message: 'What is the cancellation policy for hotels?', status: 'resolved', priority: 'low', createdAt: '2024-03-15' },
-            { id: 'TKT004', userName: 'Sneha Gupta', userEmail: 'sneha@example.com', category: 'Property Issue', subject: 'Property not as described', message: 'The property was not as shown in the pictures. Very disappointed.', bookingReference: 'BK004', status: 'open', priority: 'medium', createdAt: '2024-03-16' },
-          ])
-        }
-      } catch (error) {
-        setTickets([
-          { id: 'TKT001', userName: 'Rahul Sharma', userEmail: 'rahul@example.com', category: 'Booking Issue', subject: 'Unable to modify booking', message: 'I tried to modify my booking but the website is not allowing me to do so.', bookingReference: 'BK001', status: 'open', priority: 'high', createdAt: '2024-03-18' },
-          { id: 'TKT002', userName: 'Priya Patel', userEmail: 'priya@example.com', category: 'Payment', subject: 'Payment failed but amount deducted', message: 'My payment failed but the amount was deducted from my account.', bookingReference: 'BK002', status: 'in_progress', priority: 'high', createdAt: '2024-03-17' },
-          { id: 'TKT003', userName: 'Amit Kumar', userEmail: 'amit@example.com', category: 'General Inquiry', subject: 'Question about cancellation policy', message: 'What is the cancellation policy for hotels?', status: 'resolved', priority: 'low', createdAt: '2024-03-15' },
-          { id: 'TKT004', userName: 'Sneha Gupta', userEmail: 'sneha@example.com', category: 'Property Issue', subject: 'Property not as described', message: 'The property was not as shown in the pictures. Very disappointed.', bookingReference: 'BK004', status: 'open', priority: 'medium', createdAt: '2024-03-16' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchTickets()
-  }, [])
+  }, [page, pageSize, searchTerm, statusFilter])
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
-  const handleStatusChange = async (ticketId: string, newStatus: 'open' | 'in_progress' | 'resolved') => {
+  const handleStatusChange = async (ticketId: string, status: TicketStatus) => {
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/support/tickets/${ticketId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-      setTickets(tickets.map(t => t.id === ticketId ? { ...t, status: newStatus } : t))
-    } catch (error) {
-      console.error('Failed to update ticket status')
+      await supportService.updateTicketStatus(ticketId, status)
+      setTickets((prev) => prev.map((ticket) => (ticket.id === ticketId ? { ...ticket, status } : ticket)))
+      toast.success('Ticket status updated.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update ticket.')
     }
   }
 
-  const openCount = tickets.filter(t => t.status === 'open').length
-  const inProgressCount = tickets.filter(t => t.status === 'in_progress').length
-  const resolvedCount = tickets.filter(t => t.status === 'resolved').length
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
+  const addNote = async (ticketId: string) => {
+    const content = noteInputs[ticketId]
+    if (!content) return
+    try {
+      await supportService.addNote(ticketId, { content })
+      setNoteInputs((prev) => ({ ...prev, [ticketId]: '' }))
+      toast.success('Note added.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to add note.')
+    }
   }
+
+  const confirmCloseAction = async () => {
+    if (!confirmClose) return
+    try {
+      await supportService.closeTicket(confirmClose)
+      setTickets((prev) => prev.map((ticket) => (ticket.id === confirmClose ? { ...ticket, status: 'closed' } : ticket)))
+      toast.success('Ticket closed.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to close ticket.')
+    } finally {
+      setConfirmClose(null)
+    }
+  }
+
+  const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Support</h1>
-        <p className="text-gray-600 mt-1">Manage customer support tickets</p>
-      </div>
+      <PageHeader
+        title="Support"
+        description="Manage support tickets, update status, and add notes."
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Open Tickets</p>
-              <p className="text-2xl font-bold text-gray-900">{openCount}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Clock className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">In Progress</p>
-              <p className="text-2xl font-bold text-gray-900">{inProgressCount}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Resolved</p>
-              <p className="text-2xl font-bold text-gray-900">{resolvedCount}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search tickets..."
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by ticket number, subject, or email"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => {
+                setPage(1)
+                setSearchTerm(event.target.value)
+              }}
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value as 'all' | TicketStatus)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
-            <option value="all">All Status</option>
+            <option value="all">All status</option>
             <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
             <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
           </select>
         </div>
+      </FiltersBar>
 
-        <div className="divide-y divide-gray-200">
-          {filteredTickets.map((ticket) => (
-            <div key={ticket.id} className="p-6 hover:bg-gray-50">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm text-gray-500">#{ticket.id}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      ticket.priority === 'high'
-                        ? 'bg-red-100 text-red-700'
-                        : ticket.priority === 'medium'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {ticket.priority}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      ticket.status === 'open'
-                        ? 'bg-red-100 text-red-700'
-                        : ticket.status === 'in_progress'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}>
-                      {ticket.status.replace('_', ' ')}
-                    </span>
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load tickets"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchTickets}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : tickets.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No tickets match your filters' : 'No tickets yet'}
+          description={hasFilters ? 'Try adjusting your search or status filter.' : 'Support tickets will appear here.'}
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ticket</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Priority</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tickets.map((ticket) => (
+              <TableRow key={ticket.id}>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{ticket.ticketNumber || ticket.id}</p>
+                    <p className="text-xs text-slate-500">{ticket.subject}</p>
+                    <p className="text-xs text-slate-400">{ticket.email}</p>
                   </div>
-                  <h3 className="font-semibold text-gray-900 mt-2">{ticket.subject}</h3>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <User className="w-4 h-4" />
-                      {ticket.userName}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Mail className="w-4 h-4" />
-                      {ticket.userEmail}
-                    </span>
-                    <span className="text-gray-400">|</span>
-                    <span>{ticket.category}</span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-600">{ticket.category}</span>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge
+                    label={ticket.priority}
+                    variant={ticket.priority === 'high' ? 'danger' : ticket.priority === 'medium' ? 'warning' : 'neutral'}
+                    className="capitalize"
+                  />
+                </TableCell>
+                <TableCell>
+                  <StatusBadge label={statusLabels[ticket.status]} variant={statusVariants[ticket.status]} />
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-600">
+                    {new Date(ticket.createdAt).toLocaleDateString()}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <select
+                      value={ticket.status}
+                      onChange={(event) => handleStatusChange(ticket.id, event.target.value as TicketStatus)}
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                    >
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                    {ticket.status !== 'closed' ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmClose(ticket.id)}
+                        className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                      >
+                        Close
+                      </button>
+                    ) : null}
                   </div>
-                  <p className="mt-3 text-gray-700">{ticket.message}</p>
-                  {ticket.bookingReference && (
-                    <p className="mt-2 text-sm text-gray-500">
-                      Booking Reference: <span className="font-mono">{ticket.bookingReference}</span>
-                    </p>
-                  )}
-                  <p className="mt-2 text-sm text-gray-500">
-                    Created: {new Date(ticket.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <select
-                    value={ticket.status}
-                    onChange={(e) => handleStatusChange(ticket.id, e.target.value as typeof ticket.status)}
-                    className="text-sm border border-gray-300 rounded px-3 py-2"
-                  >
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-        {filteredTickets.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No tickets found
-          </div>
-        )}
-      </div>
+      {!isLoading && !error && tickets.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmClose)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmClose(null)
+        }}
+        title="Close this ticket?"
+        description="This will mark the ticket as closed."
+        confirmText="Close ticket"
+        variant="danger"
+        onConfirm={confirmCloseAction}
+      />
     </div>
   )
 }

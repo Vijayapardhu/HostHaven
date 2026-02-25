@@ -34,8 +34,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import api from "@/lib/api";
+import { vendorService } from "@/lib/vendor";
 import { useToast } from "@/hooks/use-toast";
+import LoadingState from "@/components/states/LoadingState";
+import EmptyState from "@/components/states/EmptyState";
+import ErrorState from "@/components/states/ErrorState";
 
 interface Property {
   id: string;
@@ -63,6 +66,7 @@ const VendorProperties = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -86,11 +90,13 @@ const VendorProperties = () => {
   }, []);
 
   const fetchProperties = async () => {
+    setErrorMessage(null);
     try {
-      const response = await api.vendor.getProperties();
+      const response = await vendorService.getProperties();
       setProperties(response.properties || []);
     } catch (error) {
       console.error("Failed to fetch properties:", error);
+      setErrorMessage("Failed to load hotel properties. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +124,7 @@ const VendorProperties = () => {
     try {
       const uploadedImages = await Promise.all(
         Array.from(files).map(async (file) => {
-          const result = await api.vendor.uploadImage(file, "hosthaven/properties");
+          const result = await vendorService.uploadImage(file, "hosthaven/properties");
           return {
             url: result.url,
             alt: file.name,
@@ -157,7 +163,7 @@ const VendorProperties = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.vendor.createProperty({
+      await vendorService.createProperty({
         ...formData,
         latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
         longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
@@ -203,7 +209,7 @@ const VendorProperties = () => {
     if (!confirm("Are you sure you want to delete this hotel?")) return;
 
     try {
-      await api.vendor.deleteProperty(id);
+      await vendorService.deleteProperty(id);
       toast({
         title: "Hotel deleted",
         description: "Hotel has been deleted successfully",
@@ -249,17 +255,16 @@ const VendorProperties = () => {
   };
 
   if (isLoading) {
+    return <LoadingState message="Loading hotels..." />;
+  }
+
+  if (errorMessage) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-48 mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-80 bg-muted rounded-2xl"></div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <ErrorState
+        title="Unable to load hotels"
+        description={errorMessage}
+        onRetry={fetchProperties}
+      />
     );
   }
 
@@ -453,6 +458,8 @@ const VendorProperties = () => {
                         <button
                           type="button"
                           onClick={() => handleRemoveImage(index)}
+                          aria-label="Remove image"
+                          title="Remove image"
                           className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="w-4 h-4" />
@@ -554,12 +561,13 @@ const VendorProperties = () => {
         </div>
       ) : (
         <Card className="border-0 shadow-lg">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Building2 className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No Hotels Yet</h3>
-            <p className="text-muted-foreground text-center mb-6">
-              Start by adding your first hotel to list on HostHaven
-            </p>
+          <CardContent className="py-16">
+            <EmptyState
+              icon={<Building2 className="w-16 h-16 text-muted-foreground" />}
+              title="No Hotels Yet"
+              description="Start by adding your first hotel to list on HostHaven"
+              className="mb-6"
+            />
             <Button onClick={() => setIsCreateOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add Your First Hotel

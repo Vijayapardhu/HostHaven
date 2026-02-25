@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { motion } from "framer-motion";
 import { Star, Search, Filter, MessageCircle, ThumbsUp, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import api from "@/lib/api";
+import { reviewsService } from "@/lib/reviews";
+import { vendorService } from "@/lib/vendor";
 
 interface Review {
   id: string;
@@ -31,12 +33,12 @@ const VendorReviews = () => {
   const fetchReviews = async () => {
     setIsLoading(true);
     try {
-      const properties = await api.vendor.getProperties();
+      const properties = await vendorService.getProperties();
       if (properties.properties && properties.properties.length > 0) {
         const allReviews: Review[] = [];
         for (const prop of properties.properties) {
           try {
-            const revs = await api.vendor.getReviews(prop.id);
+            const revs = await reviewsService.getReviewsByProperty(prop.id);
             if (revs && Array.isArray(revs)) {
               allReviews.push(...revs.map((r: any) => ({ ...r, property: { id: prop.id, name: prop.name } })));
             }
@@ -88,9 +90,12 @@ const VendorReviews = () => {
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">5 Stars</p>
             <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500" style={{ width: `${(reviews.filter(r => r.rating === 5).length / (reviews.length || 1)) * 100}%` }} />
-              </div>
+              <ProgressBar
+                value={reviews.filter(r => r.rating === 5).length}
+                max={reviews.length || 1}
+                className="flex-1"
+                barClassName="bg-amber-500"
+              />
               <span className="text-sm">{reviews.filter(r => r.rating === 5).length}</span>
             </div>
           </CardContent>
@@ -99,9 +104,12 @@ const VendorReviews = () => {
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">1-2 Stars</p>
             <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-red-500" style={{ width: `${(reviews.filter(r => r.rating <= 2).length / (reviews.length || 1)) * 100}%` }} />
-              </div>
+              <ProgressBar
+                value={reviews.filter(r => r.rating <= 2).length}
+                max={reviews.length || 1}
+                className="flex-1"
+                barClassName="bg-red-500"
+              />
               <span className="text-sm">{reviews.filter(r => r.rating <= 2).length}</span>
             </div>
           </CardContent>

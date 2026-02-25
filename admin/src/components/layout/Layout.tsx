@@ -1,6 +1,7 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
+import logo from '@/assets/logo.png'
 import {
   LayoutDashboard,
   Users,
@@ -43,7 +44,7 @@ const navigation = [
   { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { admin, logout } = useAuth()
@@ -73,10 +74,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">HH</span>
-              </div>
-              <span className="font-bold text-lg">HostHaven</span>
+              <img src={logo} alt="HostHaven" className="h-8 w-auto" />
             </Link>
             <button 
               onClick={() => setSidebarOpen(false)}
@@ -155,7 +153,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Page content */}
         <main className="p-4 lg:p-8">
-          {children}
+          <Outlet />
         </main>
       </div>
     </div>

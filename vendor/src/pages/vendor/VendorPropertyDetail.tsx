@@ -46,7 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { vendorService } from "@/lib/vendor";
 import { useToast } from "@/hooks/use-toast";
 
 interface PropertyDetail {
@@ -117,7 +117,7 @@ const VendorPropertyDetail = () => {
 
   const fetchProperty = async () => {
     try {
-      const response = await api.vendor.getPropertyById(id!);
+      const response = await vendorService.getPropertyById(id!);
       setProperty(response.property);
       setFormData({
         name: response.property.name,
@@ -155,7 +155,7 @@ const VendorPropertyDetail = () => {
     try {
       const uploadedImages = await Promise.all(
         Array.from(files).map(async (file) => {
-          const result = await api.vendor.uploadImage(file, "hosthaven/properties");
+          const result = await vendorService.uploadImage(file, "hosthaven/properties");
           return { url: result.url, alt: file.name, isPrimary: false };
         })
       );
@@ -183,7 +183,7 @@ const VendorPropertyDetail = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await api.vendor.updateProperty(id!, {
+      await vendorService.updateProperty(id!, {
         ...formData,
         basePrice: parseFloat(formData.basePrice),
       });
@@ -282,7 +282,10 @@ const VendorPropertyDetail = () => {
                     <div key={index} className="relative group rounded-lg overflow-hidden aspect-video">
                       <img src={img.url} alt={img.alt} className="w-full h-full object-cover" />
                       <button
+                        type="button"
                         onClick={() => handleRemoveImage(index)}
+                        aria-label="Remove image"
+                        title="Remove image"
                         className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X className="w-4 h-4" />

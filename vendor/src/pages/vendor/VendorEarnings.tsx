@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   DollarSign,
@@ -27,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface Payout {
@@ -43,6 +43,7 @@ interface Payout {
 }
 
 const VendorEarnings = () => {
+  const navigate = useNavigate();
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState("30");
@@ -97,6 +98,7 @@ const VendorEarnings = () => {
           <p className="text-muted-foreground mt-1">Track your revenue and payouts</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate("/vendor/earnings/payout-history")}>Payout History</Button>
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger className="w-[150px]">
               <SelectValue />

@@ -1,255 +1,226 @@
-import { useEffect, useState } from 'react'
-import { TrendingUp, Users, Building2, Calendar, DollarSign, ArrowUp, ArrowDown } from 'lucide-react'
-
-interface AnalyticsData {
-  totalUsers: number
-  userGrowth: number
-  totalProperties: number
-  propertyGrowth: number
-  totalBookings: number
-  bookingGrowth: number
-  totalRevenue: number
-  revenueGrowth: number
-  bookingsByMonth: { month: string; count: number }[]
-  revenueByMonth: { month: string; amount: number }[]
-  topProperties: { name: string; bookings: number; revenue: number }[]
-}
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, Building2, Calendar, DollarSign, TrendingUp, Users } from 'lucide-react'
+import { analyticsService, type AnalyticsData } from '../lib/analytics'
+import { PageHeader } from '../components/ui/PageHeader'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageLoader } from '../components/ui/PageLoader'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
 
 export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '3m'>('30d')
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/analytics?range=${timeRange}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const result = await response.json()
-          setData(result)
-        } else {
-          setData({
-            totalUsers: 2543,
-            userGrowth: 12.5,
-            totalProperties: 458,
-            propertyGrowth: 8.2,
-            totalBookings: 1234,
-            bookingGrowth: 24.3,
-            totalRevenue: 1245600,
-            revenueGrowth: 18.7,
-            bookingsByMonth: [
-              { month: 'Jan', count: 180 },
-              { month: 'Feb', count: 220 },
-              { month: 'Mar', count: 280 },
-              { month: 'Apr', count: 320 },
-              { month: 'May', count: 290 },
-              { month: 'Jun', count: 350 },
-            ],
-            revenueByMonth: [
-              { month: 'Jan', amount: 180000 },
-              { month: 'Feb', amount: 220000 },
-              { month: 'Mar', amount: 280000 },
-              { month: 'Apr', amount: 320000 },
-              { month: 'May', amount: 290000 },
-              { month: 'Jun', amount: 350000 },
-            ],
-            topProperties: [
-              { name: 'Grand Palace Hotel', bookings: 120, revenue: 600000 },
-              { name: 'Beach Resort Goa', bookings: 85, revenue: 425000 },
-              { name: 'Mountain View Resort', bookings: 65, revenue: 195000 },
-            ]
-          })
-        }
-      } catch (error) {
-        setData({
-          totalUsers: 2543,
-          userGrowth: 12.5,
-          totalProperties: 458,
-          propertyGrowth: 8.2,
-          totalBookings: 1234,
-          bookingGrowth: 24.3,
-          totalRevenue: 1245600,
-          revenueGrowth: 18.7,
-          bookingsByMonth: [
-            { month: 'Jan', count: 180 },
-            { month: 'Feb', count: 220 },
-            { month: 'Mar', count: 280 },
-            { month: 'Apr', count: 320 },
-            { month: 'May', count: 290 },
-            { month: 'Jun', count: 350 },
-          ],
-          revenueByMonth: [
-            { month: 'Jan', amount: 180000 },
-            { month: 'Feb', amount: 220000 },
-            { month: 'Mar', amount: 280000 },
-            { month: 'Apr', amount: 320000 },
-            { month: 'May', amount: 290000 },
-            { month: 'Jun', amount: 350000 },
-          ],
-          topProperties: [
-            { name: 'Grand Palace Hotel', bookings: 120, revenue: 600000 },
-            { name: 'Beach Resort Goa', bookings: 85, revenue: 425000 },
-            { name: 'Mountain View Resort', bookings: 65, revenue: 195000 },
-          ]
-        })
-      } finally {
-        setIsLoading(false)
-      }
+  const fetchAnalytics = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const result = await analyticsService.getAnalytics(timeRange)
+      setData(result)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load analytics.')
+      setData(null)
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchAnalytics()
   }, [timeRange])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  if (!data) return null
-
-  const stats = [
-    {
-      name: 'Total Users',
-      value: data.totalUsers.toLocaleString(),
-      growth: data.userGrowth,
-      icon: Users,
-      color: 'bg-blue-500',
-    },
-    {
-      name: 'Total Properties',
-      value: data.totalProperties.toLocaleString(),
-      growth: data.propertyGrowth,
-      icon: Building2,
-      color: 'bg-green-500',
-    },
-    {
-      name: 'Total Bookings',
-      value: data.totalBookings.toLocaleString(),
-      growth: data.bookingGrowth,
-      icon: Calendar,
-      color: 'bg-yellow-500',
-    },
-    {
-      name: 'Total Revenue',
-      value: `₹${(data.totalRevenue / 100000).toFixed(2)}L`,
-      growth: data.revenueGrowth,
-      icon: DollarSign,
-      color: 'bg-purple-500',
-    },
-  ]
+  const stats = useMemo(() => {
+    if (!data) return []
+    return [
+      {
+        name: 'Total Users',
+        value: data.totalUsers.toLocaleString(),
+        growth: data.userGrowth,
+        icon: Users,
+        color: 'bg-blue-500',
+      },
+      {
+        name: 'Total Properties',
+        value: data.totalProperties.toLocaleString(),
+        growth: data.propertyGrowth,
+        icon: Building2,
+        color: 'bg-emerald-500',
+      },
+      {
+        name: 'Total Bookings',
+        value: data.totalBookings.toLocaleString(),
+        growth: data.bookingGrowth,
+        icon: Calendar,
+        color: 'bg-amber-500',
+      },
+      {
+        name: 'Total Revenue',
+        value: `₹${data.totalRevenue.toLocaleString()}`,
+        growth: data.revenueGrowth,
+        icon: DollarSign,
+        color: 'bg-purple-500',
+      },
+    ]
+  }, [data])
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-600 mt-1">Platform performance insights</p>
-        </div>
-        <select
-          value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value as typeof timeRange)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-        >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="3m">Last 3 months</option>
-        </select>
-      </div>
+      <PageHeader
+        title="Analytics"
+        description="Track platform performance across bookings and revenue."
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => {
-          const Icon = stat.icon
-          const isPositive = stat.growth > 0
-          return (
-            <div key={stat.name} className="bg-white rounded-xl p-6 shadow-sm border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                  <div className={`flex items-center gap-1 mt-1 text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                    {isPositive ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-                    {Math.abs(stat.growth)}%
-                  </div>
-                </div>
-                <div className={`${stat.color} p-3 rounded-lg`}>
-                  <Icon className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Bookings Trend</h2>
-          <div className="h-64 flex items-end justify-between gap-2">
-            {data.bookingsByMonth.map((item) => (
-              <div key={item.month} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full bg-primary rounded-t"
-                  style={{ height: `${(item.count / 400) * 100}%` }}
-                />
-                <span className="text-xs text-gray-500">{item.month}</span>
-              </div>
-            ))}
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <TrendingUp className="h-4 w-4" />
+            Updated based on selected time range.
           </div>
+          <select
+            value={timeRange}
+            onChange={(event) => setTimeRange(event.target.value as '7d' | '30d' | '3m')}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+          >
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="3m">Last 3 months</option>
+          </select>
         </div>
+      </FiltersBar>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Revenue Trend</h2>
-          <div className="h-64 flex items-end justify-between gap-2">
-            {data.revenueByMonth.map((item) => (
-              <div key={item.month} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full bg-green-500 rounded-t"
-                  style={{ height: `${(item.amount / 400000) * 100}%` }}
-                />
-                <span className="text-xs text-gray-500">{item.month}</span>
-              </div>
-            ))}
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load analytics"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchAnalytics}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : !data ? (
+        <EmptyState
+          title="No analytics data"
+          description="Analytics will appear once bookings and revenue are recorded."
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => {
+              const Icon = stat.icon
+              const isPositive = stat.growth >= 0
+              return (
+                <Card key={stat.name}>
+                  <CardContent className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-500">{stat.name}</p>
+                      <p className="mt-2 text-2xl font-semibold text-slate-900">{stat.value}</p>
+                      <div className={`mt-1 flex items-center gap-1 text-sm ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {isPositive ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                        {Math.abs(stat.growth)}%
+                      </div>
+                    </div>
+                    <div className={`${stat.color} rounded-xl p-3 text-white`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-xl p-6 shadow-sm border">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Performing Properties</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bookings</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {data.topProperties.map((property, index) => (
-                <tr key={property.name}>
-                  <td className="px-4 py-3">
-                    <span className="flex items-center justify-center w-8 h-8 bg-primary/10 rounded-full text-primary font-medium">
-                      {index + 1}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{property.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{property.bookings}</td>
-                  <td className="px-4 py-3 font-medium text-green-600">₹{property.revenue.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bookings trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex h-64 items-end justify-between gap-2">
+                  {data.bookingsByMonth.map((item) => (
+                    <div key={item.month} className="flex-1">
+                      <div
+                        className="w-full rounded-t-lg bg-slate-900"
+                        style={{
+                          height: `${Math.max(
+                            8,
+                            (item.count / Math.max(...data.bookingsByMonth.map((b) => b.count), 1)) * 100
+                          )}%`,
+                        }}
+                      />
+                      <p className="mt-2 text-center text-xs text-slate-500">{item.month}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex h-64 items-end justify-between gap-2">
+                  {data.revenueByMonth.map((item) => (
+                    <div key={item.month} className="flex-1">
+                      <div
+                        className="w-full rounded-t-lg bg-emerald-500"
+                        style={{
+                          height: `${Math.max(
+                            8,
+                            (item.amount / Math.max(...data.revenueByMonth.map((r) => r.amount), 1)) * 100
+                          )}%`,
+                        }}
+                      />
+                      <p className="mt-2 text-center text-xs text-slate-500">{item.month}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Top performing properties</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rank</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Bookings</TableHead>
+                    <TableHead>Revenue</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.topProperties.map((property, index) => (
+                    <TableRow key={`${property.name}-${index}`}>
+                      <TableCell>
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
+                          {index + 1}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-semibold text-slate-900">{property.name}</TableCell>
+                      <TableCell>{property.bookings}</TableCell>
+                      <TableCell className="font-semibold text-emerald-600">₹{property.revenue.toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

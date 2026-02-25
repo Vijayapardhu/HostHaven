@@ -31,8 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { supportService } from "@/lib/support";
 import { useToast } from "@/hooks/use-toast";
+import LoadingState from "@/components/states/LoadingState";
+import EmptyState from "@/components/states/EmptyState";
+import ErrorState from "@/components/states/ErrorState";
 
 interface Ticket {
   id: string;
@@ -54,6 +57,7 @@ const VendorSupport = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [newTicket, setNewTicket] = useState({
@@ -69,6 +73,7 @@ const VendorSupport = () => {
 
   const fetchTickets = async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       const params: Record<string, string> = {
         page: currentPage.toString(),
@@ -77,11 +82,12 @@ const VendorSupport = () => {
       if (statusFilter !== "all") {
         params.status = statusFilter;
       }
-      const response = await api.support.getMy(params);
+      const response = await supportService.getMyTickets(params);
       setTickets(response.tickets || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (error) {
       console.error("Failed to fetch tickets:", error);
+      setErrorMessage("Failed to retrieve support tickets. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +96,7 @@ const VendorSupport = () => {
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.support.create({
+      await supportService.createTicket({
         category: newTicket.category,
         message: newTicket.message,
         bookingReference: newTicket.bookingReference || undefined,
@@ -287,9 +293,14 @@ const VendorSupport = () => {
       <Card className="border-0 shadow-lg">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-            </div>
+            <LoadingState className="p-8" message="Loading support tickets..." />
+          ) : errorMessage ? (
+            <ErrorState
+              className="p-8"
+              title="Unable to load support tickets"
+              description={errorMessage}
+              onRetry={fetchTickets}
+            />
           ) : filteredTickets.length > 0 ? (
             <div className="divide-y">
               {filteredTickets.map((ticket, index) => (
@@ -318,10 +329,12 @@ const VendorSupport = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <Headphones className="w-12 h-12 text-muted mx-auto mb-4" />
-              <p className="text-muted-foreground">No support tickets found</p>
-            </div>
+            <EmptyState
+              className="py-12"
+              icon={<Headphones className="w-12 h-12 text-muted" />}
+              title="No support tickets found"
+              description="Create a ticket to contact support."
+            />
           )}
 
           {totalPages > 1 && (

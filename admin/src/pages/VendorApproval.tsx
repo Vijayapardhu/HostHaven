@@ -1,196 +1,200 @@
-import { useEffect, useState } from 'react'
-import { Search, Building2, MapPin, Phone, Mail, CheckCircle, XCircle, Eye, FileText } from 'lucide-react'
-
-interface VendorApproval {
-  id: string
-  name: string
-  email: string
-  phone: string
-  propertyName: string
-  propertyType: string
-  location: string
-  description: string
-  rooms: number
-  priceRange: string
-  documents: string[]
-  submittedAt: string
-}
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { vendorsService, type Vendor } from '../lib/vendors'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
 export default function VendorApproval() {
-  const [vendors, setVendors] = useState<VendorApproval[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmAction, setConfirmAction] = useState<{
+    vendorId: string
+    action: 'approve' | 'reject'
+  } | null>(null)
 
-  useEffect(() => {
-    const fetchPendingVendors = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/vendors?status=pending`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setVendors(data.vendors || [])
-        } else {
-          setVendors([
-            { id: '1', name: 'Rajesh Kumar', email: 'rajesh@hotel.com', phone: '+91 9876543210', propertyName: 'Royal Palace Hotel', propertyType: 'Hotel', location: 'Jaipur, RJ', description: 'Luxury 5-star hotel in the heart of Jaipur', rooms: 50, priceRange: '₹5,000 - ₹15,000', documents: ['Aadhar Card', 'PAN Card', 'Property Deed'], submittedAt: '2024-03-10' },
-            { id: '2', name: 'Anita Desai', email: 'anita@villa.com', phone: '+91 9876543211', propertyName: 'Sunset Beach Villa', propertyType: 'Villa', location: 'Goa, GA', description: 'Beachfront villa with private pool', rooms: 6, priceRange: '₹10,000 - ₹25,000', documents: ['Aadhar Card', 'PAN Card'], submittedAt: '2024-03-12' },
-            { id: '3', name: 'Vikram Singh', email: 'vikram@resort.com', phone: '+91 9876543212', propertyName: 'Mountain View Resort', propertyType: 'Resort', location: 'Manali, HP', description: 'Hill station resort with scenic views', rooms: 25, priceRange: '₹3,000 - ₹8,000', documents: ['Aadhar Card', 'PAN Card', 'Business License'], submittedAt: '2024-03-15' },
-          ])
-        }
-      } catch (error) {
-        setVendors([
-          { id: '1', name: 'Rajesh Kumar', email: 'rajesh@hotel.com', phone: '+91 9876543210', propertyName: 'Royal Palace Hotel', propertyType: 'Hotel', location: 'Jaipur, RJ', description: 'Luxury 5-star hotel in the heart of Jaipur', rooms: 50, priceRange: '₹5,000 - ₹15,000', documents: ['Aadhar Card', 'PAN Card', 'Property Deed'], submittedAt: '2024-03-10' },
-          { id: '2', name: 'Anita Desai', email: 'anita@villa.com', phone: '+91 9876543211', propertyName: 'Sunset Beach Villa', propertyType: 'Villa', location: 'Goa, GA', description: 'Beachfront villa with private pool', rooms: 6, priceRange: '₹10,000 - ₹25,000', documents: ['Aadhar Card', 'PAN Card'], submittedAt: '2024-03-12' },
-          { id: '3', name: 'Vikram Singh', email: 'vikram@resort.com', phone: '+91 9876543212', propertyName: 'Mountain View Resort', propertyType: 'Resort', location: 'Manali, HP', description: 'Hill station resort with scenic views', rooms: 25, priceRange: '₹3,000 - ₹8,000', documents: ['Aadhar Card', 'PAN Card', 'Business License'], submittedAt: '2024-03-15' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchPendingVendors()
-  }, [])
-
-  const filteredVendors = vendors.filter(vendor =>
-    vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.propertyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vendor.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const handleApproval = async (vendorId: string, action: 'approve' | 'reject') => {
+  const fetchPendingVendors = async () => {
+    setIsLoading(true)
+    setError(null)
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/vendors/${vendorId}/${action}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      setVendors(vendors.filter(v => v.id !== vendorId))
-    } catch (error) {
-      console.error(`Failed to ${action} vendor`)
+      const data = await vendorsService.getPendingVendors({ page, limit: pageSize })
+      setVendors(data.data ?? data.vendors ?? [])
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load pending vendors.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
+  useEffect(() => {
+    fetchPendingVendors()
+  }, [page, pageSize])
+
+  const filteredVendors = useMemo(() => {
+    const query = searchTerm.toLowerCase()
+    if (!query) return vendors
+    return vendors.filter((vendor) =>
+      [vendor.email, vendor.phone, vendor.businessName].some((value) =>
+        String(value).toLowerCase().includes(query)
+      )
     )
+  }, [searchTerm, vendors])
+
+  const handleApproval = (vendorId: string, action: 'approve' | 'reject') => {
+    setConfirmAction({ vendorId, action })
+  }
+
+  const confirmApproval = async () => {
+    if (!confirmAction) return
+    try {
+      if (confirmAction.action === 'approve') {
+        await vendorsService.approveVendor(confirmAction.vendorId)
+        toast.success('Vendor approved successfully.')
+      } else {
+        await vendorsService.rejectVendor(confirmAction.vendorId)
+        toast.success('Vendor rejected successfully.')
+      }
+      setVendors((prev) => prev.filter((vendor) => vendor.id !== confirmAction.vendorId))
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update vendor approval.')
+    } finally {
+      setConfirmAction(null)
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Vendor Approval</h1>
-        <p className="text-gray-600 mt-1">Review and approve vendor registrations</p>
-      </div>
+      <PageHeader
+        title="Vendor Approval"
+        description="Review pending vendor registrations and approve or reject them."
+      />
 
-      <div className="bg-white rounded-xl shadow-sm border p-4">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search pending vendors..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
-      </div>
+      <FiltersBar>
+        <SearchInput
+          placeholder="Search pending vendors"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+        />
+      </FiltersBar>
 
-      <div className="grid gap-6">
-        {filteredVendors.map((vendor) => (
-          <div key={vendor.id} className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Building2 className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{vendor.propertyName}</h3>
-                  <p className="text-gray-600">{vendor.propertyType}</p>
-                  <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
-                    <MapPin className="w-4 h-4" />
-                    {vendor.location}
+      {isLoading ? (
+        <PageLoader rows={5} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load approvals"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchPendingVendors}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : filteredVendors.length === 0 ? (
+        <EmptyState
+          title="No pending approvals"
+          description="You are all caught up with vendor applications."
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vendor</TableHead>
+              <TableHead>Business</TableHead>
+              <TableHead>Commission</TableHead>
+              <TableHead>Submitted</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredVendors.map((vendor) => (
+              <TableRow key={vendor.id}>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{vendor.email}</p>
+                    <p className="text-xs text-slate-500">{vendor.phone}</p>
                   </div>
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleApproval(vendor.id, 'reject')}
-                  className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Reject
-                </button>
-                <button
-                  onClick={() => handleApproval(vendor.id, 'approve')}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Approve
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Vendor Name</p>
-                <p className="font-medium text-gray-900">{vendor.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Contact</p>
-                <p className="font-medium text-gray-900">{vendor.phone}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Rooms</p>
-                <p className="font-medium text-gray-900">{vendor.rooms}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Price Range</p>
-                <p className="font-medium text-gray-900">{vendor.priceRange}</p>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">Description</p>
-              <p className="text-gray-900">{vendor.description}</p>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-sm text-gray-500 mb-2">Documents Submitted</p>
-              <div className="flex flex-wrap gap-2">
-                {vendor.documents.map((doc, index) => (
-                  <span key={index} className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-sm">
-                    <FileText className="w-4 h-4" />
-                    {doc}
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{vendor.businessName}</p>
+                    <p className="text-xs text-slate-500">{vendor.businessType}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-medium text-slate-700">{vendor.commissionRate}%</span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-600">
+                    {new Date(vendor.createdAt).toLocaleDateString()}
                   </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t text-sm text-gray-500">
-              Submitted on {new Date(vendor.submittedAt).toLocaleDateString()}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {filteredVendors.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900">All Caught Up!</h3>
-          <p className="text-gray-600">No pending vendor approvals at the moment</p>
-        </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleApproval(vendor.id, 'reject')}
+                      className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApproval(vendor.id, 'approve')}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                    >
+                      Approve
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
+
+      {!isLoading && !error && filteredVendors.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null)
+        }}
+        title={confirmAction?.action === 'approve' ? 'Approve this vendor?' : 'Reject this vendor?'}
+        description={
+          confirmAction?.action === 'approve'
+            ? 'The vendor will go live once approved.'
+            : 'The vendor application will be rejected.'
+        }
+        confirmText={confirmAction?.action === 'approve' ? 'Approve vendor' : 'Reject vendor'}
+        variant={confirmAction?.action === 'approve' ? 'default' : 'danger'}
+        onConfirm={confirmApproval}
+      />
     </div>
   )
 }

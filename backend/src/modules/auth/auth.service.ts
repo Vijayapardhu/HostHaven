@@ -27,8 +27,8 @@ export class AuthService {
   }) {
     const normalizedEmail = data.email.toLowerCase();
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const existingUser = await prisma.user.findFirst({
+      where: { email: normalizedEmail, isDeleted: false },
     });
 
     if (existingUser) {
@@ -48,15 +48,8 @@ export class AuthService {
         email: normalizedEmail,
         passwordHash,
         isVerified: false,
-      },
-    });
-
-    await prisma.otpCode.create({
-      data: {
-        userId: user.id,
-        code: verificationToken,
-        type: 'email_verification',
-        expiresAt: verificationExpires,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpires,
       },
     });
 
@@ -82,8 +75,8 @@ export class AuthService {
   }) {
     const normalizedEmail = data.email.toLowerCase();
 
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
+    const user = await prisma.user.findFirst({
+      where: { email: normalizedEmail, isDeleted: false },
     });
 
     if (!user) {
@@ -341,42 +334,34 @@ export class AuthService {
   // ==========================================
 
   async verifyEmail(token: string) {
-    const otpRecord = await prisma.otpCode.findFirst({
-      where: {
-        code: token,
-        type: 'email_verification',
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
+    const user = await prisma.user.findFirst({
+      where: { isVerified: false, emailVerificationToken: token },
     });
 
-    if (!otpRecord) {
+    if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
       const error = new Error('Invalid or expired verification token');
       (error as any).code = ERROR_CODES.INVALID_TOKEN;
       throw error;
     }
 
     await prisma.user.update({
-      where: { id: otpRecord.userId },
+      where: { id: user.id },
       data: {
         isVerified: true,
         emailVerifiedAt: new Date(),
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
       },
     });
 
-    await prisma.otpCode.update({
-      where: { id: otpRecord.id },
-      data: { isUsed: true },
-    });
-
-    logger.info({ userId: otpRecord.userId }, 'Email verified');
+    logger.info({ userId: user.id }, 'Email verified');
 
     return { message: 'Email verified successfully' };
   }
 
   async resendVerificationEmail(email: string) {
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const user = await prisma.user.findFirst({
+      where: { email: email.toLowerCase(), isDeleted: false },
     });
 
     if (!user) {
@@ -387,20 +372,14 @@ export class AuthService {
       return { message: 'Email is already verified' };
     }
 
-    await prisma.otpCode.updateMany({
-      where: { userId: user.id, type: 'email_verification', isUsed: false },
-      data: { isUsed: true },
-    });
-
     const verificationToken = generateSecureToken(32);
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await prisma.otpCode.create({
+    await prisma.user.update({
+      where: { id: user.id },
       data: {
-        userId: user.id,
-        code: verificationToken,
-        type: 'email_verification',
-        expiresAt: verificationExpires,
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpires,
       },
     });
 
@@ -414,28 +393,22 @@ export class AuthService {
   // ==========================================
 
   async forgotPassword(email: string) {
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const user = await prisma.user.findFirst({
+      where: { email: email.toLowerCase(), isDeleted: false },
     });
 
     if (!user) {
       return { message: 'If the email exists, a password reset link will be sent' };
     }
 
-    await prisma.otpCode.updateMany({
-      where: { userId: user.id, type: 'password_reset', isUsed: false },
-      data: { isUsed: true },
-    });
-
     const resetToken = generateSecureToken(32);
     const resetExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
 
-    await prisma.otpCode.create({
+    await prisma.user.update({
+      where: { id: user.id },
       data: {
-        userId: user.id,
-        code: resetToken,
-        type: 'password_reset',
-        expiresAt: resetExpires,
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
       },
     });
 
@@ -445,16 +418,11 @@ export class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string) {
-    const otpRecord = await prisma.otpCode.findFirst({
-      where: {
-        code: token,
-        type: 'password_reset',
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
+    const user = await prisma.user.findFirst({
+      where: { passwordResetToken: token },
     });
 
-    if (!otpRecord) {
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
       const error = new Error('Invalid or expired reset token');
       (error as any).code = ERROR_CODES.INVALID_TOKEN;
       throw error;
@@ -463,25 +431,22 @@ export class AuthService {
     const passwordHash = await hashPassword(newPassword);
 
     await prisma.user.update({
-      where: { id: otpRecord.userId },
+      where: { id: user.id },
       data: {
         passwordHash,
         lockedUntil: null,
         failedLoginAttempts: 0,
+        passwordResetToken: null,
+        passwordResetExpires: null,
       },
     });
 
-    await prisma.otpCode.update({
-      where: { id: otpRecord.id },
-      data: { isUsed: true },
-    });
-
     await prisma.session.updateMany({
-      where: { userId: otpRecord.userId, isActive: true },
+      where: { userId: user.id, isActive: true },
       data: { isActive: false },
     });
 
-    logger.info({ userId: otpRecord.userId }, 'Password reset');
+    logger.info({ userId: user.id }, 'Password reset');
 
     return { message: 'Password reset successfully' };
   }
@@ -507,6 +472,7 @@ export class AuthService {
         refreshToken,
         ipAddress,
         userAgent,
+        deviceType: userAgent?.includes('Mobile') ? 'mobile' : 'desktop',
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });

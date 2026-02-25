@@ -239,13 +239,20 @@ export class PaymentsService {
             where: { id: payment.id },
             data: {
               status: refundAmount >= payment.amount.toNumber() ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
-              refundAmount: new (prisma as any).Decimal(refundAmount),
               refundedAt: new Date(),
             },
           }),
           prisma.booking.update({
             where: { id: payment.bookingId },
             data: { status: 'REFUNDED' },
+          }),
+          prisma.refund.create({
+            data: {
+              paymentId: payment.id,
+              amount: new (prisma as any).Decimal(refundAmount),
+              status: event === 'refund.processed' ? 'processed' : 'initiated',
+              razorpayRefundId: paymentEntity.id,
+            },
           }),
         ]);
         break;
@@ -274,6 +281,11 @@ export class PaymentsService {
       throw error;
     }
 
+    const refunds = await prisma.refund.findMany({
+      where: { paymentId: payment.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
     return {
       id: payment.id,
       amount: payment.amount.toNumber(),
@@ -283,9 +295,15 @@ export class PaymentsService {
       razorpayOrderId: payment.razorpayOrderId,
       razorpayPaymentId: payment.razorpayPaymentId,
       receiptUrl: payment.receiptUrl,
-      refundAmount: payment.refundAmount?.toNumber?.() || null,
       refundedAt: payment.refundedAt,
       createdAt: payment.createdAt,
+      refunds: refunds.map((refund) => ({
+        id: refund.id,
+        amount: refund.amount.toNumber(),
+        reason: refund.reason,
+        status: refund.status,
+        createdAt: refund.createdAt,
+      })),
       booking: {
         id: payment.booking.id,
         bookingNumber: payment.booking.bookingNumber,

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { hashPassword } from '../../src/utils/hash.util';
 
 const prisma = new PrismaClient();
 
@@ -7,10 +7,15 @@ async function main() {
   console.log('🌱 Starting seed...');
 
   // Create admin user
-  const adminPassword = await bcrypt.hash('Admin@123', 10);
+  const adminPassword = await hashPassword('Admin@123');
   const admin = await prisma.user.upsert({
     where: { email: 'admin@hosthaven.com' },
-    update: {},
+    update: {
+      passwordHash: adminPassword,
+      role: 'ADMIN',
+      isVerified: true,
+      emailVerifiedAt: new Date(),
+    },
     create: {
       email: 'admin@hosthaven.com',
       name: 'Admin User',
@@ -23,10 +28,15 @@ async function main() {
   console.log('✅ Admin user created:', admin.email);
 
   // Create test user
-  const userPassword = await bcrypt.hash('User@123', 10);
+  const userPassword = await hashPassword('User@123');
   const user = await prisma.user.upsert({
     where: { email: 'user@hosthaven.com' },
-    update: {},
+    update: {
+      passwordHash: userPassword,
+      role: 'USER',
+      isVerified: true,
+      emailVerifiedAt: new Date(),
+    },
     create: {
       email: 'user@hosthaven.com',
       name: 'Test User',
@@ -39,10 +49,15 @@ async function main() {
   console.log('✅ Test user created:', user.email);
 
   // Create vendor user
-  const vendorPassword = await bcrypt.hash('Vendor@123', 10);
+  const vendorPassword = await hashPassword('Vendor@123');
   const vendorUser = await prisma.user.upsert({
     where: { email: 'vendor@hosthaven.com' },
-    update: {},
+    update: {
+      passwordHash: vendorPassword,
+      role: 'VENDOR',
+      isVerified: true,
+      emailVerifiedAt: new Date(),
+    },
     create: {
       email: 'vendor@hosthaven.com',
       name: 'Test Vendor',
@@ -77,7 +92,7 @@ async function main() {
       description: 'A luxurious hotel in the heart of Vijayawada with modern amenities and excellent service. Perfect for business and leisure travelers.',
       shortDesc: 'Luxury hotel in Vijayawada',
       address: 'MG Road, Near Benz Circle',
-      city: 'Vijayawada',
+      city: 'VIJAYAWADA',
       state: 'Andhra Pradesh',
       pincode: '520010',
       latitude: 16.5062,
@@ -104,7 +119,7 @@ async function main() {
       description: 'Comfortable stay near Tirumala Temple with easy access to spiritual destinations. Ideal for pilgrims visiting Tirumala.',
       shortDesc: 'Pilgrim-friendly hotel near Tirumala',
       address: 'Tirupati Bazar Road',
-      city: 'Tirupati',
+      city: 'NANDIYALA',
       state: 'Andhra Pradesh',
       pincode: '517501',
       latitude: 13.6288,
@@ -130,7 +145,7 @@ async function main() {
       description: 'A serene homestay on the banks of Krishna River. Experience authentic Andhra hospitality with home-cooked meals.',
       shortDesc: 'Riverside homestay in Vijayawada',
       address: 'Kondaveedu Village',
-      city: 'Vijayawada',
+      city: 'VIJAYAWADA',
       state: 'Andhra Pradesh',
       pincode: '521215',
       latitude: 16.3200,
@@ -156,7 +171,7 @@ async function main() {
       description: 'Comfortable accommodation near the famous Srikalahasti Temple. Perfect for devotees seeking spiritual solace.',
       shortDesc: 'Temple stay near Srikalahasti',
       address: 'Srikalahasti Temple Road',
-      city: 'Srikalahasti',
+      city: 'VETLAPALEM',
       state: 'Andhra Pradesh',
       pincode: '517644',
       latitude: 13.7518,
@@ -182,7 +197,7 @@ async function main() {
       description: 'Sacred accommodation on Indrakeeladri Hill, home to Kanaka Durga Temple. Experience divine bliss with panoramic views.',
       shortDesc: 'Hilltop temple accommodation',
       address: 'Indrakeeladri Hill',
-      city: 'Vijayawada',
+      city: 'VIJAYAWADA',
       state: 'Andhra Pradesh',
       pincode: '520001',
       latitude: 16.5186,
@@ -250,14 +265,9 @@ async function main() {
       },
     ];
 
-    for (const room of rooms) {
-      const createdRoom = await prisma.room.upsert({
-        where: { id: `${property.id}-${room.type}` },
-        update: {},
-        create: room,
-      });
-      console.log('  ✅ Room created:', createdRoom.name);
-    }
+    await prisma.room.deleteMany({ where: { propertyId: property.id } });
+    await prisma.room.createMany({ data: rooms });
+    console.log('  ✅ Rooms created:', rooms.length);
 
     // Create temple details for temple properties
     if (propertyData.type === 'TEMPLE') {

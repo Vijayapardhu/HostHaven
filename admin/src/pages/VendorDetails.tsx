@@ -1,374 +1,290 @@
-import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Building2, Mail, Phone, MapPin, Star, FileText, CreditCard, Shield, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { ArrowLeft, Building2, Mail, Phone, Wallet } from 'lucide-react'
+import { vendorsService, type Vendor } from '../lib/vendors'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { PageLoader } from '../components/ui/PageLoader'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { EmptyState } from '../components/ui/EmptyState'
 
-interface VendorDetail {
-  id: string
-  name: string
-  email: string
-  phone: string
-  propertyName: string
-  propertyType: string
-  location: string
-  description: string
-  rating: number
-  totalBookings: number
-  totalRevenue: number
-  status: 'active' | 'pending' | 'suspended'
-  kycStatus: 'verified' | 'pending' | 'rejected'
-  kycDocuments: {
-    type: string
-    status: 'verified' | 'pending' | 'rejected'
-    uploadedAt: string
-  }[]
-  bankDetails: {
-    bankName: string
-    accountNumber: string
-    ifscCode: string
-    accountType: 'savings' | 'current'
-  }
-  joinedAt: string
-  recentBookings: {
-    id: string
-    userName: string
-    checkIn: string
-    checkOut: string
-    amount: number
-    status: string
-  }[]
-}
+type VendorStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 
 export default function VendorDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [vendor, setVendor] = useState<VendorDetail | null>(null)
+  const [vendor, setVendor] = useState<Vendor | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [commissionRate, setCommissionRate] = useState('')
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<'suspended' | 'approved' | null>(null)
 
-  useEffect(() => {
-    const fetchVendor = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/vendors/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setVendor(data.vendor)
-        } else {
-          setVendor({
-            id: id || '1',
-            name: 'John Doe',
-            email: 'john@hotel.com',
-            phone: '+91 9876543210',
-            propertyName: 'Grand Hotel',
-            propertyType: 'Hotel',
-            location: 'Mumbai, MH',
-            description: 'Luxury 5-star hotel in the heart of Mumbai',
-            rating: 4.5,
-            totalBookings: 120,
-            totalRevenue: 600000,
-            status: 'active',
-            kycStatus: 'verified',
-            kycDocuments: [
-              { type: 'Aadhar Card', status: 'verified', uploadedAt: '2024-01-10' },
-              { type: 'PAN Card', status: 'verified', uploadedAt: '2024-01-10' },
-              { type: 'Property Deed', status: 'verified', uploadedAt: '2024-01-12' },
-            ],
-            bankDetails: {
-              bankName: 'HDFC Bank',
-              accountNumber: '****1234',
-              ifscCode: 'HDFC0001234',
-              accountType: 'savings'
-            },
-            joinedAt: '2024-01-10',
-            recentBookings: [
-              { id: 'BK001', userName: 'Rahul Sharma', checkIn: '2024-03-20', checkOut: '2024-03-25', amount: 25000, status: 'confirmed' },
-              { id: 'BK002', userName: 'Priya Patel', checkIn: '2024-03-22', checkOut: '2024-03-27', amount: 40000, status: 'confirmed' },
-            ]
-          })
-        }
-      } catch (error) {
-        setVendor({
-          id: id || '1',
-          name: 'John Doe',
-          email: 'john@hotel.com',
-          phone: '+91 9876543210',
-          propertyName: 'Grand Hotel',
-          propertyType: 'Hotel',
-          location: 'Mumbai, MH',
-          description: 'Luxury 5-star hotel',
-          rating: 4.5,
-          totalBookings: 120,
-          totalRevenue: 600000,
-          status: 'active',
-          kycStatus: 'verified',
-          kycDocuments: [
-            { type: 'Aadhar Card', status: 'verified', uploadedAt: '2024-01-10' },
-            { type: 'PAN Card', status: 'verified', uploadedAt: '2024-01-10' },
-          ],
-          bankDetails: {
-            bankName: 'HDFC Bank',
-            accountNumber: '****1234',
-            ifscCode: 'HDFC0001234',
-            accountType: 'savings'
-          },
-          joinedAt: '2024-01-10',
-          recentBookings: []
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchVendor()
-  }, [id])
-
-  const handleStatusChange = async (newStatus: 'active' | 'suspended') => {
+  const fetchVendor = async () => {
+    if (!id) return
+    setIsLoading(true)
+    setError(null)
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/vendors/${id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-      if (vendor) setVendor({ ...vendor, status: newStatus })
-    } catch (error) {
-      console.error('Failed to update status')
+      const data = await vendorsService.getVendorById(id)
+      setVendor(data)
+      setCommissionRate(String(data.commissionRate ?? ''))
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load vendor details.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleKycVerification = async (docType: string, action: 'verify' | 'reject') => {
+  useEffect(() => {
+    fetchVendor()
+  }, [id])
+
+  const statusLabel = useMemo(() => {
+    if (!vendor) return ''
+    if (vendor.status === 'approved') return 'Approved'
+    if (vendor.status === 'pending') return 'Pending'
+    if (vendor.status === 'rejected') return 'Rejected'
+    return 'Suspended'
+  }, [vendor])
+
+  const statusVariant = useMemo(() => {
+    if (!vendor) return 'neutral' as const
+    if (vendor.status === 'approved') return 'success' as const
+    if (vendor.status === 'pending') return 'warning' as const
+    if (vendor.status === 'rejected') return 'danger' as const
+    return 'danger' as const
+  }, [vendor])
+
+  const confirmStatusChange = async () => {
+    if (!vendor || !confirmAction) return
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/vendors/${id}/kyc`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ documentType: docType, action })
-      })
-      if (vendor) {
-        setVendor({
-          ...vendor,
-          kycDocuments: vendor.kycDocuments.map(d => 
-            d.type === docType ? { ...d, status: action === 'verify' ? 'verified' : 'rejected' } : d
-          )
-        })
+      if (confirmAction === 'suspended') {
+        await vendorsService.suspendVendor(vendor.id)
+        setVendor({ ...vendor, status: 'suspended' })
+        toast.success('Vendor suspended successfully.')
+      } else {
+        await vendorsService.activateVendor(vendor.id)
+        setVendor({ ...vendor, status: 'approved' })
+        toast.success('Vendor reactivated successfully.')
       }
-    } catch (error) {
-      console.error('Failed to update KYC')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update vendor status.')
+    } finally {
+      setConfirmAction(null)
+    }
+  }
+
+  const handleCommissionSave = async () => {
+    if (!vendor) return
+    const value = Number(commissionRate)
+    if (Number.isNaN(value) || value < 0 || value > 100) {
+      toast.error('Commission rate must be between 0 and 100.')
+      return
+    }
+    setCommissionLoading(true)
+    try {
+      await vendorsService.setCommission(vendor.id, value)
+      setVendor({ ...vendor, commissionRate: value })
+      toast.success('Commission updated successfully.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update commission.')
+    } finally {
+      setCommissionLoading(false)
     }
   }
 
   if (isLoading) {
+    return <PageLoader rows={6} />
+  }
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <EmptyState
+        title="Unable to load vendor"
+        description={error}
+        action={
+          <button
+            type="button"
+            onClick={fetchVendor}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+        }
+      />
     )
   }
 
-  if (!vendor) return <div>Vendor not found</div>
+  if (!vendor) {
+    return <EmptyState title="Vendor not found" description="This vendor record does not exist." />
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/vendors')} className="p-2 hover:bg-gray-100 rounded-lg">
-          <ArrowLeft className="w-5 h-5" />
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/vendors')}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
         </button>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{vendor.propertyName}</h1>
-          <p className="text-gray-600">Vendor Details</p>
-        </div>
+        <PageHeader
+          title={vendor.businessName}
+          description={`Vendor ID: ${vendor.id}`}
+          actions={<StatusBadge label={statusLabel} variant={statusVariant} />}
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Property Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <Building2 className="w-5 h-5 text-gray-400" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Vendor profile</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-sm text-gray-500">Property Name</p>
-                  <p className="font-medium">{vendor.propertyName}</p>
+                  <p className="text-xs font-semibold text-slate-500">Business type</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{vendor.businessType}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Hotel ID</p>
+                  <p className="mt-1 text-sm text-slate-700">{vendor.hotelId || 'Not linked yet'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Email</p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <Mail className="h-4 w-4 text-slate-400" />
+                    {vendor.email}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Phone</p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <Phone className="h-4 w-4 text-slate-400" />
+                    {vendor.phone}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Created</p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {new Date(vendor.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Location</p>
-                  <p className="font-medium">{vendor.location}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Star className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Rating</p>
-                  <p className="font-medium">{vendor.rating} / 5</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Joined</p>
-                  <p className="font-medium">{new Date(vendor.joinedAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="text-sm text-gray-500">Description</p>
-              <p className="mt-1">{vendor.description}</p>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">KYC Documents</h2>
-            <div className="space-y-3">
-              {vendor.kycDocuments.map((doc, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="font-medium">{doc.type}</p>
-                      <p className="text-sm text-gray-500">Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {doc.status === 'verified' ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="w-4 h-4" /> Verified
-                      </span>
-                    ) : doc.status === 'rejected' ? (
-                      <span className="flex items-center gap-1 text-red-600">
-                        <XCircle className="w-4 h-4" /> Rejected
-                      </span>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleKycVerification(doc.type, 'verify')}
-                          className="text-sm text-green-600 hover:underline"
-                        >
-                          Verify
-                        </button>
-                        <button
-                          onClick={() => handleKycVerification(doc.type, 'reject')}
-                          className="text-sm text-red-600 hover:underline"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                  </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Payout details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">UPI ID</p>
+                  <p className="mt-1 text-sm text-slate-700">{vendor.payoutDetails?.upiId || '—'}</p>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Recent Bookings</h2>
-            <div className="space-y-3">
-              {vendor.recentBookings.map((booking) => (
-                <div key={booking.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{booking.userName}</p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(booking.checkIn).toLocaleDateString()} - {new Date(booking.checkOut).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">₹{booking.amount.toLocaleString()}</p>
-                    <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
-                      {booking.status}
-                    </span>
-                  </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Bank account</p>
+                  <p className="mt-1 text-sm text-slate-700">{vendor.payoutDetails?.bankAccount || '—'}</p>
                 </div>
-              ))}
-              {vendor.recentBookings.length === 0 && (
-                <p className="text-gray-500 text-center py-4">No recent bookings</p>
-              )}
-            </div>
-          </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Bank name</p>
+                  <p className="mt-1 text-sm text-slate-700">{vendor.payoutDetails?.bankName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">IFSC</p>
+                  <p className="mt-1 text-sm text-slate-700">{vendor.payoutDetails?.ifsc || '—'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Vendor Info</h2>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-primary" />
+          <Card>
+            <CardHeader>
+              <CardTitle>Commission rate</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={commissionRate}
+                    onChange={(event) => setCommissionRate(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                  />
+                  <span className="absolute right-3 top-2.5 text-sm text-slate-400">%</span>
                 </div>
-                <div>
-                  <p className="font-medium">{vendor.name}</p>
-                  <p className="text-sm text-gray-500">{vendor.propertyType}</p>
+                <button
+                  type="button"
+                  onClick={handleCommissionSave}
+                  disabled={commissionLoading}
+                  className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {commissionLoading ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Commission applies to booking payouts for this vendor.</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {vendor.status === 'approved' ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction('suspended')}
+                    className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    Suspend vendor
+                  </button>
+                ) : vendor.status === 'suspended' ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction('approved')}
+                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
+                  >
+                    Reactivate vendor
+                  </button>
+                ) : null}
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                  <Wallet className="h-4 w-4" />
+                  Commission: {vendor.commissionRate}%
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-gray-400" />
-                <span>{vendor.email}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gray-400" />
-                <span>{vendor.phone}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Stats</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Total Bookings</span>
-                <span className="font-bold">{vendor.totalBookings}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Total Revenue</span>
-                <span className="font-bold text-green-600">₹{vendor.totalRevenue.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Rating</span>
-                <span className="font-bold">{vendor.rating}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Bank Details</h2>
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-500">Bank Name</p>
-                <p className="font-medium">{vendor.bankDetails.bankName}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Account Number</p>
-                <p className="font-medium">{vendor.bankDetails.accountNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">IFSC Code</p>
-                <p className="font-medium">{vendor.bankDetails.ifscCode}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Actions</h2>
-            <select
-              value={vendor.status}
-              onChange={(e) => handleStatusChange(e.target.value as 'active' | 'suspended')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="active">Active</option>
-              <option value="suspended">Suspend</option>
-            </select>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null)
+        }}
+        title={confirmAction === 'suspended' ? 'Suspend this vendor?' : 'Reactivate this vendor?'}
+        description={
+          confirmAction === 'suspended'
+            ? 'The vendor will lose access and listings will be hidden.'
+            : 'The vendor will regain access immediately.'
+        }
+        confirmText={confirmAction === 'suspended' ? 'Suspend vendor' : 'Reactivate vendor'}
+        variant={confirmAction === 'suspended' ? 'danger' : 'default'}
+        onConfirm={confirmStatusChange}
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { logger } from '../../utils/logger.util';
 import { generateBookingNumber } from '../../utils/crypto.util';
+import inventoryService from '../inventory/inventory.service';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
 import notificationsService from '../notifications/notifications.service';
@@ -19,10 +20,15 @@ export class BookingsService {
     guestDetails?: any[];
     userId: string;
   }) {
+    if (data.roomId) {
+      await inventoryService.releaseLock(data.roomId, data.userId);
+    }
     const property = await prisma.property.findUnique({
-      where: { id: data.propertyId },
+      where: { id: data.propertyId, isDeleted: false },
       include: {
-        rooms: data.roomId ? { where: { id: data.roomId } } : true,
+        rooms: data.roomId
+          ? { where: { id: data.roomId, isDeleted: false, isActive: true } }
+          : { where: { isDeleted: false, isActive: true } },
       },
     });
 
@@ -40,21 +46,32 @@ export class BookingsService {
       throw error;
     }
 
-    const overlappingBookings = await prisma.booking.count({
+    const stayDates: Date[] = [];
+    const current = new Date(data.checkInDate);
+    while (current < data.checkOutDate) {
+      stayDates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    const inventoryDays = await prisma.inventoryDay.findMany({
       where: {
-        propertyId: data.propertyId,
         roomId: room.id,
-        status: { in: ['CONFIRMED', 'PENDING'] },
-        OR: [
-          {
-            checkInDate: { lt: data.checkOutDate },
-            checkOutDate: { gt: data.checkInDate },
-          },
-        ],
+        date: { in: stayDates },
       },
     });
 
-    if (overlappingBookings >= room.totalRooms) {
+    const inventoryMap = new Map(
+      inventoryDays.map((day) => [day.date.toISOString().slice(0, 10), day])
+    );
+
+    const hasAvailability = stayDates.every((date) => {
+      const key = date.toISOString().slice(0, 10);
+      const day = inventoryMap.get(key);
+      const available = day ? day.availableRooms : room.totalRooms;
+      return available > 0;
+    });
+
+    if (!hasAvailability) {
       const error = new Error('Room not available for selected dates');
       (error as any).code = ERROR_CODES.ROOM_NOT_AVAILABLE;
       throw error;
@@ -103,6 +120,30 @@ export class BookingsService {
         room: true,
       },
     });
+
+    await prisma.$transaction(
+      stayDates.map((date) =>
+        prisma.inventoryDay.upsert({
+          where: {
+            roomId_date: {
+              roomId: room.id,
+              date,
+            },
+          },
+          update: {
+            availableRooms: {
+              decrement: 1,
+            },
+          },
+          create: {
+            roomId: room.id,
+            date,
+            totalRooms: room.totalRooms,
+            availableRooms: Math.max(room.totalRooms - 1, 0),
+          },
+        })
+      )
+    );
 
     const payment = await prisma.payment.create({
       data: {
@@ -202,6 +243,7 @@ export class BookingsService {
     const booking = await prisma.booking.findFirst({
       where: {
         id,
+        isDeleted: false,
         ...(userId ? { userId } : {}),
       },
       include: {
@@ -243,7 +285,7 @@ export class BookingsService {
     const limit = filters.limit || 10;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.BookingWhereInput = { userId };
+    const where: Prisma.BookingWhereInput = { userId, isDeleted: false };
 
     if (filters.status) {
       where.status = filters.status as any;
@@ -305,8 +347,8 @@ export class BookingsService {
 
   async cancel(id: string, userId: string, reason?: string) {
     const booking = await prisma.booking.findFirst({
-      where: { id, userId },
-      include: { payment: true, property: true },
+      where: { id, userId, isDeleted: false },
+      include: { payment: true, property: true, room: true },
     });
 
     if (!booking) {
@@ -321,10 +363,6 @@ export class BookingsService {
       throw error;
     }
 
-    const refundAmount = booking.payment?.status === 'COMPLETED'
-      ? booking.totalAmount
-      : null;
-
     const updated = await prisma.booking.update({
       where: { id },
       data: {
@@ -332,9 +370,44 @@ export class BookingsService {
         cancelledAt: new Date(),
         cancelledBy: userId,
         cancellationReason: reason,
-        refundAmount,
       },
     });
+
+    if (booking.roomId) {
+      const stayDates: Date[] = [];
+      const current = new Date(booking.checkInDate);
+      while (current < booking.checkOutDate) {
+        stayDates.push(new Date(current));
+        current.setDate(current.getDate() + 1);
+      }
+
+      const room = await prisma.room.findUnique({ where: { id: booking.roomId } });
+      if (room) {
+        await prisma.$transaction(
+          stayDates.map((date) =>
+            prisma.inventoryDay.upsert({
+              where: {
+                roomId_date: {
+                  roomId: booking.roomId as string,
+                  date,
+                },
+              },
+              update: {
+                availableRooms: {
+                  increment: 1,
+                },
+              },
+              create: {
+                roomId: booking.roomId as string,
+                date,
+                totalRooms: room.totalRooms,
+                availableRooms: room.totalRooms,
+              },
+            })
+          )
+        );
+      }
+    }
 
     if (booking.payment?.status === 'COMPLETED') {
       await prisma.payment.update({
@@ -342,7 +415,15 @@ export class BookingsService {
         data: {
           status: 'REFUNDED',
           refundedAt: new Date(),
-          refundAmount: booking.totalAmount,
+        },
+      });
+
+      await prisma.refund.create({
+        data: {
+          paymentId: booking.payment.id,
+          amount: booking.totalAmount,
+          reason,
+          status: 'initiated',
         },
       });
     }
@@ -353,7 +434,6 @@ export class BookingsService {
 
     return {
       booking: this.sanitizeBooking(updated),
-      refundAmount: refundAmount?.toNumber?.() || null,
     };
   }
 
@@ -825,7 +905,6 @@ export class BookingsService {
       user: booking.user,
       cancelledAt: booking.cancelledAt,
       cancellationReason: booking.cancellationReason,
-      refundAmount: booking.refundAmount?.toNumber?.() || booking.refundAmount,
       createdAt: booking.createdAt,
     };
   }

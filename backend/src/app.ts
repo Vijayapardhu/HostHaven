@@ -24,6 +24,7 @@ import notificationsRoutes from './modules/notifications/notifications.routes';
 import serviceBookingsRoutes from './modules/service-bookings/service-bookings.routes';
 import supportRoutes from './modules/support/support.routes';
 import pushRoutes from './modules/push/push.routes';
+import inventoryRoutes from './modules/inventory/inventory.routes';
 
 export const buildApp = async () => {
   const fastify = Fastify({
@@ -158,6 +159,7 @@ export const buildApp = async () => {
   await fastify.register(uploadsRoutes, { prefix: `/${config.app.apiVersion}/uploads` });
   await fastify.register(notificationsRoutes, { prefix: `/${config.app.apiVersion}/notifications` });
   await fastify.register(serviceBookingsRoutes, { prefix: `/${config.app.apiVersion}/services` });
+  await fastify.register(inventoryRoutes, { prefix: `/${config.app.apiVersion}/inventory` });
   await fastify.register(supportRoutes, { prefix: `/${config.app.apiVersion}/support` });
   await fastify.register(pushRoutes, { prefix: `/${config.app.apiVersion}` });
 

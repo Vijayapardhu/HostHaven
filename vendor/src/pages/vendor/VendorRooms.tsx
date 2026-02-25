@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   BedDouble,
@@ -25,8 +26,12 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import api from "@/lib/api";
+import { roomsService } from "@/lib/rooms";
+import { vendorService } from "@/lib/vendor";
 import { useToast } from "@/hooks/use-toast";
+import LoadingState from "@/components/states/LoadingState";
+import EmptyState from "@/components/states/EmptyState";
+import ErrorState from "@/components/states/ErrorState";
 
 interface Room {
   id: string;
@@ -54,12 +59,14 @@ const amenitiesList = [
 ];
 
 const VendorRooms = () => {
+  const navigate = useNavigate();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -81,17 +88,19 @@ const VendorRooms = () => {
 
   const fetchData = async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
-      const props = await api.vendor.getProperties();
+      const props = await vendorService.getProperties();
       setProperties(props.properties || []);
       
       if (props.properties && props.properties.length > 0) {
         setSelectedProperty(props.properties[0].id);
-        const roomsData = await api.vendor.getRooms(props.properties[0].id);
+        const roomsData = await roomsService.getRooms(props.properties[0].id);
         setRooms(roomsData || []);
       }
     } catch (error) {
       console.error("Failed to fetch data:", error);
+      setErrorMessage("Failed to load rooms and properties. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +108,7 @@ const VendorRooms = () => {
 
   const fetchRooms = async (propertyId: string) => {
     try {
-      const roomsData = await api.vendor.getRooms(propertyId);
+      const roomsData = await roomsService.getRooms(propertyId);
       setRooms(roomsData || []);
     } catch (error) {
       console.error("Failed to fetch rooms:", error);
@@ -134,7 +143,7 @@ const VendorRooms = () => {
     }
 
     try {
-      await api.vendor.createRoom({
+      await roomsService.createRoom({
         propertyId: selectedProperty,
         name: formData.name,
         type: formData.type,
@@ -177,7 +186,7 @@ const VendorRooms = () => {
     if (!confirm("Are you sure you want to delete this room?")) return;
 
     try {
-      await api.vendor.deleteRoom(id);
+      await roomsService.deleteRoom(id);
       toast({ title: "Room deleted" });
       if (selectedProperty) fetchRooms(selectedProperty);
     } catch (error: any) {
@@ -203,7 +212,7 @@ const VendorRooms = () => {
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => navigate("/vendor/rooms/add")}>
               <Plus className="w-4 h-4" />
               Add Room
             </Button>
@@ -217,6 +226,8 @@ const VendorRooms = () => {
               <div className="space-y-2">
                 <Label>Hotel *</Label>
                 <select
+                  title="Select hotel"
+                  aria-label="Select hotel"
                   className="w-full p-2 border rounded-md"
                   value={selectedProperty}
                   onChange={(e) => setSelectedProperty(e.target.value)}
@@ -239,6 +250,8 @@ const VendorRooms = () => {
                 <div className="space-y-2">
                   <Label>Room Type *</Label>
                   <select
+                    title="Select room type"
+                    aria-label="Select room type"
                     className="w-full p-2 border rounded-md"
                     name="type"
                     value={formData.type}
@@ -307,6 +320,8 @@ const VendorRooms = () => {
       {/* Property Filter */}
       <div className="flex gap-4">
         <select
+          title="Filter by hotel"
+          aria-label="Filter by hotel"
           className="p-2 border rounded-md"
           value={selectedProperty}
           onChange={(e) => handlePropertyChange(e.target.value)}
@@ -331,11 +346,13 @@ const VendorRooms = () => {
 
       {/* Rooms Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 bg-muted rounded-2xl animate-pulse"></div>
-          ))}
-        </div>
+        <LoadingState message="Loading rooms..." />
+      ) : errorMessage ? (
+        <ErrorState
+          title="Unable to load rooms"
+          description={errorMessage}
+          onRetry={fetchData}
+        />
       ) : filteredRooms.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredRooms.map((room) => (
@@ -344,10 +361,15 @@ const VendorRooms = () => {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="font-semibold text-lg">{room.name}</h3>
+                      <button type="button" className="font-semibold text-lg text-left hover:underline" onClick={() => navigate(`/vendor/rooms/${room.id}`)}>
+                        {room.name}
+                      </button>
                       <p className="text-sm text-muted-foreground capitalize">{room.type}</p>
                     </div>
                     <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/vendor/rooms/${room.id}/edit`)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={() => handleDeleteRoom(room.id)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
@@ -381,12 +403,13 @@ const VendorRooms = () => {
         </div>
       ) : (
         <Card className="border-0 shadow-lg">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <BedDouble className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No Rooms Found</h3>
-            <p className="text-muted-foreground text-center">
-              Add rooms to your hotel to start receiving bookings
-            </p>
+          <CardContent>
+            <EmptyState
+              className="py-12"
+              icon={<BedDouble className="w-16 h-16 text-muted-foreground" />}
+              title="No Rooms Found"
+              description="Add rooms to your hotel to start receiving bookings"
+            />
           </CardContent>
         </Card>
       )}

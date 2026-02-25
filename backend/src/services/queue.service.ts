@@ -3,13 +3,16 @@ import Redis from 'ioredis';
 import { config } from '../config';
 import { logger } from '../utils/logger.util';
 
-const connection = new Redis(config.redis.url, {
-  maxRetriesPerRequest: null,
-});
+const connection = config.redis.enabled
+  ? new Redis(config.redis.url, { maxRetriesPerRequest: null })
+  : null;
 
-export const emailQueue = new Queue('email-queue', { connection });
+export const emailQueue = config.redis.enabled
+  ? new Queue('email-queue', { connection: connection as Redis })
+  : null;
 
-export const queueService = {
+export const queueService = config.redis.enabled
+  ? {
   async addBookingConfirmedJob(data: {
     userEmail: string;
     userName: string;
@@ -31,7 +34,6 @@ export const queueService = {
     userName: string;
     propertyName: string;
     bookingNumber: string;
-    refundAmount?: number;
   }) {
     await emailQueue.add('booking-cancelled', {
       type: 'booking-cancelled',
@@ -67,6 +69,20 @@ export const queueService = {
     });
     logger.info({ bookingNumber: data.bookingNumber }, 'Added review request job to queue');
   },
-};
+}
+  : {
+    async addBookingConfirmedJob(data: { bookingNumber: string }) {
+      logger.warn({ bookingNumber: data.bookingNumber }, 'Redis disabled, skipping email queue job');
+    },
+    async addBookingCancelledJob(data: { bookingNumber: string }) {
+      logger.warn({ bookingNumber: data.bookingNumber }, 'Redis disabled, skipping email queue job');
+    },
+    async addPaymentReminderJob(data: { bookingNumber: string }) {
+      logger.warn({ bookingNumber: data.bookingNumber }, 'Redis disabled, skipping email queue job');
+    },
+    async addReviewRequestJob(data: { bookingNumber: string }) {
+      logger.warn({ bookingNumber: data.bookingNumber }, 'Redis disabled, skipping email queue job');
+    },
+  };
 
 export default queueService;

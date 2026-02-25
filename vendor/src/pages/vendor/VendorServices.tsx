@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { vendorService } from "@/lib/vendor";
 import { useToast } from "@/hooks/use-toast";
 
 interface Service {
@@ -109,7 +109,7 @@ const VendorServices = () => {
     try {
       const uploadedImages = await Promise.all(
         Array.from(files).map(async (file) => {
-          const result = await api.vendor.uploadImage(file, "hosthaven/services");
+          const result = await vendorService.uploadImage(file, "hosthaven/services");
           return { url: result.url };
         })
       );

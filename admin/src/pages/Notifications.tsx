@@ -1,101 +1,77 @@
-import { useEffect, useState } from 'react'
-import { Search, Bell, CheckCircle, Clock, Trash2, Mail, MessageSquare, Calendar, CreditCard, Home, User } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { Bell, CheckCircle, Clock, Mail, MessageSquare, Calendar, CreditCard, Home, User } from 'lucide-react'
+import { notificationsService, type NotificationItem } from '../lib/notifications'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { PageLoader } from '../components/ui/PageLoader'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface Notification {
-  id: string
-  type: string
-  title: string
-  message: string
-  userId: string
-  userName: string
-  isRead: boolean
-  createdAt: string
-  data?: Record<string, unknown>
-}
+type NotificationFilter = 'all' | 'unread' | 'read'
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all')
+  const [filter, setFilter] = useState<NotificationFilter>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmMarkAll, setConfirmMarkAll] = useState(false)
+
+  const fetchNotifications = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await notificationsService.getNotifications({
+        page,
+        limit: pageSize,
+        isRead: filter === 'all' ? undefined : filter === 'read',
+      })
+      setNotifications(data.notifications ?? [])
+      setTotal(data.pagination?.total ?? data.notifications?.length ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load notifications.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/notifications`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setNotifications(data.notifications || [])
-        } else {
-          setNotifications([
-            { id: '1', type: 'booking_confirmed', title: 'New Booking', message: 'A new booking has been made at Grand Palace Hotel', userId: 'U1', userName: 'Rahul Sharma', isRead: false, createdAt: '2024-03-20T10:00:00Z' },
-            { id: '2', type: 'payment_received', title: 'Payment Received', message: 'Payment of ₹25,000 received for booking BK001', userId: 'U1', userName: 'Rahul Sharma', isRead: false, createdAt: '2024-03-20T09:30:00Z' },
-            { id: '3', type: 'vendor_registered', title: 'New Vendor', message: 'A new vendor has registered and is pending approval', userId: 'U2', userName: 'John Doe', isRead: true, createdAt: '2024-03-19T15:00:00Z' },
-            { id: '4', type: 'review_submitted', title: 'New Review', message: 'A new review has been submitted for Beach Resort', userId: 'U3', userName: 'Priya Patel', isRead: true, createdAt: '2024-03-19T12:00:00Z' },
-            { id: '5', type: 'support_ticket', title: 'Support Ticket', message: 'A new support ticket has been created', userId: 'U4', userName: 'Amit Kumar', isRead: false, createdAt: '2024-03-18T18:00:00Z' },
-            { id: '6', type: 'property_approved', title: 'Property Approved', message: 'Mountain View Resort has been approved and is now live', userId: 'U5', userName: 'Sarah Smith', isRead: true, createdAt: '2024-03-18T10:00:00Z' },
-          ])
-        }
-      } catch (error) {
-        setNotifications([
-          { id: '1', type: 'booking_confirmed', title: 'New Booking', message: 'A new booking has been made', userId: 'U1', userName: 'Rahul Sharma', isRead: false, createdAt: '2024-03-20T10:00:00Z' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchNotifications()
-  }, [])
+  }, [page, pageSize, filter])
 
-  const filteredNotifications = notifications.filter(notification => {
+  const filteredNotifications = useMemo(() => notifications.filter(notification => {
     const matchesSearch = notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       notification.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notification.userName.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filter === 'all' || (filter === 'unread' ? !notification.isRead : notification.isRead)
-    return matchesSearch && matchesFilter
-  })
+      (notification.userName || '').toLowerCase().includes(searchTerm.toLowerCase())
+    return matchesSearch
+  }), [notifications, searchTerm])
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/notifications/${notificationId}/read`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      setNotifications(notifications.map(n => n.id === notificationId ? { ...n, isRead: true } : n))
-    } catch (error) {
-      console.error('Failed to mark as read')
+      await notificationsService.markAsRead(notificationId)
+      setNotifications((prev) => prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n))
+      toast.success('Notification marked as read.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to mark notification as read.')
     }
   }
 
   const handleMarkAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/notifications/read-all`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      setNotifications(notifications.map(n => ({ ...n, isRead: true })))
-    } catch (error) {
-      console.error('Failed to mark all as read')
-    }
-  }
-
-  const handleDelete = async (notificationId: string) => {
-    try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      setNotifications(notifications.filter(n => n.id !== notificationId))
-    } catch (error) {
-      console.error('Failed to delete notification')
+      await notificationsService.markAllAsRead()
+      setNotifications((prev) => prev.map(n => ({ ...n, isRead: true })))
+      toast.success('All notifications marked as read.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to mark notifications as read.')
+    } finally {
+      setConfirmMarkAll(false)
     }
   }
 
@@ -142,145 +118,174 @@ export default function Notifications() {
   }
 
   const unreadCount = notifications.filter(n => !n.isRead).length
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
+  const hasFilters = useMemo(() => searchTerm.length > 0 || filter !== 'all', [searchTerm, filter])
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-gray-600 mt-1">View and manage platform notifications</p>
-        </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={handleMarkAllAsRead}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Mark all as read
-          </button>
-        )}
+      <PageHeader
+        title="Notifications"
+        description="Monitor and respond to platform activity notifications."
+        actions={
+          unreadCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setConfirmMarkAll(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Mark all as read
+            </button>
+          ) : null
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center gap-3">
+            <div className="rounded-xl bg-blue-100 p-2 text-blue-600">
+              <Bell className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Total</p>
+              <p className="text-xl font-semibold text-slate-900">{total || notifications.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3">
+            <div className="rounded-xl bg-amber-100 p-2 text-amber-600">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Unread</p>
+              <p className="text-xl font-semibold text-slate-900">{unreadCount}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-100 p-2 text-emerald-600">
+              <CheckCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Read</p>
+              <p className="text-xl font-semibold text-slate-900">{notifications.filter(n => n.isRead).length}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Bell className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total</p>
-              <p className="text-2xl font-bold text-gray-900">{notifications.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <Clock className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Unread</p>
-              <p className="text-2xl font-bold text-gray-900">{unreadCount}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Read</p>
-              <p className="text-2xl font-bold text-gray-900">{notifications.filter(n => n.isRead).length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search notifications..."
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search notifications"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
           <select
             value={filter}
-            onChange={(e) => setFilter(e.target.value as typeof filter)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onChange={(event) => {
+              setPage(1)
+              setFilter(event.target.value as NotificationFilter)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
             <option value="all">All</option>
             <option value="unread">Unread</option>
             <option value="read">Read</option>
           </select>
         </div>
+      </FiltersBar>
 
-        <div className="divide-y divide-gray-200">
-          {filteredNotifications.map((notification) => (
-            <div
-              key={notification.id}
-              className={`p-4 hover:bg-gray-50 ${!notification.isRead ? 'bg-blue-50' : ''}`}
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load notifications"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchNotifications}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              <div className="flex items-start gap-4">
-                <div className={`p-2 rounded-full ${getIconColor(notification.type)}`}>
-                  {getIcon(notification.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-900">{notification.title}</h3>
-                    {!notification.isRead && (
-                      <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                    )}
+              Retry
+            </button>
+          }
+        />
+      ) : filteredNotifications.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No notifications match your filters' : 'No notifications yet'}
+          description={
+            hasFilters ? 'Try adjusting your search or filter.' : 'Notifications will appear here once generated.'
+          }
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>All notifications</CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-slate-100">
+            {filteredNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between ${!notification.isRead ? 'bg-blue-50/40' : ''}`}
+              >
+                <div className="flex gap-4">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${getIconColor(notification.type)}`}>
+                    {getIcon(notification.type)}
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                  <div className="flex items-center gap-4 mt-2">
-                    <span className="text-xs text-gray-500">by {notification.userName}</span>
-                    <span className="text-xs text-gray-500">
-                      {new Date(notification.createdAt).toLocaleString()}
-                    </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-slate-900">{notification.title}</h3>
+                      {!notification.isRead ? <span className="h-2 w-2 rounded-full bg-blue-500" /> : null}
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                      <span>by {notification.userName || 'System'}</span>
+                      <span>{new Date(notification.createdAt).toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!notification.isRead && (
+                  {!notification.isRead ? (
                     <button
+                      type="button"
                       onClick={() => handleMarkAsRead(notification.id)}
-                      className="p-2 text-gray-400 hover:text-blue-600"
-                      title="Mark as read"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
-                      <CheckCircle className="w-5 h-5" />
+                      Mark as read
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(notification.id)}
-                    className="p-2 text-gray-400 hover:text-red-600"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  ) : null}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
-        {filteredNotifications.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No notifications found
-          </div>
-        )}
-      </div>
+      {!isLoading && !error && filteredNotifications.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total || filteredNotifications.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmMarkAll}
+        onOpenChange={setConfirmMarkAll}
+        title="Mark all notifications as read?"
+        description="All unread notifications will be marked as read."
+        confirmText="Mark all as read"
+        onConfirm={handleMarkAllAsRead}
+      />
     </div>
   )
 }

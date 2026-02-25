@@ -18,6 +18,7 @@ export const config = {
 
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
+    enabled: process.env.DISABLE_REDIS !== 'true',
   },
 
   jwt: {
@@ -51,6 +52,24 @@ export const config = {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
     apiKey: process.env.CLOUDINARY_API_KEY || '',
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
+  },
+
+  // Cloudflare R2 Storage
+  r2: {
+    accountId: process.env.R2_ACCOUNT_ID || '',
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    bucketName: process.env.R2_BUCKET_NAME || '',
+    publicUrl: process.env.R2_PUBLIC_URL || '',
+  },
+
+  // process.env.R2 Supabase (PostgreSQL)
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    anonKey: process.env.SUPABASE_ANON_KEY || '',
+    serviceKey: process.env.SUPABASE_SERVICE_KEY || '',
+    // Direct PostgreSQL connection (for Prisma)
+    databaseUrl: process.env.DATABASE_URL || '',
   },
 
   rateLimit: {

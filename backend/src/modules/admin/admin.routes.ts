@@ -4,10 +4,14 @@ import { requireRole } from '../../middleware/auth.middleware';
 import { NotificationsController } from '../notifications/notifications.controller';
 
 export default async function adminRoutes(fastify: FastifyInstance) {
-  fastify.addHook('preHandler', [fastify.authenticate, requireRole('ADMIN')]);
+  fastify.addHook('preHandler', fastify.authenticate);
+  fastify.addHook('preHandler', requireRole('ADMIN'));
 
   fastify.get('/dashboard', AdminController.getDashboard);
   fastify.get('/stats', AdminController.getSystemStats);
+  fastify.get('/analytics', AdminController.getAnalytics);
+  fastify.get('/settings', AdminController.getSettings);
+  fastify.put('/settings', AdminController.updateSettings);
 
   fastify.get('/users', AdminController.getAllUsers);
   fastify.put('/users/:id/status', AdminController.updateUserStatus);

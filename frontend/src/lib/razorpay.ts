@@ -96,6 +96,8 @@ export const createBookingPayment = async ({
   checkIn,
   checkOut,
   guests,
+  orderId,
+  notes,
   userName,
   userEmail,
   userPhone,
@@ -106,6 +108,8 @@ export const createBookingPayment = async ({
   checkIn: string;
   checkOut: string;
   guests: number;
+  orderId?: string;
+  notes?: Record<string, string>;
   userName?: string;
   userEmail?: string;
   userPhone?: string;
@@ -115,6 +119,7 @@ export const createBookingPayment = async ({
       amount: amount * 100, // Razorpay expects amount in paise
       name: "HostHaven",
       description: `${propertyName} - ${nights} Night${nights > 1 ? "s" : ""}`,
+      order_id: orderId,
       prefill: {
         name: userName,
         email: userEmail,
@@ -126,6 +131,7 @@ export const createBookingPayment = async ({
         checkOut,
         guests: guests.toString(),
         nights: nights.toString(),
+        ...(notes || {}),
       },
     });
 

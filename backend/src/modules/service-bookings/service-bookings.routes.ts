@@ -10,5 +10,7 @@ export default async function serviceBookingsRoutes(fastify: FastifyInstance) {
   fastify.get('/bookings/my', ServiceBookingsController.getMyBookings);
 
   fastify.get('/bookings/admin', { preHandler: [requireRole('ADMIN')] }, ServiceBookingsController.getAllForAdmin);
+  fastify.get('/bookings/admin/:id', { preHandler: [requireRole('ADMIN')] }, ServiceBookingsController.getByIdForAdmin);
   fastify.put('/bookings/admin/:id/status', { preHandler: [requireRole('ADMIN')] }, ServiceBookingsController.updateStatus);
+  fastify.post('/bookings/admin/:id/refund', { preHandler: [requireRole('ADMIN')] }, ServiceBookingsController.refund);
 }

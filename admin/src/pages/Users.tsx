@@ -1,206 +1,262 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, MoreVertical, User, Mail, Phone, Calendar, Shield } from 'lucide-react'
+import { toast } from 'sonner'
+import { Ban, CheckCircle, Eye, UserX } from 'lucide-react'
+import { usersService, type User } from '../lib/users'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface User {
-  id: string
-  name: string
-  email: string
-  phone: string
-  role: string
-  isVerified: boolean
-  createdAt: string
-  status: 'active' | 'suspended'
-}
+type UserStatus = 'active' | 'suspended'
+
+const statusOptions: Array<{ label: string; value: 'all' | UserStatus }> = [
+  { label: 'All status', value: 'all' },
+  { label: 'Active', value: 'active' },
+  { label: 'Suspended', value: 'suspended' },
+]
 
 export default function Users() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | UserStatus>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmAction, setConfirmAction] = useState<{
+    userId: string
+    nextStatus: UserStatus
+    name?: string
+  } | null>(null)
+
+  const fetchUsers = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await usersService.getUsers({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      })
+      setUsers(data.data)
+      setTotal(data.pagination.total)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load users.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/users`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setUsers(data.users || [])
-        } else {
-          setUsers([
-            { id: '1', name: 'Rahul Sharma', email: 'rahul@example.com', phone: '+91 9876543210', role: 'USER', isVerified: true, createdAt: '2024-01-15', status: 'active' },
-            { id: '2', name: 'Priya Patel', email: 'priya@example.com', phone: '+91 9876543211', role: 'USER', isVerified: true, createdAt: '2024-02-20', status: 'active' },
-            { id: '3', name: 'Amit Kumar', email: 'amit@example.com', phone: '+91 9876543212', role: 'USER', isVerified: false, createdAt: '2024-03-10', status: 'suspended' },
-          ])
-        }
-      } catch (error) {
-        setUsers([
-          { id: '1', name: 'Rahul Sharma', email: 'rahul@example.com', phone: '+91 9876543210', role: 'USER', isVerified: true, createdAt: '2024-01-15', status: 'active' },
-          { id: '2', name: 'Priya Patel', email: 'priya@example.com', phone: '+91 9876543211', role: 'USER', isVerified: true, createdAt: '2024-02-20', status: 'active' },
-          { id: '3', name: 'Amit Kumar', email: 'amit@example.com', phone: '+91 9876543212', role: 'USER', isVerified: false, createdAt: '2024-03-10', status: 'suspended' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchUsers()
-  }, [])
+  }, [page, pageSize, searchTerm, statusFilter])
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const handleStatusChange = (user: User, nextStatus: UserStatus) => {
+    setConfirmAction({ userId: user.id, nextStatus, name: user.name || user.email || user.phone })
+  }
 
-  const handleStatusChange = async (userId: string, newStatus: 'active' | 'suspended') => {
+  const confirmStatusChange = async () => {
+    if (!confirmAction) return
+    const { userId, nextStatus } = confirmAction
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/users/${userId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-      setUsers(users.map(u => u.id === userId ? { ...u, status: newStatus } : u))
-    } catch (error) {
-      console.error('Failed to update user status')
+      if (nextStatus === 'suspended') {
+        await usersService.suspendUser(userId)
+      } else {
+        await usersService.activateUser(userId)
+      }
+      toast.success(`User ${nextStatus === 'suspended' ? 'suspended' : 'activated'} successfully.`)
+      setUsers((prev) =>
+        prev.map((user) => (user.id === userId ? { ...user, status: nextStatus } : user))
+      )
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update user status.')
+    } finally {
+      setConfirmAction(null)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
+  const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Users</h1>
-        <p className="text-gray-600 mt-1">Manage platform users</p>
-      </div>
+      <PageHeader
+        title="Users"
+        description="Manage platform users, verification, and access status."
+      />
 
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search users..."
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by name, email, or phone"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => {
+                setPage(1)
+                setSearchTerm(event.target.value)
+              }}
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value as 'all' | UserStatus)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="suspended">Suspended</option>
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
+      </FiltersBar>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{user.name}</p>
-                        <p className="text-sm text-gray-500">ID: {user.id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="w-4 h-4" />
-                        {user.email}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="w-4 h-4" />
-                        {user.phone}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                      <Shield className="w-3 h-3" />
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      user.status === 'active' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load users"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchUsers}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : users.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No users match your filters' : 'No users yet'}
+          description={
+            hasFilters
+              ? 'Try adjusting your search or status filter.'
+              : 'New users will appear here once they sign up.'
+          }
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Bookings</TableHead>
+              <TableHead>Joined</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{user.name || 'Unnamed User'}</p>
+                    <p className="text-xs text-slate-500">ID: {user.id}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    {user.email ? <p className="text-sm text-slate-700">{user.email}</p> : null}
+                    <p className="text-sm text-slate-500">{user.phone}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge
+                    label={user.status === 'active' ? 'Active' : 'Suspended'}
+                    variant={user.status === 'active' ? 'success' : 'danger'}
+                  />
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-medium text-slate-700">
+                    {user.bookingsCount ?? 0}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-600">
                     {new Date(user.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        to={`/users/${user.id}`}
-                        className="text-primary hover:underline text-sm"
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Link
+                      to={`/users/${user.id}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Link>
+                    {user.status === 'active' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(user, 'suspended')}
+                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                       >
-                        View
-                      </Link>
-                      <select
-                        value={user.status}
-                        onChange={(e) => handleStatusChange(user.id, e.target.value as 'active' | 'suspended')}
-                        className="text-sm border border-gray-300 rounded px-2 py-1"
+                        <Ban className="h-4 w-4" />
+                        Suspend
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(user, 'active')}
+                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
                       >
-                        <option value="active">Active</option>
-                        <option value="suspended">Suspend</option>
-                      </select>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        <CheckCircle className="h-4 w-4" />
+                        Activate
+                      </button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-        {filteredUsers.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No users found matching your criteria
-          </div>
-        )}
-      </div>
+      {!isLoading && !error && users.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null)
+        }}
+        title={
+          confirmAction?.nextStatus === 'suspended'
+            ? 'Suspend this user?'
+            : 'Reactivate this user?'
+        }
+        description={
+          confirmAction?.nextStatus === 'suspended'
+            ? 'The user will lose access until reactivated.'
+            : 'The user will regain access immediately.'
+        }
+        confirmText={confirmAction?.nextStatus === 'suspended' ? 'Suspend user' : 'Activate user'}
+        variant={confirmAction?.nextStatus === 'suspended' ? 'danger' : 'default'}
+        onConfirm={confirmStatusChange}
+      />
     </div>
   )
 }

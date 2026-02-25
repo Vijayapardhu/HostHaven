@@ -42,6 +42,10 @@ export const inventoryOverrideSchema = z.object({
   availableRooms: z.coerce.number().int().nonnegative(),
 });
 
+export const analyticsSchema = z.object({
+  range: z.enum(['7d', '30d', '3m']).default('30d'),
+});
+
 export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>;
 export type PropertyApprovalInput = z.infer<typeof propertyApprovalSchema>;
 export type SystemStatsInput = z.infer<typeof systemStatsSchema>;
@@ -50,3 +54,4 @@ export type PayoutProcessingInput = z.infer<typeof payoutProcessingSchema>;
 export type BookingRefundInput = z.infer<typeof bookingRefundSchema>;
 export type MarkPayoutPaidInput = z.infer<typeof markPayoutPaidSchema>;
 export type InventoryOverrideInput = z.infer<typeof inventoryOverrideSchema>;
+export type AnalyticsInput = z.infer<typeof analyticsSchema>;

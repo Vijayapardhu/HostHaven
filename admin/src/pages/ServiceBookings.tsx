@@ -1,274 +1,410 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Calendar, User, MapPin, Phone, Mail, CheckCircle, XCircle, Clock, MoreVertical } from 'lucide-react'
+import { toast } from 'sonner'
+import { RefreshCw } from 'lucide-react'
+import { serviceBookingsService, type ServiceBooking } from '../lib/serviceBookings'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface ServiceBooking {
-  id: string
-  bookingNumber: string
-  userName: string
-  userEmail: string
-  userPhone: string
-  serviceName: string
-  serviceCategory: string
-  serviceDate: string
-  serviceTime: string
-  location: string
-  notes: string
-  advanceAmount: number
-  totalAmount: number
-  remainingAmount: number
-  status: 'ADVANCE_PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
-  createdAt: string
+type ServiceBookingStatus = 'ADVANCE_PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
+type ServicePaymentStatus = 'PENDING' | 'COMPLETED' | 'REFUNDED'
+
+const statusOptions: Array<{ label: string; value: 'all' | ServiceBookingStatus }> = [
+  { label: 'All status', value: 'all' },
+  { label: 'Advance paid', value: 'ADVANCE_PAID' },
+  { label: 'Confirmed', value: 'CONFIRMED' },
+  { label: 'Completed', value: 'COMPLETED' },
+  { label: 'Cancelled', value: 'CANCELLED' },
+]
+
+const statusLabels: Record<ServiceBookingStatus, string> = {
+  ADVANCE_PAID: 'Advance paid',
+  CONFIRMED: 'Confirmed',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+}
+
+const statusVariants: Record<ServiceBookingStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
+  ADVANCE_PAID: 'warning',
+  CONFIRMED: 'info',
+  COMPLETED: 'success',
+  CANCELLED: 'danger',
+}
+
+const paymentVariants: Record<ServicePaymentStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  COMPLETED: 'success',
+  PENDING: 'warning',
+  REFUNDED: 'neutral',
 }
 
 export default function ServiceBookings() {
   const [bookings, setBookings] = useState<ServiceBooking[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ADVANCE_PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | ServiceBookingStatus>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmReject, setConfirmReject] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  const [confirmRefund, setConfirmRefund] = useState<ServiceBooking | null>(null)
+
+  const fetchBookings = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await serviceBookingsService.getServiceBookings({
+        page,
+        limit: pageSize,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      })
+      const source = data.data ?? data.serviceBookings ?? data.bookings ?? []
+      const filtered = searchTerm
+        ? source.filter((booking: ServiceBooking) => {
+            const haystack = [
+              booking.serviceBookingNumber,
+              booking.bookingNumber,
+              booking.user?.name,
+              booking.user?.phone,
+              booking.serviceName,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase()
+            return haystack.includes(searchTerm.toLowerCase())
+          })
+        : source
+      setBookings(filtered)
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load service bookings.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/service-bookings`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setBookings(data.bookings || [])
-        } else {
-          setBookings([
-            { id: '1', bookingNumber: 'SB001', userName: 'Rahul Sharma', userEmail: 'rahul@example.com', userPhone: '+91 9876543210', serviceName: 'Airport Pickup', serviceCategory: 'transport', serviceDate: '2024-03-25', serviceTime: '10:00 AM', location: 'Mumbai Airport', notes: 'Flight arriving at 9:30 AM', advanceAmount: 1500, totalAmount: 1500, remainingAmount: 0, status: 'ADVANCE_PAID', createdAt: '2024-03-20' },
-            { id: '2', bookingNumber: 'SB002', userName: 'Priya Patel', userEmail: 'priya@example.com', userPhone: '+91 9876543211', serviceName: 'Local Guide', serviceCategory: 'guide', serviceDate: '2024-03-26', serviceTime: '09:00 AM', location: 'Temple Complex', notes: 'Need guide for main temple', advanceAmount: 1000, totalAmount: 2000, remainingAmount: 1000, status: 'CONFIRMED', createdAt: '2024-03-21' },
-            { id: '3', bookingNumber: 'SB003', userName: 'Amit Kumar', userEmail: 'amit@example.com', userPhone: '+91 9876543212', serviceName: 'Photography Session', serviceCategory: 'photography', serviceDate: '2024-03-22', serviceTime: '06:00 AM', location: 'Temple Gate', notes: 'Sunrise photography', advanceAmount: 1500, totalAmount: 3000, remainingAmount: 1500, status: 'COMPLETED', createdAt: '2024-03-18' },
-            { id: '4', bookingNumber: 'SB004', userName: 'Sneha Gupta', userEmail: 'sneha@example.com', userPhone: '+91 9876543213', serviceName: 'Traditional Meal', serviceCategory: 'food', serviceDate: '2024-03-27', serviceTime: '12:30 PM', location: 'Heritage Kitchen', notes: 'Vegetarian meal for 2', advanceAmount: 500, totalAmount: 1000, remainingAmount: 500, status: 'CANCELLED', createdAt: '2024-03-19' },
-          ])
-        }
-      } catch (error) {
-        setBookings([
-          { id: '1', bookingNumber: 'SB001', userName: 'Rahul Sharma', userEmail: 'rahul@example.com', userPhone: '+91 9876543210', serviceName: 'Airport Pickup', serviceCategory: 'transport', serviceDate: '2024-03-25', serviceTime: '10:00 AM', location: 'Mumbai Airport', notes: '', advanceAmount: 1500, totalAmount: 1500, remainingAmount: 0, status: 'ADVANCE_PAID', createdAt: '2024-03-20' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchBookings()
-  }, [])
+  }, [page, pageSize, searchTerm, statusFilter])
 
-  const filteredBookings = bookings.filter(booking => {
-    const matchesSearch = booking.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.bookingNumber.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || booking.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
-  const handleStatusChange = async (bookingId: string, newStatus: string) => {
+  const handleAccept = async (bookingId: string) => {
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/service-bookings/${bookingId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-      setBookings(bookings.map(b => b.id === bookingId ? { ...b, status: newStatus as typeof b.status } : b))
-    } catch (error) {
-      console.error('Failed to update status')
+      await serviceBookingsService.acceptServiceBooking(bookingId)
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === bookingId ? { ...booking, status: 'CONFIRMED' } : booking
+        )
+      )
+      toast.success('Service booking accepted.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to accept service booking.')
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ADVANCE_PAID': return 'bg-yellow-100 text-yellow-700'
-      case 'CONFIRMED': return 'bg-green-100 text-green-700'
-      case 'COMPLETED': return 'bg-blue-100 text-blue-700'
-      case 'CANCELLED': return 'bg-red-100 text-red-700'
-      default: return 'bg-gray-100 text-gray-700'
+  const handleComplete = async (bookingId: string) => {
+    try {
+      await serviceBookingsService.completeServiceBooking(bookingId)
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === bookingId ? { ...booking, status: 'COMPLETED' } : booking
+        )
+      )
+      toast.success('Service booking marked as completed.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update service booking.')
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
+  const handleReject = async () => {
+    if (!confirmReject) return
+    try {
+      await serviceBookingsService.rejectServiceBooking(confirmReject, 'Rejected by admin')
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === confirmReject ? { ...booking, status: 'CANCELLED' } : booking
+        )
+      )
+      toast.success('Service booking rejected.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to reject service booking.')
+    } finally {
+      setConfirmReject(null)
+    }
   }
+
+  const handleCancel = async () => {
+    if (!confirmCancel) return
+    try {
+      await serviceBookingsService.cancelServiceBooking(confirmCancel, 'Cancelled by admin')
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === confirmCancel ? { ...booking, status: 'CANCELLED' } : booking
+        )
+      )
+      toast.success('Service booking cancelled.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to cancel service booking.')
+    } finally {
+      setConfirmCancel(null)
+    }
+  }
+
+  const handleRefund = async () => {
+    if (!confirmRefund) return
+    try {
+      const refundAmount = confirmRefund.advanceAmount ?? confirmRefund.totalAmount
+      await serviceBookingsService.processServiceRefund(confirmRefund.id, refundAmount, 'Refund issued by admin')
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === confirmRefund.id
+            ? { ...booking, paymentStatus: 'REFUNDED', status: 'CANCELLED' }
+            : booking
+        )
+      )
+      toast.success('Refund processed successfully.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to process refund.')
+    } finally {
+      setConfirmRefund(null)
+    }
+  }
+
+  const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Service Bookings</h1>
-        <p className="text-gray-600 mt-1">Manage service bookings (transport, guide, photography)</p>
-      </div>
+      <PageHeader
+        title="Service Bookings"
+        description="Review service bookings, statuses, and payments."
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <Clock className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">{bookings.filter(b => b.status === 'ADVANCE_PAID').length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Confirmed</p>
-              <p className="text-2xl font-bold text-gray-900">{bookings.filter(b => b.status === 'CONFIRMED').length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Completed</p>
-              <p className="text-2xl font-bold text-gray-900">{bookings.filter(b => b.status === 'COMPLETED').length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <XCircle className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Cancelled</p>
-              <p className="text-2xl font-bold text-gray-900">{bookings.filter(b => b.status === 'CANCELLED').length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search bookings..."
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by booking number, user, or service"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => {
+                setPage(1)
+                setSearchTerm(event.target.value)
+              }}
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value as 'all' | ServiceBookingStatus)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
-            <option value="all">All Status</option>
-            <option value="ADVANCE_PAID">Advance Paid</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
+      </FiltersBar>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Booking ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredBookings.map((booking) => (
-                <tr key={booking.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-sm text-gray-900">#{booking.bookingNumber}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">{booking.serviceName}</p>
-                      <p className="text-sm text-gray-500 capitalize">{booking.serviceCategory}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">{booking.userName}</p>
-                      <p className="text-sm text-gray-500">{booking.userPhone}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-gray-900">{new Date(booking.serviceDate).toLocaleDateString()}</p>
-                      <p className="text-sm text-gray-500">{booking.serviceTime}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <MapPin className="w-4 h-4" />
-                      {booking.location}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">₹{booking.totalAmount.toLocaleString()}</p>
-                      {booking.remainingAmount > 0 && (
-                        <p className="text-sm text-gray-500">Pending: ₹{booking.remainingAmount}</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
-                      {booking.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        to={`/service-bookings/${booking.id}`}
-                        className="text-primary hover:underline text-sm"
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load service bookings"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchBookings}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : bookings.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No bookings match your filters' : 'No service bookings yet'}
+          description={
+            hasFilters ? 'Try adjusting your search or status filter.' : 'Bookings will appear here once created.'
+          }
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Booking</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>Service</TableHead>
+              <TableHead>Schedule</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Payment</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {bookings.map((booking) => (
+              <TableRow key={booking.id}>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">#{booking.serviceBookingNumber || booking.bookingNumber || booking.id}</p>
+                    <p className="text-xs text-slate-500">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{booking.user?.name || 'Guest'}</p>
+                    <p className="text-xs text-slate-500">{booking.user?.phone || '—'}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{booking.serviceName || booking.service?.name || 'Service'}</p>
+                    <p className="text-xs text-slate-500">Category: {booking.serviceCategory || '—'}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="text-sm text-slate-700">{booking.serviceDate ? new Date(booking.serviceDate).toLocaleDateString() : '—'}</p>
+                    <p className="text-xs text-slate-500">{booking.serviceTime || '—'}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">₹{booking.totalAmount.toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">Advance: ₹{(booking.advanceAmount ?? 0).toLocaleString()}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge label={statusLabels[booking.status]} variant={statusVariants[booking.status]} />
+                </TableCell>
+                <TableCell>
+                  <StatusBadge
+                    label={booking.paymentStatus ? booking.paymentStatus.toLowerCase() : 'pending'}
+                    variant={paymentVariants[booking.paymentStatus || 'PENDING']}
+                    className="capitalize"
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Link
+                      to={`/service-bookings/${booking.id}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      View
+                    </Link>
+                    {booking.status === 'ADVANCE_PAID' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAccept(booking.id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmReject(booking.id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    ) : null}
+                    {booking.status === 'CONFIRMED' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleComplete(booking.id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                        >
+                          Complete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmCancel(booking.id)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : null}
+                    {booking.paymentStatus === 'COMPLETED' && booking.status !== 'CANCELLED' ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRefund(booking)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"
                       >
-                        View
-                      </Link>
-                      <select
-                        value={booking.status}
-                        onChange={(e) => handleStatusChange(booking.id, e.target.value)}
-                        className="text-sm border border-gray-300 rounded px-2 py-1"
-                      >
-                        <option value="ADVANCE_PAID">Advance Paid</option>
-                        <option value="CONFIRMED">Confirmed</option>
-                        <option value="COMPLETED">Completed</option>
-                        <option value="CANCELLED">Cancelled</option>
-                      </select>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        <RefreshCw className="h-4 w-4" />
+                        Refund
+                      </button>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-        {filteredBookings.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No bookings found
-          </div>
-        )}
-      </div>
+      {!isLoading && !error && bookings.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmReject)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmReject(null)
+        }}
+        title="Reject this booking?"
+        description="The booking will be marked as rejected."
+        confirmText="Reject booking"
+        variant="danger"
+        onConfirm={handleReject}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmCancel)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmCancel(null)
+        }}
+        title="Cancel this booking?"
+        description="The booking will be cancelled and the guest will be notified."
+        confirmText="Cancel booking"
+        variant="danger"
+        onConfirm={handleCancel}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmRefund)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmRefund(null)
+        }}
+        title="Process refund?"
+        description="The refund will be issued and the booking will be cancelled."
+        confirmText="Process refund"
+        variant="danger"
+        onConfirm={handleRefund}
+      />
     </div>
   )
 }

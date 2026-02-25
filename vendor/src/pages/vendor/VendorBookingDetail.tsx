@@ -23,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import api from "@/lib/api";
+import { bookingsService } from "@/lib/bookings";
 import { useToast } from "@/hooks/use-toast";
 
 interface BookingDetail {
@@ -58,7 +58,7 @@ const VendorBookingDetail = () => {
 
   const fetchBooking = async () => {
     try {
-      const response = await api.vendor.getBookingById(id!);
+      const response = await bookingsService.getBookingById(id!);
       setBooking(response);
     } catch (error) {
       console.error("Failed to fetch booking:", error);
@@ -72,7 +72,7 @@ const VendorBookingDetail = () => {
     if (!confirm("Are you sure you want to check in this guest?")) return;
     setIsActionLoading(true);
     try {
-      await api.vendor.checkIn(id!);
+      await bookingsService.checkIn(id!);
       toast({ title: "Guest checked in successfully" });
       fetchBooking();
     } catch (error: any) {
@@ -86,7 +86,7 @@ const VendorBookingDetail = () => {
     if (!confirm("Are you sure you want to check out this guest?")) return;
     setIsActionLoading(true);
     try {
-      await api.vendor.checkOut(id!);
+      await bookingsService.checkOut(id!);
       toast({ title: "Guest checked out successfully" });
       fetchBooking();
     } catch (error: any) {
@@ -100,7 +100,7 @@ const VendorBookingDetail = () => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
     setIsActionLoading(true);
     try {
-      await api.vendor.updateBookingStatus(id!, "CANCELLED");
+      await bookingsService.updateBookingStatus(id!, "CANCELLED");
       toast({ title: "Booking cancelled" });
       fetchBooking();
     } catch (error: any) {
@@ -112,7 +112,7 @@ const VendorBookingDetail = () => {
 
   const handleViewInvoice = async () => {
     try {
-      const invoice = await api.vendor.getInvoice(id!);
+      const invoice = await bookingsService.getInvoice(id!);
       window.open(`/vendor/invoice/${id}`, "_blank");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });

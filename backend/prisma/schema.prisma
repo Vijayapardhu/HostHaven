@@ -26,6 +26,12 @@ enum PropertyType {
   TEMPLE
 }
 
+enum City {
+  VIJAYAWADA
+  NANDIYALA
+  VETLAPALEM
+}
+
 enum PropertyStatus {
   DRAFT
   PENDING
@@ -75,6 +81,12 @@ enum SupportTicketStatus {
   RESOLVED
 }
 
+enum PayoutFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 // ============================================
 // USER MANAGEMENT
 // ============================================
@@ -95,6 +107,12 @@ model User {
   isActive      Boolean   @default(true)
   isVerified    Boolean   @default(false)
   emailVerifiedAt DateTime?
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+  passwordResetToken String?
+  passwordResetExpires DateTime?
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
   
   // Security
   lastLoginAt   DateTime?
@@ -108,11 +126,12 @@ model User {
   reviews       Review[]
   wishlistItems Wishlist[]
   sessions      Session[]
-  otpCodes      OtpCode[]
   notifications Notification[]
   serviceBookings ServiceBooking[]
   supportTickets SupportTicket[]
   pushSubscriptions UserPushSubscription[]
+  addresses     UserAddress[]
+  adminLogs     AdminLog[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -130,6 +149,8 @@ model Session {
   refreshToken String   @unique
   userAgent    String?
   ipAddress    String?
+  deviceType   String?
+  location     String?
   expiresAt    DateTime
   isActive     Boolean  @default(true)
   
@@ -138,22 +159,6 @@ model Session {
   @@index([userId])
   @@index([refreshToken])
   @@map("sessions")
-}
-
-model OtpCode {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  code      String
-  type      String   // email_verification, password_reset, phone_verification
-  expiresAt DateTime
-  isUsed    Boolean  @default(false)
-  
-  createdAt DateTime @default(now())
-  
-  @@index([userId, type])
-  @@map("otp_codes")
 }
 
 // ============================================
@@ -176,10 +181,12 @@ model Vendor {
   approvedBy      String?
   approvedAt      DateTime?
   commissionRate  Decimal  @default(10) @db.Decimal(5, 2)
+  isDeleted      Boolean  @default(false)
+  deletedAt      DateTime?
   
   properties      Property[]
-  services        Service[]
   payouts         Payout[]
+  commissionLedger CommissionLedger[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -204,10 +211,11 @@ model Property {
   slug            String         @unique
   description     String         @db.Text
   shortDesc       String?
+  searchText      String?
   
   // Location
   address         String
-  city            String
+  city            City
   state           String
   pincode         String
   latitude        Decimal?       @db.Decimal(10, 8)
@@ -221,6 +229,7 @@ model Property {
   // Features
   amenities       Json           // ["wifi", "parking", "pool"]
   highlights      Json?
+  featureFlags    Json?
   
   // Pricing (base)
   basePrice       Decimal        @db.Decimal(10, 2)
@@ -235,6 +244,8 @@ model Property {
   // Flags
   isFeatured      Boolean        @default(false)
   isVerified      Boolean        @default(false)
+  isDeleted       Boolean        @default(false)
+  deletedAt       DateTime?
   
   // SEO
   metaTitle       String?
@@ -245,6 +256,7 @@ model Property {
   bookings        Booking[]
   reviews         Review[]
   templeDetails   TempleDetails?
+  cancellationPolicy CancellationPolicy?
   
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -282,14 +294,52 @@ model Room {
   availableRooms  Int      @default(1)
   
   isActive        Boolean  @default(true)
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
   
   bookings        Booking[]
+  inventoryLocks  InventoryLock[]
+  inventoryDays   InventoryDay[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([propertyId])
   @@map("rooms")
+}
+
+model InventoryLock {
+  id             String   @id @default(uuid())
+  roomId         String
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId         String?
+  quantity       Int      @default(1)
+  checkInDate    DateTime
+  checkOutDate   DateTime
+  lockUntil      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([roomId, lockUntil])
+  @@index([roomId, checkInDate, checkOutDate])
+  @@map("inventory_locks")
+}
+
+model InventoryDay {
+  id             String   @id @default(uuid())
+  roomId         String
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  date           DateTime
+  totalRooms     Int
+  availableRooms Int
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([roomId, date])
+  @@index([roomId, date])
+  @@map("inventory_days")
 }
 
 model TempleDetails {
@@ -301,6 +351,7 @@ model TempleDetails {
   templeType      String?  // shiva, vishnu, etc.
   builtYear       String?
   architecture    String?
+  searchText      String?
   
   darshanTimings  Json     // [{ day, openTime, closeTime }]
   aartiTimings    Json?
@@ -353,9 +404,12 @@ model Booking {
   
   // Status
   status          BookingStatus @default(PENDING)
+  isDeleted       Boolean       @default(false)
+  deletedAt       DateTime?
   
   // Payment
   payment         Payment?
+  commissionLedger CommissionLedger?
   
   // Additional
   specialRequests String?       @db.Text
@@ -369,7 +423,6 @@ model Booking {
   cancelledAt     DateTime?
   cancelledBy     String?
   cancellationReason String?
-  refundAmount    Decimal?      @db.Decimal(10, 2)
   
   // Check-in/out
   actualCheckIn   DateTime?
@@ -420,8 +473,8 @@ model Payment {
   
   // Refund
   refundId        String?
-  refundAmount    Decimal?      @db.Decimal(10, 2)
   refundedAt      DateTime?
+  refunds         Refund[]
   
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -429,6 +482,24 @@ model Payment {
   @@index([status])
   @@index([razorpayOrderId])
   @@map("payments")
+}
+
+model Refund {
+  id               String   @id @default(uuid())
+  paymentId        String
+  payment          Payment  @relation(fields: [paymentId], references: [id])
+
+  amount           Decimal  @db.Decimal(10, 2)
+  reason           String?
+  status           String
+
+  razorpayRefundId String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([paymentId])
+  @@map("refunds")
 }
 
 model Payout {
@@ -450,6 +521,26 @@ model Payout {
   
   @@index([vendorId])
   @@map("payouts")
+}
+
+model CommissionLedger {
+  id               String   @id @default(uuid())
+
+  bookingId        String   @unique
+  booking          Booking  @relation(fields: [bookingId], references: [id])
+
+  vendorId         String
+  vendor           Vendor   @relation(fields: [vendorId], references: [id])
+
+  bookingAmount    Decimal  @db.Decimal(10, 2)
+  commissionRate   Decimal  @db.Decimal(5, 2)
+  commissionAmount Decimal  @db.Decimal(10, 2)
+  vendorEarning    Decimal  @db.Decimal(10, 2)
+
+  createdAt        DateTime @default(now())
+
+  @@index([vendorId])
+  @@map("commission_ledger")
 }
 
 // ============================================
@@ -482,6 +573,8 @@ model Review {
   // Status
   isVerified      Boolean  @default(false)
   isVisible       Boolean  @default(true)
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
   
   // Response
   vendorResponse  String?  @db.Text
@@ -520,10 +613,27 @@ model Wishlist {
   itemRating  Decimal? @db.Decimal(3, 2)
   
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([userId, itemType, itemId])
   @@index([userId])
   @@map("wishlist")
+}
+
+model CancellationPolicy {
+  id                    String   @id @default(uuid())
+
+  propertyId            String   @unique
+  property              Property @relation(fields: [propertyId], references: [id])
+
+  freeBeforeHours       Int
+  refundPercentBefore   Decimal  @db.Decimal(5, 2)
+  refundPercentAfter    Decimal  @db.Decimal(5, 2)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("cancellation_policies")
 }
 
 // ============================================
@@ -532,12 +642,10 @@ model Wishlist {
 
 model Service {
   id              String   @id @default(uuid())
-  vendorId        String?
-  vendor          Vendor?  @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  
   name            String
   description     String   @db.Text
   category        String   // transport, guide, photography, etc.
+  searchText      String?
   
   price           Decimal  @db.Decimal(10, 2)
   priceUnit       String   @default("per_person")
@@ -547,6 +655,8 @@ model Service {
   
   isActive        Boolean  @default(true)
   isVerified      Boolean  @default(false)
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
   
   rating          Decimal  @default(0) @db.Decimal(3, 2)
   reviewCount     Int      @default(0)
@@ -586,6 +696,8 @@ model ServiceBooking {
   razorpayOrderId String?
 
   status          ServiceBookingStatus @default(ADVANCE_PAID)
+  isDeleted       Boolean              @default(false)
+  deletedAt       DateTime?
 
   adminContactedAt DateTime?
   cancelledAt      DateTime?
@@ -614,6 +726,8 @@ model SupportTicket {
   attachmentUrl     String?
 
   status            SupportTicketStatus @default(OPEN)
+  isDeleted         Boolean            @default(false)
+  deletedAt         DateTime?
 
   adminNotes        String?           @db.Text
   resolvedAt        DateTime?
@@ -624,6 +738,41 @@ model SupportTicket {
   @@index([userId])
   @@index([status])
   @@map("support_tickets")
+}
+
+model PlatformSetting {
+  id                 String          @id @default(uuid())
+  platformName       String
+  commissionRate     Decimal         @db.Decimal(5, 2)
+  supportEmail       String
+  supportPhone       String
+  emailNotifications Boolean         @default(true)
+  pushNotifications  Boolean         @default(true)
+  minPayoutAmount    Decimal         @db.Decimal(10, 2)
+  payoutFrequency    PayoutFrequency @default(WEEKLY)
+  emailTemplates     Json?
+  featureFlags       Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@map("platform_settings")
+}
+
+model AdminLog {
+  id        String   @id @default(uuid())
+
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id])
+
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@map("admin_logs")
 }
 
 // ============================================
@@ -668,4 +817,33 @@ model UserPushSubscription {
   @@unique([userId, endpoint])
   @@index([userId])
   @@map("user_push_subscriptions")
+}
+
+model UserAddress {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  label     String
+  address   String
+  city      String
+  state     String
+  pincode   String
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("user_addresses")
+}
+
+model Media {
+  id         String   @id @default(uuid())
+  url        String
+  type       String
+  entityType String
+  entityId   String
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("media")
 }

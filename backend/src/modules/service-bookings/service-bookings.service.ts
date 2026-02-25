@@ -135,10 +135,54 @@ export class ServiceBookingsService {
     return this.serialize(updated);
   }
 
+  async getByIdForAdmin(id: string) {
+    const booking = await prisma.serviceBooking.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true } },
+      },
+    });
+
+    if (!booking) {
+      const error = new Error('Service booking not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return this.serialize(booking);
+  }
+
+  async refund(id: string, amount: number, reason?: string) {
+    const booking = await prisma.serviceBooking.findUnique({ where: { id } });
+
+    if (!booking) {
+      const error = new Error('Service booking not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updated = await prisma.serviceBooking.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancellationReason: reason,
+      },
+    });
+
+    logger.info({ serviceBookingId: id, amount }, 'Service booking refund requested');
+
+    return {
+      booking: this.serialize(updated),
+      message: 'Refund recorded',
+    };
+  }
+
   private serialize(booking: any) {
     return {
       id: booking.id,
       bookingNumber: booking.bookingNumber,
+      serviceBookingNumber: booking.bookingNumber,
       user: booking.user,
       serviceId: booking.serviceId,
       serviceName: booking.serviceName,
@@ -151,6 +195,7 @@ export class ServiceBookingsService {
       totalAmount: booking.totalAmount?.toNumber?.() ?? booking.totalAmount,
       remainingAmount: booking.remainingAmount?.toNumber?.() ?? booking.remainingAmount,
       razorpayPaymentId: booking.razorpayPaymentId,
+      paymentStatus: booking.razorpayPaymentId ? 'COMPLETED' : 'PENDING',
       status: booking.status,
       adminContactedAt: booking.adminContactedAt,
       cancelledAt: booking.cancelledAt,

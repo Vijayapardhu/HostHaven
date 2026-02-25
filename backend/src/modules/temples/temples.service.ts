@@ -243,8 +243,9 @@ export class TemplesService {
       throw error;
     }
 
-    await prisma.templeDetails.delete({
-      where: { id },
+    await prisma.property.update({
+      where: { id: temple.propertyId },
+      data: { isDeleted: true, deletedAt: new Date(), status: 'INACTIVE' },
     });
 
     await cacheService.del(cacheService.keys.property(temple.propertyId));

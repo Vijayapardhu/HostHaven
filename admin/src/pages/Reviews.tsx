@@ -1,205 +1,235 @@
-import { useEffect, useState } from 'react'
-import { Search, Star, User, Building2, Flag, Trash2, Eye } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { reviewsService, type Review } from '../lib/reviews'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface Review {
-  id: string
-  userName: string
-  propertyName: string
-  propertyType: string
-  rating: number
-  comment: string
-  isFlagged: boolean
-  createdAt: string
+type ReviewStatus = 'approved' | 'pending' | 'rejected'
+
+const statusLabels: Record<ReviewStatus, string> = {
+  approved: 'Approved',
+  pending: 'Pending',
+  rejected: 'Rejected',
+}
+
+const statusVariants: Record<ReviewStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  approved: 'success',
+  pending: 'warning',
+  rejected: 'danger',
 }
 
 export default function Reviews() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | ReviewStatus>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
+  const fetchReviews = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await reviewsService.getReviews({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      })
+      setReviews(data.data ?? data.reviews ?? [])
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load reviews.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/reviews`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setReviews(data.reviews || [])
-        } else {
-          setReviews([
-            { id: '1', userName: 'Rahul Sharma', propertyName: 'Grand Palace Hotel', propertyType: 'Hotel', rating: 5, comment: 'Amazing experience! The staff was very polite and the rooms were spotless.', isFlagged: false, createdAt: '2024-03-15' },
-            { id: '2', userName: 'Priya Patel', propertyName: 'Beach Resort', propertyType: 'Hotel', rating: 4, comment: 'Great location and beautiful views. Could improve breakfast options.', isFlagged: false, createdAt: '2024-03-14' },
-            { id: '3', userName: 'Amit Kumar', propertyName: 'Mountain Homestay', propertyType: 'Home', rating: 2, comment: 'Not as described. Very disappointed with the cleanliness.', isFlagged: true, createdAt: '2024-03-13' },
-            { id: '4', userName: 'Sneha Gupta', propertyName: 'Luxury Villa', propertyType: 'Villa', rating: 5, comment: 'Perfect for a family vacation. Will definitely come back!', isFlagged: false, createdAt: '2024-03-12' },
-          ])
-        }
-      } catch (error) {
-        setReviews([
-          { id: '1', userName: 'Rahul Sharma', propertyName: 'Grand Palace Hotel', propertyType: 'Hotel', rating: 5, comment: 'Amazing experience! The staff was very polite and the rooms were spotless.', isFlagged: false, createdAt: '2024-03-15' },
-          { id: '2', userName: 'Priya Patel', propertyName: 'Beach Resort', propertyType: 'Hotel', rating: 4, comment: 'Great location and beautiful views. Could improve breakfast options.', isFlagged: false, createdAt: '2024-03-14' },
-          { id: '3', userName: 'Amit Kumar', propertyName: 'Mountain Homestay', propertyType: 'Home', rating: 2, comment: 'Not as described. Very disappointed with the cleanliness.', isFlagged: true, createdAt: '2024-03-13' },
-          { id: '4', userName: 'Sneha Gupta', propertyName: 'Luxury Villa', propertyType: 'Villa', rating: 5, comment: 'Perfect for a family vacation. Will definitely come back!', isFlagged: false, createdAt: '2024-03-12' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchReviews()
-  }, [])
+  }, [page, pageSize, searchTerm, statusFilter])
 
-  const filteredReviews = reviews.filter(review => {
-    const matchesSearch = review.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.propertyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.comment.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFlag = !showFlaggedOnly || review.isFlagged
-    return matchesSearch && matchesFlag
-  })
-
-  const handleDelete = async (reviewId: string) => {
+  const handleStatusChange = async (reviewId: string, status: ReviewStatus) => {
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/reviews/${reviewId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      setReviews(reviews.filter(r => r.id !== reviewId))
-    } catch (error) {
-      console.error('Failed to delete review')
+      if (status === 'approved') {
+        await reviewsService.approveReview(reviewId)
+      } else if (status === 'rejected') {
+        await reviewsService.rejectReview(reviewId)
+      }
+      setReviews((prev) => prev.map((review) => (review.id === reviewId ? { ...review, status } : review)))
+      toast.success('Review status updated.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update review.')
     }
   }
 
-  const handleUnflag = async (reviewId: string) => {
+  const confirmDeleteAction = async () => {
+    if (!confirmDelete) return
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/reviews/${reviewId}/unflag`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      setReviews(reviews.map(r => r.id === reviewId ? { ...r, isFlagged: false } : r))
-    } catch (error) {
-      console.error('Failed to unflag review')
+      await reviewsService.deleteReview(confirmDelete)
+      setReviews((prev) => prev.filter((review) => review.id !== confirmDelete))
+      toast.success('Review deleted successfully.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to delete review.')
+    } finally {
+      setConfirmDelete(null)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
+  const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Reviews</h1>
-        <p className="text-gray-600 mt-1">Moderate and manage reviews</p>
-      </div>
+      <PageHeader
+        title="Reviews"
+        description="Moderate user reviews and manage approvals."
+      />
 
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search reviews..."
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by reviewer, title, or comment"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => {
+                setPage(1)
+                setSearchTerm(event.target.value)
+              }}
             />
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showFlaggedOnly}
-              onChange={(e) => setShowFlaggedOnly(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <span className="text-sm text-gray-700">Show flagged only</span>
-          </label>
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value as 'all' | ReviewStatus)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+          >
+            <option value="all">All status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
         </div>
+      </FiltersBar>
 
-        <div className="divide-y divide-gray-200">
-          {filteredReviews.map((review) => (
-            <div key={review.id} className="p-6 hover:bg-gray-50">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="w-6 h-6 text-primary" />
-                  </div>
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load reviews"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchReviews}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : reviews.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No reviews match your filters' : 'No reviews yet'}
+          description={hasFilters ? 'Try adjusting your search or status filter.' : 'Reviews will appear here.'}
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Reviewer</TableHead>
+              <TableHead>Rating</TableHead>
+              <TableHead>Comment</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reviews.map((review) => (
+              <TableRow key={review.id}>
+                <TableCell>
                   <div>
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-gray-900">{review.userName}</h3>
-                      {review.isFlagged && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs">
-                          <Flag className="w-3 h-3" />
-                          Flagged
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Building2 className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{review.propertyName}</span>
-                      <span className="text-gray-300">|</span>
-                      <span className="text-sm text-gray-500">{review.propertyType}</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${
-                            star <= review.rating
-                              ? 'text-yellow-500 fill-yellow-500'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <p className="mt-3 text-gray-700">{review.comment}</p>
-                    <p className="mt-2 text-sm text-gray-500">
-                      {new Date(review.createdAt).toLocaleDateString()}
-                    </p>
+                    <p className="font-semibold text-slate-900">{review.userName}</p>
+                    <p className="text-xs text-slate-500">{review.propertyId}</p>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  {review.isFlagged && (
-                    <button
-                      onClick={() => handleUnflag(review.id)}
-                      className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-700">{review.rating} / 5</span>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{review.title}</p>
+                    <p className="text-xs text-slate-500 line-clamp-2">{review.comment}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge label={statusLabels[review.status]} variant={statusVariants[review.status]} />
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-600">{new Date(review.createdAt).toLocaleDateString()}</span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <select
+                      value={review.status}
+                      onChange={(event) => handleStatusChange(review.id, event.target.value as ReviewStatus)}
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700"
                     >
-                      Unflag
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(review.id)}
+                      className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      Delete
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(review.id)}
-                    className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-        {filteredReviews.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No reviews found
-          </div>
-        )}
-      </div>
+      {!isLoading && !error && reviews.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmDelete)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(null)
+        }}
+        title="Delete this review?"
+        description="This action cannot be undone."
+        confirmText="Delete review"
+        variant="danger"
+        onConfirm={confirmDeleteAction}
+      />
     </div>
   )
 }

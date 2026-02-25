@@ -9,12 +9,26 @@ const createRedisClient = () => {
   });
 };
 
+const createNoopRedis = () => {
+  return {
+    get: async () => null,
+    set: async () => 'OK',
+    setex: async () => 'OK',
+    del: async () => 0,
+    keys: async () => [],
+    exists: async () => 0,
+    quit: async () => undefined,
+  };
+};
+
 declare global {
   // eslint-disable-next-line no-var
   var redis: Redis | undefined;
 }
 
-export const redis = globalThis.redis ?? createRedisClient();
+export const redis = config.redis.enabled
+  ? globalThis.redis ?? createRedisClient()
+  : createNoopRedis();
 
 if (config.app.nodeEnv === 'development') {
   globalThis.redis = redis;

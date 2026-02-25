@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { roomsService } from "@/lib/rooms";
 import { useToast } from "@/hooks/use-toast";
 
 interface Room {
@@ -73,7 +73,7 @@ const VendorRoomDetail = () => {
 
   const fetchRoom = async () => {
     try {
-      const response = await api.vendor.getRooms("");
+      const response = await roomsService.getRooms("");
       const foundRoom = response.find((r: Room) => r.id === id);
       if (foundRoom) {
         setRoom(foundRoom);
@@ -95,7 +95,7 @@ const VendorRoomDetail = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await api.vendor.updateRoom(id!, {
+      await roomsService.updateRoom(id!, {
         name: formData.name,
         type: formData.type,
         basePrice: parseFloat(formData.basePrice),
@@ -114,7 +114,7 @@ const VendorRoomDetail = () => {
 
   const handleToggleActive = async () => {
     try {
-      await api.vendor.updateRoom(id!, { isActive: !room?.isActive });
+      await roomsService.updateRoom(id!, { isActive: !room?.isActive });
       setRoom((prev) => prev ? { ...prev, isActive: !prev.isActive } : null);
       toast({ title: room?.isActive ? "Room deactivated" : "Room activated" });
     } catch (error: any) {
@@ -125,7 +125,7 @@ const VendorRoomDetail = () => {
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this room?")) return;
     try {
-      await api.vendor.deleteRoom(id!);
+      await roomsService.deleteRoom(id!);
       toast({ title: "Room deleted" });
       navigate("/vendor/rooms");
     } catch (error: any) {
@@ -161,7 +161,7 @@ const VendorRoomDetail = () => {
           <p className="text-muted-foreground">{room.property.name}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={() => setIsEditOpen(true)}>
+          <Button variant="outline" className="gap-2" onClick={() => navigate(`/vendor/rooms/${id}/edit`)}>
             <Edit className="w-4 h-4" />Edit Room
           </Button>
           <Button variant="destructive" onClick={handleDelete}>

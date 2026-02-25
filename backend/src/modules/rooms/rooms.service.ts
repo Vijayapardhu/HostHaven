@@ -18,7 +18,7 @@ export class RoomsService {
     const limit = filters.limit || 10;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.RoomWhereInput = { isActive: true };
+    const where: Prisma.RoomWhereInput = { isActive: true, isDeleted: false };
 
     if (filters.propertyId) {
       where.propertyId = filters.propertyId;
@@ -75,7 +75,7 @@ export class RoomsService {
 
   async getById(id: string) {
     const room = await prisma.room.findUnique({
-      where: { id },
+      where: { id, isDeleted: false },
       include: {
         property: {
           include: {
@@ -116,7 +116,7 @@ export class RoomsService {
     availableRooms: number;
   }) {
     const property = await prisma.property.findUnique({
-      where: { id: data.propertyId },
+      where: { id: data.propertyId, isDeleted: false },
     });
 
     if (!property) {
@@ -168,7 +168,7 @@ export class RoomsService {
     isActive: boolean;
   }>) {
     const room = await prisma.room.findUnique({
-      where: { id },
+      where: { id, isDeleted: false },
       include: { property: true },
     });
 
@@ -216,7 +216,7 @@ export class RoomsService {
 
     await prisma.room.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive: false, isDeleted: true, deletedAt: new Date() },
     });
 
     await cacheService.del(cacheService.keys.property(room.propertyId));

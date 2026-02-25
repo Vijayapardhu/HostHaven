@@ -30,6 +30,7 @@ export class PropertiesService {
 
     const where: Prisma.PropertyWhereInput = {
       status: 'ACTIVE',
+      isDeleted: false,
     };
 
     if (filters.vendorId) {
@@ -41,7 +42,7 @@ export class PropertiesService {
     }
 
     if (filters.city) {
-      where.city = { equals: filters.city, mode: 'insensitive' };
+      where.city = filters.city as any;
     }
 
     if (filters.state) {
@@ -72,7 +73,6 @@ export class PropertiesService {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
         { description: { contains: filters.search, mode: 'insensitive' } },
-        { city: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
 
@@ -105,7 +105,7 @@ export class PropertiesService {
         orderBy,
         include: {
           rooms: {
-            where: { isActive: true },
+            where: { isActive: true, isDeleted: false },
             select: {
               id: true,
               name: true,
@@ -140,10 +140,10 @@ export class PropertiesService {
     }
 
     const property = await prisma.property.findUnique({
-      where: { id },
+      where: { id, isDeleted: false },
       include: {
         rooms: {
-          where: { isActive: true },
+          where: { isActive: true, isDeleted: false },
         },
         templeDetails: true,
         reviews: {
@@ -304,7 +304,7 @@ export class PropertiesService {
 
     await prisma.property.update({
       where: { id },
-      data: { status: 'INACTIVE' },
+      data: { status: 'INACTIVE', isDeleted: true, deletedAt: new Date() },
     });
 
     await cacheService.del(cacheService.keys.property(id));

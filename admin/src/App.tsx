@@ -2,6 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Toaster } from 'sonner'
 import AdminLogin from './pages/AdminLogin'
+import Success from './pages/Success'
+import ErrorPage from './pages/ErrorPage'
+import LoadingPage from './pages/LoadingPage'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
 import Vendors from './pages/Vendors'
@@ -35,6 +38,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<AdminLogin />} />
+          <Route path="/success" element={<Success />} />
+          <Route path="/error" element={<ErrorPage />} />
+          <Route path="/loading" element={<LoadingPage />} />
           
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />

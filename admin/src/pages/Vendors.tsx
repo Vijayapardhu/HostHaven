@@ -1,203 +1,281 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Building2, MapPin, Phone, Mail, Star, ArrowRight, CheckCircle, XCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import { Ban, CheckCircle, Eye } from 'lucide-react'
+import { vendorsService, type Vendor } from '../lib/vendors'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface Vendor {
-  id: string
-  name: string
-  email: string
-  phone: string
-  propertyName: string
-  location: string
-  rating: number
-  totalBookings: number
-  status: 'active' | 'pending' | 'suspended'
-  kycVerified: boolean
-  createdAt: string
+type VendorStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
+
+const statusOptions: Array<{ label: string; value: 'all' | VendorStatus }> = [
+  { label: 'All status', value: 'all' },
+  { label: 'Approved', value: 'approved' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Rejected', value: 'rejected' },
+  { label: 'Suspended', value: 'suspended' },
+]
+
+const statusLabels: Record<VendorStatus, string> = {
+  approved: 'Approved',
+  pending: 'Pending',
+  rejected: 'Rejected',
+  suspended: 'Suspended',
+}
+
+const statusVariants: Record<VendorStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  approved: 'success',
+  pending: 'warning',
+  rejected: 'danger',
+  suspended: 'danger',
 }
 
 export default function Vendors() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'suspended'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | VendorStatus>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmAction, setConfirmAction] = useState<{
+    vendorId: string
+    nextStatus: 'suspended' | 'approved'
+  } | null>(null)
+
+  const fetchVendors = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await vendorsService.getVendors({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      })
+      setVendors(data.data ?? data.vendors ?? [])
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load vendors.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchVendors = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/vendors`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setVendors(data.vendors || [])
-        } else {
-          setVendors([
-            { id: '1', name: 'John Doe', email: 'john@hotel.com', phone: '+91 9876543210', propertyName: 'Grand Hotel', location: 'Mumbai, MH', rating: 4.5, totalBookings: 120, status: 'active', kycVerified: true, createdAt: '2024-01-10' },
-            { id: '2', name: 'Sarah Smith', email: 'sarah@resort.com', phone: '+91 9876543211', propertyName: 'Beach Resort', location: 'Goa, GA', rating: 4.8, totalBookings: 85, status: 'active', kycVerified: true, createdAt: '2024-02-15' },
-            { id: '3', name: 'Mike Johnson', email: 'mike@homestay.com', phone: '+91 9876543212', propertyName: 'Mountain Homestay', location: 'Manali, HP', rating: 4.2, totalBookings: 45, status: 'pending', kycVerified: false, createdAt: '2024-03-01' },
-          ])
-        }
-      } catch (error) {
-        setVendors([
-          { id: '1', name: 'John Doe', email: 'john@hotel.com', phone: '+91 9876543210', propertyName: 'Grand Hotel', location: 'Mumbai, MH', rating: 4.5, totalBookings: 120, status: 'active', kycVerified: true, createdAt: '2024-01-10' },
-          { id: '2', name: 'Sarah Smith', email: 'sarah@resort.com', phone: '+91 9876543211', propertyName: 'Beach Resort', location: 'Goa, GA', rating: 4.8, totalBookings: 85, status: 'active', kycVerified: true, createdAt: '2024-02-15' },
-          { id: '3', name: 'Mike Johnson', email: 'mike@homestay.com', phone: '+91 9876543212', propertyName: 'Mountain Homestay', location: 'Manali, HP', rating: 4.2, totalBookings: 45, status: 'pending', kycVerified: false, createdAt: '2024-03-01' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchVendors()
-  }, [])
+  }, [page, pageSize, searchTerm, statusFilter])
 
-  const filteredVendors = vendors.filter(vendor => {
-    const matchesSearch = vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.propertyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
+  const handleStatusChange = (vendor: Vendor, nextStatus: 'suspended' | 'approved') => {
+    setConfirmAction({ vendorId: vendor.id, nextStatus })
   }
+
+  const confirmStatusChange = async () => {
+    if (!confirmAction) return
+    const { vendorId, nextStatus } = confirmAction
+    try {
+      if (nextStatus === 'suspended') {
+        await vendorsService.suspendVendor(vendorId)
+      } else {
+        await vendorsService.activateVendor(vendorId)
+      }
+      toast.success(`Vendor ${nextStatus === 'suspended' ? 'suspended' : 'activated'} successfully.`)
+      setVendors((prev) =>
+        prev.map((vendor) =>
+          vendor.id === vendorId ? { ...vendor, status: nextStatus === 'approved' ? 'approved' : 'suspended' } : vendor
+        )
+      )
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update vendor status.')
+    } finally {
+      setConfirmAction(null)
+    }
+  }
+
+  const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Vendors</h1>
-          <p className="text-gray-600 mt-1">Manage registered vendors</p>
-        </div>
-        <Link
-          to="/vendors/approval"
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          Pending Approvals
-        </Link>
-      </div>
+      <PageHeader
+        title="Vendors"
+        description="Track vendor onboarding, status, and payouts."
+        actions={
+          <Link
+            to="/vendors/approval"
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            Pending approvals
+          </Link>
+        }
+      />
 
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search vendors..."
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by vendor, business, or email"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => {
+                setPage(1)
+                setSearchTerm(event.target.value)
+              }}
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value as 'all' | VendorStatus)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="pending">Pending</option>
-            <option value="suspended">Suspended</option>
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
+      </FiltersBar>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">KYC</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredVendors.map((vendor) => (
-                <tr key={vendor.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{vendor.name}</p>
-                        <p className="text-sm text-gray-500">{vendor.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-gray-900">{vendor.propertyName}</p>
-                    <p className="text-sm text-gray-500">{vendor.totalBookings} bookings</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <MapPin className="w-4 h-4" />
-                      {vendor.location}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className="font-medium">{vendor.rating}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {vendor.kycVerified ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="w-4 h-4" />
-                        Verified
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-red-600">
-                        <XCircle className="w-4 h-4" />
-                        Pending
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      vendor.status === 'active' 
-                        ? 'bg-green-100 text-green-700' 
-                        : vendor.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {vendor.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load vendors"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchVendors}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : vendors.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No vendors match your filters' : 'No vendors yet'}
+          description={
+            hasFilters
+              ? 'Try adjusting your search or status filter.'
+              : 'New vendor registrations will appear here.'
+          }
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Vendor</TableHead>
+              <TableHead>Business</TableHead>
+              <TableHead>Commission</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Joined</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {vendors.map((vendor) => (
+              <TableRow key={vendor.id}>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{vendor.email}</p>
+                    <p className="text-xs text-slate-500">{vendor.phone}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{vendor.businessName}</p>
+                    <p className="text-xs text-slate-500">{vendor.businessType}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-medium text-slate-700">{vendor.commissionRate}%</span>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge
+                    label={statusLabels[vendor.status]}
+                    variant={statusVariants[vendor.status]}
+                  />
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-slate-600">
+                    {new Date(vendor.createdAt).toLocaleDateString()}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <Link
                       to={`/vendors/${vendor.id}`}
-                      className="text-primary hover:underline text-sm font-medium"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
-                      View Details
+                      <Eye className="h-4 w-4" />
+                      View
                     </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    {vendor.status === 'approved' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(vendor, 'suspended')}
+                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                      >
+                        <Ban className="h-4 w-4" />
+                        Suspend
+                      </button>
+                    ) : vendor.status === 'suspended' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(vendor, 'approved')}
+                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Activate
+                      </button>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-        {filteredVendors.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No vendors found matching your criteria
-          </div>
-        )}
-      </div>
+      {!isLoading && !error && vendors.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null)
+        }}
+        title={confirmAction?.nextStatus === 'suspended' ? 'Suspend this vendor?' : 'Reactivate this vendor?'}
+        description={
+          confirmAction?.nextStatus === 'suspended'
+            ? 'The vendor will lose access and listings will be hidden.'
+            : 'The vendor will regain access immediately.'
+        }
+        confirmText={confirmAction?.nextStatus === 'suspended' ? 'Suspend vendor' : 'Activate vendor'}
+        variant={confirmAction?.nextStatus === 'suspended' ? 'danger' : 'default'}
+        onConfirm={confirmStatusChange}
+      />
     </div>
   )
 }

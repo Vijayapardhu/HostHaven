@@ -1,5 +1,11 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
-import api from "@/lib/api";
+import { authService } from "@/lib/auth";
+import { vendorService } from "@/lib/vendor";
+import {
+  clearTokens,
+  hasValidAccessToken,
+  setTokens,
+} from "@/services/tokenService";
 
 interface VendorUser {
   id: string;
@@ -28,7 +34,7 @@ interface VendorContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshVendor: () => Promise<void>;
 }
 
@@ -38,25 +44,16 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
   const [vendor, setVendor] = useState<VendorProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const storeTokens = (tokens: { accessToken: string; refreshToken: string }) => {
-    localStorage.setItem("vendorToken", tokens.accessToken);
-    localStorage.setItem("vendorRefreshToken", tokens.refreshToken);
-  };
-
-  const clearTokens = () => {
-    localStorage.removeItem("vendorToken");
-    localStorage.removeItem("vendorRefreshToken");
-  };
-
   const refreshVendor = useCallback(async () => {
-    const token = localStorage.getItem("vendorToken");
-    if (!token) {
+    if (!hasValidAccessToken()) {
+      clearTokens();
+      setVendor(null);
       setIsLoading(false);
       return;
     }
 
     try {
-      const response = await api.vendor.getProfile();
+      const response = await vendorService.getProfile();
       setVendor(response);
     } catch {
       clearTokens();
@@ -70,16 +67,27 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
     refreshVendor();
   }, [refreshVendor]);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearTokens();
+      setVendor(null);
+    };
+
+    window.addEventListener("vendor:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("vendor:unauthorized", handleUnauthorized);
+    };
+  }, []);
+
   const login = async (email: string, password: string) => {
-    const response = await api.vendor.login(email, password);
-    storeTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
+    const response = await vendorService.login(email, password);
+    setTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
     setVendor(response.vendor);
   };
 
   const logout = async () => {
     try {
-      const refreshToken = localStorage.getItem("vendorRefreshToken");
-      await api.auth.logout(refreshToken || undefined);
+      await authService.logout();
     } catch {
       // Ignore
     }

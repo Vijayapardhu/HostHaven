@@ -208,7 +208,7 @@ export class ReviewsService {
     images: string[];
   }>) {
     const review = await prisma.review.findFirst({
-      where: { id, userId },
+      where: { id, userId, isDeleted: false },
     });
 
     if (!review) {
@@ -237,7 +237,7 @@ export class ReviewsService {
       ? { id } 
       : { id, userId };
 
-    const review = await prisma.review.findFirst({ where });
+    const review = await prisma.review.findFirst({ where: { ...where, isDeleted: false } });
 
     if (!review) {
       const error = new Error('Review not found');
@@ -247,7 +247,7 @@ export class ReviewsService {
 
     await prisma.review.update({
       where: { id },
-      data: { isVisible: false },
+      data: { isVisible: false, isDeleted: true, deletedAt: new Date() },
     });
 
     await this.updatePropertyRating(review.propertyId);
@@ -265,6 +265,7 @@ export class ReviewsService {
         where: {
           propertyId,
           isVisible: true,
+          isDeleted: false,
         },
         skip,
         take: limit,

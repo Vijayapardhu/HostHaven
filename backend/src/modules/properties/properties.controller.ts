@@ -69,6 +69,10 @@ export const PropertiesController = {
         data.type = 'HOTEL';
       }
 
+      if (data.type === 'HOME' && user.role !== 'ADMIN') {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Only admin can manage homes', 403);
+      }
+
       const property = await propertiesService.create({
         ...data,
         vendorId: user.role === 'VENDOR' ? user.id : undefined,

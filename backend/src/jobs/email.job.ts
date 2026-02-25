@@ -4,47 +4,51 @@ import { config } from '../config';
 import { logger } from '../utils/logger.util';
 import prisma from '../config/database';
 
-const connection = new Redis(config.redis.url, {
-  maxRetriesPerRequest: null,
-});
+const connection = config.redis.enabled
+  ? new Redis(config.redis.url, { maxRetriesPerRequest: null })
+  : null;
 
-export const emailWorker = new Worker(
-  'email-queue',
-  async (job: Job) => {
-    logger.info({ jobId: job.id, name: job.name }, 'Processing email job');
+export const emailWorker = config.redis.enabled
+  ? new Worker(
+      'email-queue',
+      async (job: Job) => {
+        logger.info({ jobId: job.id, name: job.name }, 'Processing email job');
 
-    const { type, data } = job.data;
+        const { type, data } = job.data;
 
-    switch (type) {
-      case 'booking-confirmed':
-        await handleBookingConfirmed(data);
-        break;
-      case 'booking-cancelled':
-        await handleBookingCancelled(data);
-        break;
-      case 'payment-reminder':
-        await handlePaymentReminder(data);
-        break;
-      case 'review-request':
-        await handleReviewRequest(data);
-        break;
-      default:
-        logger.warn({ jobType: type }, 'Unknown email job type');
-    }
-  },
-  {
-    connection,
-    concurrency: 5,
-  }
-);
+        switch (type) {
+          case 'booking-confirmed':
+            await handleBookingConfirmed(data);
+            break;
+          case 'booking-cancelled':
+            await handleBookingCancelled(data);
+            break;
+          case 'payment-reminder':
+            await handlePaymentReminder(data);
+            break;
+          case 'review-request':
+            await handleReviewRequest(data);
+            break;
+          default:
+            logger.warn({ jobType: type }, 'Unknown email job type');
+        }
+      },
+      {
+        connection: connection as Redis,
+        concurrency: 5,
+      }
+    )
+  : null;
 
-emailWorker.on('completed', (job) => {
-  logger.info({ jobId: job.id }, 'Email job completed');
-});
+if (emailWorker) {
+  emailWorker.on('completed', (job) => {
+    logger.info({ jobId: job.id }, 'Email job completed');
+  });
 
-emailWorker.on('failed', (job, err) => {
-  logger.error({ jobId: job?.id, error: err.message }, 'Email job failed');
-});
+  emailWorker.on('failed', (job, err) => {
+    logger.error({ jobId: job?.id, error: err.message }, 'Email job failed');
+  });
+}
 
 async function handleBookingConfirmed(data: any) {
   const { userEmail, userName, propertyName, checkIn, checkOut, bookingNumber, totalAmount } = data;
@@ -86,7 +90,7 @@ async function handleBookingConfirmed(data: any) {
 }
 
 async function handleBookingCancelled(data: any) {
-  const { userEmail, userName, propertyName, bookingNumber, refundAmount } = data;
+  const { userEmail, userName, propertyName, bookingNumber } = data;
   
   const nodemailer = await import('nodemailer');
   const transporter = nodemailer.createTransport({
@@ -108,7 +112,6 @@ async function handleBookingCancelled(data: any) {
         <h2 style="color: #e74c3c;">Booking Cancelled</h2>
         <p>Dear ${userName},</p>
         <p>Your booking (${bookingNumber}) for ${propertyName} has been cancelled.</p>
-        ${refundAmount ? `<p><strong>Refund Amount:</strong> ₹${refundAmount}</p>` : ''}
         <p>We hope to serve you again in the future.</p>
         <p>Best regards,<br>HostHaven Team</p>
       </div>

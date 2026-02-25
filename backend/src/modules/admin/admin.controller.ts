@@ -12,7 +12,9 @@ import {
   bookingRefundSchema,
   markPayoutPaidSchema,
   inventoryOverrideSchema,
+  analyticsSchema,
 } from './admin.schema';
+import { platformSettingsSchema } from './admin-settings.schema';
 
 export const AdminController = {
   async getDashboard(request: FastifyRequest, reply: FastifyReply) {
@@ -38,6 +40,38 @@ export const AdminController = {
     } catch (error: any) {
       logger.error({ error }, 'Get system stats failed');
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch stats', 500);
+    }
+  },
+
+  async getAnalytics(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const query = analyticsSchema.parse(request.query);
+      const result = await adminService.getAnalytics(query.range);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Get analytics failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch analytics', 500);
+    }
+  },
+
+  async getSettings(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const result = await adminService.getPlatformSettings();
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Get settings failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch settings', 500);
+    }
+  },
+
+  async updateSettings(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = platformSettingsSchema.parse(request.body);
+      const result = await adminService.updatePlatformSettings(data);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Update settings failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update settings', 500);
     }
   },
 

@@ -1,324 +1,388 @@
-import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, Clock, CreditCard, CheckCircle, XCircle, MessageSquare, Save, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { ArrowLeft, CalendarDays, Clock, Phone } from 'lucide-react'
+import { serviceBookingsService, type ServiceBooking } from '../lib/serviceBookings'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { PageLoader } from '../components/ui/PageLoader'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { EmptyState } from '../components/ui/EmptyState'
 
-interface WorkerAssignment {
-  name: string
-  phone: string
-  role: string
-  notes: string
+type ServiceBookingStatus = 'ADVANCE_PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
+
+const statusLabels: Record<ServiceBookingStatus, string> = {
+  ADVANCE_PAID: 'Advance paid',
+  CONFIRMED: 'Confirmed',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
 }
 
-interface ServiceBookingDetail {
-  id: string
-  bookingNumber: string
-  userName: string
-  userEmail: string
-  userPhone: string
-  serviceName: string
-  serviceCategory: string
-  serviceDate: string
-  serviceTime: string
-  location: string
-  notes: string
-  advanceAmount: number
-  totalAmount: number
-  remainingAmount: number
-  status: 'ADVANCE_PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
-  createdAt: string
-  adminContactedAt?: string
-  assignedWorker?: WorkerAssignment
-  activityLog: { action: string; timestamp: string; by: string }[]
+const statusVariants: Record<ServiceBookingStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
+  ADVANCE_PAID: 'warning',
+  CONFIRMED: 'info',
+  COMPLETED: 'success',
+  CANCELLED: 'danger',
 }
 
 export default function ServiceBookingDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [booking, setBooking] = useState<ServiceBookingDetail | null>(null)
+  const [booking, setBooking] = useState<ServiceBooking | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [worker, setWorker] = useState<WorkerAssignment>({
-    name: '',
-    phone: '',
-    role: 'Guide',
-    notes: '',
-  })
+  const [error, setError] = useState<string | null>(null)
+  const [confirmAccept, setConfirmAccept] = useState(false)
+  const [confirmReject, setConfirmReject] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [confirmComplete, setConfirmComplete] = useState(false)
+  const [confirmRefund, setConfirmRefund] = useState(false)
 
-  useEffect(() => {
-    const fetchBooking = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/service-bookings/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setBooking(data.booking)
-          if (data.booking?.assignedWorker) {
-            setWorker(data.booking.assignedWorker)
-          }
-        } else {
-          const mockBooking: ServiceBookingDetail = {
-            id: id || '1',
-            bookingNumber: 'SB001',
-            userName: 'Rahul Sharma',
-            userEmail: 'rahul@example.com',
-            userPhone: '+91 9876543210',
-            serviceName: 'Local Guide',
-            serviceCategory: 'guide',
-            serviceDate: '2024-03-25',
-            serviceTime: '09:00 AM',
-            location: 'Temple Complex, Tirupati',
-            notes: 'Need guide for main temple and nearby spots',
-            advanceAmount: 1000,
-            totalAmount: 2000,
-            remainingAmount: 1000,
-            status: 'ADVANCE_PAID',
-            createdAt: '2024-03-20',
-            activityLog: [
-              { action: 'Service booking created', timestamp: '2024-03-20T10:00:00Z', by: 'System' },
-              { action: 'Advance payment received', timestamp: '2024-03-20T10:05:00Z', by: 'System' },
-            ]
-          }
-          setBooking(mockBooking)
-        }
-      } catch (error) {
-        setBooking(null)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchBooking()
-  }, [id])
-
-  const handleAssignWorker = async () => {
-    if (!booking) return
-    setIsSaving(true)
+  const fetchBooking = async () => {
+    if (!id) return
+    setIsLoading(true)
+    setError(null)
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/service-bookings/${id}/assign-worker`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(worker)
-      })
-      setBooking({
-        ...booking,
-        assignedWorker: worker,
-        status: booking.status === 'ADVANCE_PAID' ? 'CONFIRMED' : booking.status
-      })
-    } catch (error) {
-      console.error('Failed to assign worker')
+      const data = await serviceBookingsService.getServiceBookingById(id)
+      setBooking(data)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load service booking details.')
     } finally {
-      setIsSaving(false)
+      setIsLoading(false)
     }
   }
 
-  const handleStatusChange = async (newStatus: ServiceBookingDetail['status']) => {
+  useEffect(() => {
+    fetchBooking()
+  }, [id])
+
+  const statusLabel = useMemo(() => {
+    if (!booking) return ''
+    return statusLabels[booking.status]
+  }, [booking])
+
+  const statusVariant = useMemo(() => {
+    if (!booking) return 'neutral' as const
+    return statusVariants[booking.status]
+  }, [booking])
+
+  const handleAccept = async () => {
     if (!booking) return
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/service-bookings/${id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-      setBooking({ ...booking, status: newStatus })
-    } catch (error) {
-      console.error('Failed to update status')
+      await serviceBookingsService.acceptServiceBooking(booking.id)
+      setBooking({ ...booking, status: 'CONFIRMED' })
+      toast.success('Service booking accepted.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to accept service booking.')
+    } finally {
+      setConfirmAccept(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!booking) return
+    try {
+      await serviceBookingsService.rejectServiceBooking(booking.id, 'Rejected by admin')
+      setBooking({ ...booking, status: 'CANCELLED' })
+      toast.success('Service booking rejected.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to reject service booking.')
+    } finally {
+      setConfirmReject(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!booking) return
+    try {
+      await serviceBookingsService.cancelServiceBooking(booking.id, 'Cancelled by admin')
+      setBooking({ ...booking, status: 'CANCELLED' })
+      toast.success('Service booking cancelled.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to cancel service booking.')
+    } finally {
+      setConfirmCancel(false)
+    }
+  }
+
+  const handleComplete = async () => {
+    if (!booking) return
+    try {
+      await serviceBookingsService.completeServiceBooking(booking.id)
+      setBooking({ ...booking, status: 'COMPLETED' })
+      toast.success('Service booking marked as completed.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update service booking.')
+    } finally {
+      setConfirmComplete(false)
+    }
+  }
+
+  const handleRefund = async () => {
+    if (!booking) return
+    try {
+      const refundAmount = booking.advanceAmount ?? booking.totalAmount
+      await serviceBookingsService.processServiceRefund(booking.id, refundAmount, 'Refund issued by admin')
+      setBooking({ ...booking, paymentStatus: 'REFUNDED', status: 'CANCELLED' })
+      toast.success('Refund processed successfully.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to process refund.')
+    } finally {
+      setConfirmRefund(false)
     }
   }
 
   if (isLoading) {
+    return <PageLoader rows={6} />
+  }
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <EmptyState
+        title="Unable to load service booking"
+        description={error}
+        action={
+          <button
+            type="button"
+            onClick={fetchBooking}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+        }
+      />
     )
   }
 
-  if (!booking) return <div>Service booking not found</div>
+  if (!booking) {
+    return <EmptyState title="Service booking not found" description="This booking record does not exist." />
+  }
+
+  const canAccept = booking.status === 'ADVANCE_PAID'
+  const canReject = booking.status === 'ADVANCE_PAID'
+  const canComplete = booking.status === 'CONFIRMED'
+  const canCancel = booking.status === 'CONFIRMED' || booking.status === 'ADVANCE_PAID'
+  const canRefund = booking.paymentStatus === 'COMPLETED' && booking.status !== 'CANCELLED'
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/service-bookings')} className="p-2 hover:bg-gray-100 rounded-lg">
-          <ArrowLeft className="w-5 h-5" />
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/service-bookings')}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
         </button>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Service Booking #{booking.bookingNumber}</h1>
-          <p className="text-gray-600">Advance paid, assign worker and confirm</p>
-        </div>
+        <PageHeader
+          title={`Service Booking #${booking.serviceBookingNumber || booking.bookingNumber || booking.id}`}
+          description={`Created ${new Date(booking.createdAt).toLocaleDateString()}`}
+          actions={<StatusBadge label={statusLabel} variant={statusVariant} />}
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Service Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-gray-400" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Service details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-sm text-gray-500">Service</p>
-                  <p className="font-medium">{booking.serviceName}</p>
-                  <p className="text-sm text-gray-500 capitalize">{booking.serviceCategory}</p>
+                  <p className="text-xs font-semibold text-slate-500">Service</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{booking.serviceName || booking.service?.name || 'Service'}</p>
+                  <p className="text-xs text-slate-500">Category: {booking.serviceCategory || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Schedule</p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <CalendarDays className="h-4 w-4 text-slate-400" />
+                    {booking.serviceDate ? new Date(booking.serviceDate).toLocaleDateString() : '—'}
+                  </p>
+                  <p className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <Clock className="h-4 w-4 text-slate-400" />
+                    {booking.serviceTime || '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Notes</p>
+                  <p className="mt-1 text-sm text-slate-700">{booking.notes || 'No notes provided.'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Description</p>
+                  <p className="mt-1 text-sm text-slate-700">{booking.location || 'No location provided.'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Date</p>
-                  <p className="font-medium">{new Date(booking.serviceDate).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Time</p>
-                  <p className="font-medium">{booking.serviceTime}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Location</p>
-                  <p className="font-medium">{booking.location}</p>
-                </div>
-              </div>
-            </div>
-            {booking.notes && (
-              <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Notes:</strong> {booking.notes}
-                </p>
-              </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Payment Summary</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total Amount</span>
-                <span className="font-semibold">₹{booking.totalAmount.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Advance Paid</span>
-                <span className="font-semibold text-green-600">₹{booking.advanceAmount.toLocaleString()}</span>
-              </div>
-              {booking.remainingAmount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Remaining</span>
-                  <span className="font-semibold text-yellow-600">₹{booking.remainingAmount.toLocaleString()}</span>
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Total amount</span>
+                  <span className="font-semibold text-slate-900">₹{booking.totalAmount.toLocaleString()}</span>
                 </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Assignment</h2>
-            <div className="grid gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Worker Name</label>
-                <input
-                  type="text"
-                  value={worker.name}
-                  onChange={(e) => setWorker({ ...worker, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input
-                    type="text"
-                    value={worker.phone}
-                    onChange={(e) => setWorker({ ...worker, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Advance amount</span>
+                  <span className="font-semibold text-slate-900">₹{(booking.advanceAmount ?? 0).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Payment status</span>
+                  <StatusBadge
+                    label={booking.paymentStatus ? booking.paymentStatus.toLowerCase() : 'pending'}
+                    variant={
+                      booking.paymentStatus === 'COMPLETED'
+                        ? 'success'
+                        : booking.paymentStatus === 'REFUNDED'
+                        ? 'neutral'
+                        : 'warning'
+                    }
+                    className="capitalize"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select
-                    value={worker.role}
-                    onChange={(e) => setWorker({ ...worker, role: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="Guide">Guide</option>
-                    <option value="Driver">Driver</option>
-                    <option value="Photographer">Photographer</option>
-                    <option value="Support">Support</option>
-                  </select>
-                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea
-                  value={worker.notes}
-                  onChange={(e) => setWorker({ ...worker, notes: e.target.value })}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleAssignWorker}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                Assign Worker
-              </button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Customer</h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <User className="w-5 h-5 text-gray-400" />
-                <span>{booking.userName}</span>
+          <Card>
+            <CardHeader>
+              <CardTitle>Guest info</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-slate-400" />
+                  <span>{booking.user?.name || 'Guest'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-slate-400" />
+                  <span>{booking.user?.phone || '—'}</span>
+                </div>
+                {booking.userId ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/users/${booking.userId}`)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    View user profile
+                  </button>
+                ) : null}
               </div>
-              <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-gray-400" />
-                <span>{booking.userEmail}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gray-400" />
-                <span>{booking.userPhone}</span>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Status</h2>
-            <div className="space-y-3">
-              <select
-                value={booking.status}
-                onChange={(e) => handleStatusChange(e.target.value as ServiceBookingDetail['status'])}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="ADVANCE_PAID">Advance Paid</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-              <p className="text-sm text-gray-500">
-                Admin receives request after advance payment and assigns worker.
-              </p>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {canAccept ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAccept(true)}
+                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                  >
+                    Accept booking
+                  </button>
+                ) : null}
+                {canReject ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReject(true)}
+                    className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    Reject booking
+                  </button>
+                ) : null}
+                {canComplete ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmComplete(true)}
+                    className="w-full rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                  >
+                    Mark as completed
+                  </button>
+                ) : null}
+                {canCancel ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmCancel(true)}
+                    className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    Cancel booking
+                  </button>
+                ) : null}
+                {canRefund ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRefund(true)}
+                    className="w-full rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+                  >
+                    Process refund
+                  </button>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmAccept}
+        onOpenChange={setConfirmAccept}
+        title="Accept this booking?"
+        description="The booking will be marked as accepted."
+        confirmText="Accept booking"
+        onConfirm={handleAccept}
+      />
+
+      <ConfirmDialog
+        open={confirmReject}
+        onOpenChange={setConfirmReject}
+        title="Reject this booking?"
+        description="The booking will be marked as rejected."
+        confirmText="Reject booking"
+        variant="danger"
+        onConfirm={handleReject}
+      />
+
+      <ConfirmDialog
+        open={confirmComplete}
+        onOpenChange={setConfirmComplete}
+        title="Mark as completed?"
+        description="The booking will be marked as completed."
+        confirmText="Mark completed"
+        onConfirm={handleComplete}
+      />
+
+      <ConfirmDialog
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="Cancel this booking?"
+        description="The booking will be cancelled and the guest will be notified."
+        confirmText="Cancel booking"
+        variant="danger"
+        onConfirm={handleCancel}
+      />
+
+      <ConfirmDialog
+        open={confirmRefund}
+        onOpenChange={setConfirmRefund}
+        title="Process refund?"
+        description="The refund will be issued and the booking will be cancelled."
+        confirmText="Process refund"
+        variant="danger"
+        onConfirm={handleRefund}
+      />
     </div>
   )
 }

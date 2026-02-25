@@ -157,7 +157,21 @@ class ApiService {
     },
 
     getById: (id: string) =>
-      this.get<{ property: any; rooms: any[]; reviews: any[] }>(`/properties/${id}`),
+      this.get<any>(`/properties/${id}`),
+  };
+
+  // Inventory endpoints
+  inventory = {
+    lock: (data: { roomId: string; checkIn: string; checkOut: string; quantity?: number }) =>
+      this.post<any>('/inventory/lock', data, true),
+
+    release: (data: { roomId: string }) =>
+      this.post<any>('/inventory/release', data, true),
+
+    getAvailability: (params: { roomId: string; date: string }) => {
+      const query = new URLSearchParams(params).toString();
+      return this.get<any>(`/inventory?${query}`, true);
+    },
   };
 
   // Service booking endpoints
@@ -180,6 +194,35 @@ class ApiService {
       const query = params ? `?${new URLSearchParams(params)}` : '';
       return this.get<any>(`/services/bookings/my${query}`, true);
     },
+  };
+
+  payments = {
+    createOrder: (bookingId: string) =>
+      this.post<{ orderId: string; amount: number; currency: string; keyId: string }>(
+        '/payments/create-order',
+        { bookingId },
+        true
+      ),
+
+    verify: (data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+      this.post<any>('/payments/verify', data, true),
+  };
+
+  bookings = {
+    create: (data: {
+      propertyId: string;
+      roomId?: string;
+      checkInDate: string;
+      checkOutDate: string;
+      adults: number;
+      children?: number;
+      extraBeds?: number;
+      specialRequests?: string;
+      guestDetails?: Array<{ name: string; age: number; gender: 'male' | 'female' | 'other'; idProof?: string }>;
+    }) => this.post<any>('/bookings', data, true),
+
+    cancel: (bookingId: string, reason?: string) =>
+      this.put<any>(`/bookings/${bookingId}/cancel`, { reason }, true),
   };
 
   // Support ticket endpoints

@@ -1,339 +1,321 @@
-import { useState } from 'react'
-import { Save, Settings, Percent, Mail, Bell, Shield, FileText, Plus, Edit, Trash2 } from 'lucide-react'
-
-interface EmailTemplate {
-  id: string
-  name: string
-  subject: string
-  trigger: string
-  isActive: boolean
-}
-
-interface FeatureFlag {
-  id: string
-  name: string
-  description: string
-  isEnabled: boolean
-}
-
-interface PlatformSettings {
-  platformName: string
-  commissionRate: number
-  supportEmail: string
-  supportPhone: string
-  emailNotifications: boolean
-  pushNotifications: boolean
-  minPayoutAmount: number
-  payoutFrequency: 'daily' | 'weekly' | 'monthly'
-}
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { Bell, FileText, Mail, Percent, Save, Settings, Shield } from 'lucide-react'
+import { settingsService, type PlatformSettings, type EmailTemplate, type FeatureFlag } from '../lib/settings'
+import { PageHeader } from '../components/ui/PageHeader'
+import { PageLoader } from '../components/ui/PageLoader'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<PlatformSettings>({
-    platformName: 'HostHaven',
-    commissionRate: 15,
-    supportEmail: 'support@hosthaven.com',
-    supportPhone: '+91 1800 123 4567',
-    emailNotifications: true,
-    pushNotifications: true,
-    minPayoutAmount: 1000,
-    payoutFrequency: 'weekly',
-  })
-
-  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([
-    { id: '1', name: 'Booking Confirmation', subject: 'Your booking is confirmed!', trigger: 'Booking Created', isActive: true },
-    { id: '2', name: 'Payment Received', subject: 'Payment received successfully', trigger: 'Payment Verified', isActive: true },
-    { id: '3', name: 'Booking Reminder', subject: 'Your check-in is tomorrow', trigger: '24h Before Check-in', isActive: true },
-    { id: '4', name: 'Review Request', subject: 'How was your stay?', trigger: 'After Check-out', isActive: false },
-  ])
-
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([
-    { id: '1', name: 'Service Bookings', description: 'Enable service booking feature', isEnabled: true },
-    { id: '2', name: 'Temple Listings', description: 'Show temple listings to users', isEnabled: true },
-    { id: '3', name: 'Vendor Registration', description: 'Allow new vendor registrations', isEnabled: true },
-    { id: '4', name: 'Featured Properties', description: 'Enable featured properties section', isEnabled: true },
-  ])
+  const [settings, setSettings] = useState<PlatformSettings | null>(null)
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+
+  const fetchSettings = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await settingsService.getSettings()
+      setSettings(data)
+      setEmailTemplates(data.emailTemplates ?? [])
+      setFeatureFlags(data.featureFlags ?? [])
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load settings.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSettings()
+  }, [])
 
   const handleSave = async () => {
+    if (!settings) return
     setIsSaving(true)
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/settings`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-      })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
-    } catch (error) {
-      console.error('Failed to save settings')
+      const payload: PlatformSettings = {
+        ...settings,
+        emailTemplates,
+        featureFlags,
+      }
+      const updated = await settingsService.updateSettings(payload)
+      setSettings(updated)
+      setEmailTemplates(updated.emailTemplates ?? emailTemplates)
+      setFeatureFlags(updated.featureFlags ?? featureFlags)
+      toast.success('Settings updated successfully.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to save settings.')
     } finally {
       setIsSaving(false)
     }
   }
 
+  const canSave = useMemo(() => Boolean(settings), [settings])
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">Manage platform settings and configuration</p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Manage platform settings and configuration."
+      />
 
-      <div className="grid gap-6">
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Settings className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">General Settings</h2>
-          </div>
-          
-          <div className="grid gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Platform Name
-              </label>
-              <input
-                type="text"
-                value={settings.platformName}
-                onChange={(e) => setSettings({ ...settings, platformName: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Percent className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">Commission & Payments</h2>
-          </div>
-          
-          <div className="grid gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Platform Commission Rate (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={settings.commissionRate}
-                onChange={(e) => setSettings({ ...settings, commissionRate: Number(e.target.value) })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                This is the percentage of each booking that HostHaven retains as commission
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Mail className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">Support Contact</h2>
-          </div>
-          
-          <div className="grid gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Support Email
-              </label>
-              <input
-                type="email"
-                value={settings.supportEmail}
-                onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Support Phone
-              </label>
-              <input
-                type="text"
-                value={settings.supportPhone}
-                onChange={(e) => setSettings({ ...settings, supportPhone: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Bell className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
-          </div>
-          
-          <div className="space-y-4">
-            <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer">
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error || !settings ? (
+        <EmptyState
+          title="Unable to load settings"
+          description={error || 'Settings are not available yet.'}
+          action={
+            <button
+              type="button"
+              onClick={fetchSettings}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : (
+        <div className="grid gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-4 w-4 text-slate-500" />
+                General Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
               <div>
-                <p className="font-medium text-gray-900">Email Notifications</p>
-                <p className="text-sm text-gray-500">Receive email updates about platform activities</p>
+                <label className="block text-sm font-medium text-slate-700">Platform Name</label>
+                <input
+                  type="text"
+                  value={settings.platformName}
+                  onChange={(event) => setSettings({ ...settings, platformName: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
               </div>
-              <input
-                type="checkbox"
-                checked={settings.emailNotifications}
-                onChange={(e) => setSettings({ ...settings, emailNotifications: e.target.checked })}
-                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-            </label>
-            <label className="flex items-center justify-between p-4 border border-gray-200 rounded-lg cursor-pointer">
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Percent className="h-4 w-4 text-slate-500" />
+                Commission & Payments
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
               <div>
-                <p className="font-medium text-gray-900">Push Notifications</p>
-                <p className="text-sm text-gray-500">Receive push notifications for urgent matters</p>
+                <label className="block text-sm font-medium text-slate-700">Platform Commission Rate (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={settings.commissionRate}
+                  onChange={(event) => setSettings({ ...settings, commissionRate: Number(event.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+                <p className="mt-1 text-xs text-slate-500">Percentage of each booking retained as commission.</p>
               </div>
-              <input
-                type="checkbox"
-                checked={settings.pushNotifications}
-                onChange={(e) => setSettings({ ...settings, pushNotifications: e.target.checked })}
-                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-            </label>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
 
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Percent className="w-5 h-5 text-primary" />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-slate-500" />
+                Support Contact
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Support Email</label>
+                <input
+                  type="email"
+                  value={settings.supportEmail}
+                  onChange={(event) => setSettings({ ...settings, supportEmail: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">Payout Settings</h2>
-            </div>
-          </div>
-          
-          <div className="grid gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Minimum Payout Amount (₹)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={settings.minPayoutAmount}
-                onChange={(e) => setSettings({ ...settings, minPayoutAmount: Number(e.target.value) })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Payout Frequency
-              </label>
-              <select
-                value={settings.payoutFrequency}
-                onChange={(e) => setSettings({ ...settings, payoutFrequency: e.target.value as 'daily' | 'weekly' | 'monthly' })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </div>
-          </div>
-        </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Support Phone</label>
+                <input
+                  type="text"
+                  value={settings.supportPhone}
+                  onChange={(event) => setSettings({ ...settings, supportPhone: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileText className="w-5 h-5 text-primary" />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-slate-500" />
+                Notifications
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Email Notifications</p>
+                  <p className="text-xs text-slate-500">Receive email updates about platform activity.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.emailNotifications}
+                  onChange={(event) => setSettings({ ...settings, emailNotifications: event.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Push Notifications</p>
+                  <p className="text-xs text-slate-500">Receive push notifications for urgent matters.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.pushNotifications}
+                  onChange={(event) => setSettings({ ...settings, pushNotifications: event.target.checked })}
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                />
+              </label>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Percent className="h-4 w-4 text-slate-500" />
+                Payout Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Minimum Payout Amount (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={settings.minPayoutAmount}
+                  onChange={(event) => setSettings({ ...settings, minPayoutAmount: Number(event.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">Email Templates</h2>
-            </div>
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-              <Plus className="w-4 h-4" />
-              Add Template
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Payout Frequency</label>
+                <select
+                  value={settings.payoutFrequency}
+                  onChange={(event) => setSettings({ ...settings, payoutFrequency: event.target.value as PlatformSettings['payoutFrequency'] })}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                  <option value="DAILY">Daily</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">Monthly</option>
+                </select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-500" />
+                Email Templates
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {emailTemplates.length === 0 ? (
+                <p className="text-sm text-slate-500">No templates configured.</p>
+              ) : (
+                emailTemplates.map((template) => (
+                  <div key={template.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">{template.name}</p>
+                      <p className="text-sm text-slate-500">{template.subject}</p>
+                      <p className="text-xs text-slate-400">Trigger: {template.trigger}</p>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={template.isActive}
+                        onChange={() =>
+                          setEmailTemplates((prev) =>
+                            prev.map((item) =>
+                              item.id === template.id ? { ...item, isActive: !item.isActive } : item
+                            )
+                          )
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                      />
+                      Active
+                    </label>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-slate-500" />
+                Feature Flags
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {featureFlags.length === 0 ? (
+                <p className="text-sm text-slate-500">No feature flags configured.</p>
+              ) : (
+                featureFlags.map((flag) => (
+                  <div key={flag.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">{flag.name}</p>
+                      <p className="text-sm text-slate-500">{flag.description}</p>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={flag.isEnabled}
+                        onChange={() =>
+                          setFeatureFlags((prev) =>
+                            prev.map((item) =>
+                              item.id === flag.id ? { ...item, isEnabled: !item.isEnabled } : item
+                            )
+                          )
+                        }
+                        className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                      />
+                      Enabled
+                    </label>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || !canSave}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {isSaving ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Save changes
             </button>
           </div>
-          
-          <div className="space-y-3">
-            {emailTemplates.map((template) => (
-              <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">{template.name}</p>
-                  <p className="text-sm text-gray-500">{template.subject}</p>
-                  <p className="text-xs text-gray-400 mt-1">Trigger: {template.trigger}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={template.isActive}
-                      onChange={() => setEmailTemplates(emailTemplates.map(t => 
-                        t.id === template.id ? { ...t, isActive: !t.isActive } : t
-                      ))}
-                      className="w-4 h-4 rounded border-gray-300 text-primary"
-                    />
-                    <span className="text-sm text-gray-600">Active</span>
-                  </label>
-                  <button className="p-2 text-gray-400 hover:text-gray-600">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Shield className="w-5 h-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">Feature Flags</h2>
-          </div>
-          
-          <div className="space-y-3">
-            {featureFlags.map((flag) => (
-              <div key={flag.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">{flag.name}</p>
-                  <p className="text-sm text-gray-500">{flag.description}</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={flag.isEnabled}
-                    onChange={() => setFeatureFlags(featureFlags.map(f => 
-                      f.id === flag.id ? { ...f, isEnabled: !f.isEnabled } : f
-                    ))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {isSaving ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            {saved ? 'Saved!' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

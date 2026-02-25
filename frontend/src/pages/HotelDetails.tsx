@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Star, MapPin, Wifi, UtensilsCrossed, Car, Dumbbell, Phone, ArrowLeft, Calendar as CalendarIcon, Users, X, ChevronLeft, ChevronRight, CalendarDays, Minus, Plus } from "lucide-react";
+import { Star, MapPin, Wifi, UtensilsCrossed, Car, Dumbbell, Phone, ArrowLeft, Calendar as CalendarIcon, Users, CalendarDays, Minus, Plus } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createBookingPayment } from "@/lib/razorpay";
+import api from "@/lib/api";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
@@ -25,109 +26,43 @@ import {
 } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 
-const hotelData: Record<string, {
+interface PropertyRoom {
   id: string;
   name: string;
-  location: string;
-  address: string;
-  price: number;
-  rating: number;
-  reviews: number;
-  images: string[];
-  description: string;
-  amenities: { name: string; icon: string }[];
-  roomTypes: { name: string; price: number; capacity: number }[];
-  mentorContact: string;
-}> = {
-  "1": {
-    id: "1",
-    name: "Taj Gateway Hotel",
-    location: "Tirupati",
-    address: "Renigunta Road, Near Airport, Tirupati 517501",
-    price: 8500,
-    rating: 4.8,
-    reviews: 324,
-    images: [
-      "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200",
-      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800",
-      "https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800",
-      "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800",
-    ],
-    description: "Experience luxury and comfort at Taj Gateway Hotel, perfectly located near Tirumala Temple. Our hotel offers world-class amenities, authentic South Indian cuisine, and personalized service to make your pilgrimage memorable.",
-    amenities: [
-      { name: "Free WiFi", icon: "wifi" },
-      { name: "Restaurant", icon: "restaurant" },
-      { name: "Parking", icon: "parking" },
-      { name: "Gym", icon: "gym" },
-    ],
-    roomTypes: [
-      { name: "Deluxe Room", price: 8500, capacity: 2 },
-      { name: "Premium Suite", price: 12500, capacity: 3 },
-      { name: "Presidential Suite", price: 25000, capacity: 4 },
-    ],
-    mentorContact: "+91 98765 43210",
-  },
-  "2": {
-    id: "2",
-    name: "Fortune Murali Park",
-    location: "Vijayawada",
-    address: "MG Road, Vijayawada 520010",
-    price: 7200,
-    rating: 4.8,
-    reviews: 312,
-    images: [
-      "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=1200",
-      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800",
-      "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800",
-      "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800",
-    ],
-    description: "Premium hotel in the heart of Vijayawada, close to Kanaka Durga Temple. Features modern amenities, spa facilities, and authentic Andhra cuisine.",
-    amenities: [
-      { name: "Free WiFi", icon: "wifi" },
-      { name: "Restaurant", icon: "restaurant" },
-      { name: "Parking", icon: "parking" },
-      { name: "Gym", icon: "gym" },
-    ],
-    roomTypes: [
-      { name: "Standard Room", price: 7200, capacity: 2 },
-      { name: "Deluxe Suite", price: 11000, capacity: 3 },
-    ],
-    mentorContact: "+91 98765 43211",
-  },
-  "3": {
-    id: "3",
-    name: "Sri Sai Residency",
-    location: "Nandyala",
-    address: "Temple Road, Nandyala 518501",
-    price: 3200,
-    rating: 4.5,
-    reviews: 145,
-    images: [
-      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1200",
-      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800",
-      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800",
-    ],
-    description: "Comfortable stay near Mahanandi Temple. Perfect for pilgrims seeking peace and convenience.",
-    amenities: [
-      { name: "Free WiFi", icon: "wifi" },
-      { name: "Restaurant", icon: "restaurant" },
-      { name: "Parking", icon: "parking" },
-    ],
-    roomTypes: [
-      { name: "Standard Room", price: 3200, capacity: 2 },
-      { name: "Deluxe Room", price: 4500, capacity: 3 },
-    ],
-    mentorContact: "+91 98765 43212",
-  },
-};
+  pricePerNight: number;
+  capacity: number;
+}
 
-const defaultHotel = hotelData["1"];
+interface PropertyData {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  basePrice: number;
+  rating: number;
+  reviewCount: number;
+  description: string;
+  images: Array<{ url: string; alt?: string; isPrimary?: boolean }>;
+  amenities: string[];
+  rooms?: PropertyRoom[];
+  reviews?: Array<{
+    id: string;
+    rating: number;
+    comment?: string;
+    createdAt: string;
+    user?: { name?: string; avatarUrl?: string };
+  }>;
+  latitude?: number;
+  longitude?: number;
+}
 
 const HotelDetails = () => {
   const { id } = useParams();
-  const hotel = hotelData[id || "1"] || defaultHotel;
-  const [bookingRoom, setBookingRoom] = useState<{ name: string; price: number; capacity: number } | null>(null);
-  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [hotel, setHotel] = useState<PropertyData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [bookingRoom, setBookingRoom] = useState<PropertyRoom | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
@@ -153,14 +88,24 @@ const HotelDetails = () => {
 
   const nights = calculateNights();
 
+  const hotelImages = useMemo(() => {
+    if (!hotel?.images?.length) return [];
+    return hotel.images.map((image) => image.url);
+  }, [hotel]);
+
+  const rooms = useMemo(() => hotel?.rooms || [], [hotel]);
+
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const updateGuests = (delta: number) => {
-    setGuests(prev => Math.max(1, Math.min(4, prev + delta)));
+    const maxGuests = rooms.length
+      ? Math.max(...rooms.map((room) => room.capacity))
+      : 4;
+    setGuests((prev) => Math.max(1, Math.min(maxGuests, prev + delta)));
   };
 
-  const handleBooking = async (room?: typeof hotel.rooms[0]) => {
+  const handleBooking = async (room?: PropertyRoom) => {
     // Check if user is logged in
     if (!isAuthenticated) {
       toast({
@@ -184,13 +129,61 @@ const HotelDetails = () => {
       return;
     }
 
+    if (!hotel) {
+      toast({
+        title: "Hotel Unavailable",
+        description: "Hotel details are not available right now.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessingPayment(true);
+    let bookingId: string | undefined;
     
     try {
-      const roomPrice = room?.price || hotel.price;
+      const roomPrice = room?.pricePerNight || hotel.basePrice;
       const totalAmount = roomPrice * nights;
-      const propertyName = room ? `${hotel.name} - ${room.type}` : hotel.name;
+      const propertyName = room ? `${hotel.name} - ${room.name}` : hotel.name;
+      const selectedRoom = bookingRoom || room;
+      let lockAcquired = false;
+      const checkInIso = checkIn.toISOString();
+      const checkOutIso = checkOut.toISOString();
+
+      if (!selectedRoom?.id) {
+        toast({
+          title: "Room Required",
+          description: "Please select a room type before booking.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await api.inventory.lock({
+        roomId: selectedRoom.id,
+        checkIn: checkInIso,
+        checkOut: checkOutIso,
+        quantity: 1,
+      });
+      lockAcquired = true;
       
+      const bookingResponse = await api.bookings.create({
+        propertyId: hotel.id,
+        roomId: selectedRoom.id,
+        checkInDate: checkInIso,
+        checkOutDate: checkOutIso,
+        adults: guests,
+        children: 0,
+        extraBeds: 0,
+      });
+
+      bookingId = bookingResponse?.booking?.id || bookingResponse?.id;
+      if (!bookingId) {
+        throw new Error("Booking creation failed");
+      }
+
+      const order = await api.payments.createOrder(bookingId);
+
       const result = await createBookingPayment({
         propertyName: propertyName,
         amount: totalAmount,
@@ -198,9 +191,21 @@ const HotelDetails = () => {
         checkIn: format(checkIn, "MMM dd, yyyy"),
         checkOut: format(checkOut, "MMM dd, yyyy"),
         guests: guests,
+        orderId: order.orderId,
+        notes: {
+          propertyId: hotel.id,
+          roomId: selectedRoom.id,
+        },
       });
 
       if (result.success) {
+        if (result.response?.razorpay_order_id && result.response?.razorpay_payment_id && result.response?.razorpay_signature) {
+          await api.payments.verify({
+            razorpay_order_id: result.response.razorpay_order_id,
+            razorpay_payment_id: result.response.razorpay_payment_id,
+            razorpay_signature: result.response.razorpay_signature,
+          });
+        }
         toast({
           title: "Booking Successful! 🎉",
           description: `Your booking for ${propertyName} has been confirmed. Payment ID: ${result.paymentId}`,
@@ -216,6 +221,12 @@ const HotelDetails = () => {
         setCheckOut(undefined);
         setGuests(2);
       } else {
+        if (bookingId) {
+          await api.bookings.cancel(bookingId, "Payment failed");
+        }
+        if (lockAcquired && selectedRoom?.id) {
+          await api.inventory.release({ roomId: selectedRoom.id });
+        }
         toast({
           title: "Payment Failed",
           description: result.error || "Unable to process payment. Please try again.",
@@ -223,6 +234,13 @@ const HotelDetails = () => {
         });
       }
     } catch (error) {
+      const roomId = bookingRoom?.id || room?.id;
+      if (roomId) {
+        await api.inventory.release({ roomId });
+      }
+      if (typeof bookingId === "string") {
+        await api.bookings.cancel(bookingId, "Payment failed");
+      }
       toast({
         title: "Booking Error",
         description: "An unexpected error occurred. Please try again.",
@@ -233,14 +251,34 @@ const HotelDetails = () => {
     }
   };
 
+  useEffect(() => {
+    const fetchHotel = async () => {
+      if (!id) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await api.properties.getById(id);
+        setHotel(data);
+      } catch (err: any) {
+        setError(err?.message || "Failed to load hotel details");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchHotel();
+  }, [id]);
+
+
   // Auto-scroll functionality
   useEffect(() => {
+    if (!hotelImages.length) return;
     const startAutoScroll = () => {
       if (autoScrollInterval.current) {
         clearInterval(autoScrollInterval.current);
       }
       autoScrollInterval.current = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % hotel.images.length);
+        setCurrentImageIndex((prev) => (prev + 1) % hotelImages.length);
       }, 3500);
     };
 
@@ -250,7 +288,7 @@ const HotelDetails = () => {
         clearInterval(autoScrollInterval.current);
       }
     };
-  }, [hotel.images.length]);
+  }, [hotelImages.length]);
 
   // Touch handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -262,17 +300,17 @@ const HotelDetails = () => {
   };
 
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (!touchStart || !touchEnd || hotelImages.length === 0) return;
     
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
     if (isLeftSwipe) {
-      setCurrentImageIndex((prev) => (prev + 1) % hotel.images.length);
+      setCurrentImageIndex((prev) => (prev + 1) % hotelImages.length);
     }
     if (isRightSwipe) {
-      setCurrentImageIndex((prev) => (prev - 1 + hotel.images.length) % hotel.images.length);
+      setCurrentImageIndex((prev) => (prev - 1 + hotelImages.length) % hotelImages.length);
     }
 
     // Reset auto-scroll after manual swipe
@@ -280,7 +318,7 @@ const HotelDetails = () => {
       clearInterval(autoScrollInterval.current);
     }
     autoScrollInterval.current = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % hotel.images.length);
+      setCurrentImageIndex((prev) => (prev + 1) % hotelImages.length);
     }, 3500);
 
     setTouchStart(0);
@@ -288,14 +326,39 @@ const HotelDetails = () => {
   };
 
   const getIcon = (iconName: string) => {
-    switch (iconName) {
-      case "wifi": return <Wifi className="w-5 h-5" />;
-      case "restaurant": return <UtensilsCrossed className="w-5 h-5" />;
-      case "parking": return <Car className="w-5 h-5" />;
-      case "gym": return <Dumbbell className="w-5 h-5" />;
-      default: return <Wifi className="w-5 h-5" />;
+    const key = iconName.toLowerCase();
+    switch (key) {
+      case "wifi":
+        return <Wifi className="w-5 h-5" />;
+      case "restaurant":
+        return <UtensilsCrossed className="w-5 h-5" />;
+      case "parking":
+        return <Car className="w-5 h-5" />;
+      case "gym":
+        return <Dumbbell className="w-5 h-5" />;
+      default:
+        return <Wifi className="w-5 h-5" />;
     }
   };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="py-16 text-center text-muted-foreground">Loading hotel details...</div>
+      </Layout>
+    );
+  }
+
+  if (error || !hotel) {
+    return (
+      <Layout>
+        <div className="py-16 text-center">
+          <p className="text-lg font-semibold">Unable to load hotel</p>
+          <p className="text-sm text-muted-foreground mt-2">{error || "Hotel not found"}</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -317,7 +380,7 @@ const HotelDetails = () => {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
               >
-                {hotel.images.map((img, index) => (
+                {hotelImages.map((img, index) => (
                   <img
                     key={index}
                     src={img}
@@ -331,7 +394,7 @@ const HotelDetails = () => {
                 ))}
               </div>
               <div className="flex justify-center gap-1.5 mt-3">
-                {hotel.images.map((_, index) => (
+                {hotelImages.map((_, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
@@ -350,13 +413,13 @@ const HotelDetails = () => {
             <div className="hidden md:grid grid-cols-3 gap-4">
               <div className="col-span-2 rounded-2xl overflow-hidden aspect-[16/10]">
                 <img
-                  src={hotel.images[0]}
+                  src={hotelImages[0]}
                   alt={hotel.name}
                   className="w-full h-full object-cover"
                 />
               </div>
               <div className="grid grid-rows-2 gap-4">
-                {hotel.images.slice(1, 3).map((img, index) => (
+                {hotelImages.slice(1, 3).map((img, index) => (
                   <div key={index} className="rounded-2xl overflow-hidden">
                     <img
                       src={img}
@@ -379,14 +442,14 @@ const HotelDetails = () => {
                     <Star className="w-3.5 h-3.5 md:w-4 md:h-4 fill-current" />
                     <span className="text-sm md:text-base font-medium">{hotel.rating}</span>
                   </div>
-                  <span className="text-muted-foreground text-xs md:text-sm">({hotel.reviews} reviews)</span>
+                  <span className="text-muted-foreground text-xs md:text-sm">({hotel.reviewCount} reviews)</span>
                 </div>
                 <h1 className="text-xl md:text-4xl font-serif font-bold text-foreground">
                   {hotel.name}
                 </h1>
                 <div className="flex items-center gap-2 text-muted-foreground mt-2 text-sm md:text-base">
                   <MapPin className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                  {hotel.address}
+                  {hotel.address}, {hotel.city}
                 </div>
               </div>
 
@@ -400,28 +463,58 @@ const HotelDetails = () => {
               <div>
                 <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-3 md:mb-4">Amenities</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                  {hotel.amenities.map((amenity) => (
-                    <div key={amenity.name} className="flex items-center gap-2 md:gap-3 bg-card rounded-xl p-3 md:p-4 shadow-card">
-                      <div className="text-primary">{getIcon(amenity.icon)}</div>
-                      <span className="text-xs md:text-sm font-medium">{amenity.name}</span>
+                  {hotel.amenities.slice(0, 12).map((amenity) => (
+                    <div key={amenity} className="flex items-center gap-2 md:gap-3 bg-card rounded-xl p-3 md:p-4 shadow-card">
+                      <div className="text-primary">{getIcon(amenity)}</div>
+                      <span className="text-xs md:text-sm font-medium">{amenity}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {hotel.reviews?.length ? (
+                <div>
+                  <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-3 md:mb-4">Guest Reviews</h2>
+                  <div className="space-y-4">
+                    {hotel.reviews.slice(0, 4).map((review) => (
+                      <div key={review.id} className="rounded-xl bg-card p-4 shadow-card">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                            <span className="text-sm font-semibold">
+                              {(review.user?.name || "G").charAt(0)}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{review.user?.name || "Guest"}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <div className="ml-auto flex items-center gap-1 text-primary">
+                            <Star className="h-4 w-4 fill-current" />
+                            <span className="text-sm font-semibold">{review.rating.toFixed(1)}</span>
+                          </div>
+                        </div>
+                        {review.comment ? (
+                          <p className="mt-3 text-sm text-muted-foreground">{review.comment}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {/* Room Types */}
               <div>
                 <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-3 md:mb-4">Room Types</h2>
                 <div className="space-y-4">
-                  {hotel.roomTypes.map((room) => (
-                    <div key={room.name} className="bg-card rounded-xl p-5 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  {rooms.map((room) => (
+                    <div key={room.id} className="bg-card rounded-xl p-5 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <h3 className="font-semibold text-foreground">{room.name}</h3>
                         <p className="text-muted-foreground text-sm">Up to {room.capacity} guests</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <p className="text-xl font-semibold text-foreground">
-                          ₹{room.price.toLocaleString()}
+                          ₹{room.pricePerNight.toLocaleString()}
                           <span className="text-muted-foreground font-normal text-sm">/night</span>
                         </p>
                         <Button variant="gold" onClick={() => setBookingRoom(room)}>Book Now</Button>
@@ -438,17 +531,28 @@ const HotelDetails = () => {
                 <div className="text-center mb-4 md:mb-6">
                   <p className="text-muted-foreground text-xs md:text-sm">Starting from</p>
                   <p className="text-2xl md:text-3xl font-serif font-bold text-foreground">
-                    ₹{hotel.price.toLocaleString()}
+                    ₹{hotel.basePrice.toLocaleString()}
                     <span className="text-muted-foreground font-normal text-sm md:text-base">/night</span>
                   </p>
                   {nights > 0 && (
                     <div className="mt-2 inline-flex items-center gap-1.5 bg-primary/10 text-primary rounded-full px-3 py-1">
                       <CalendarDays className="w-3.5 h-3.5" />
                       <span className="text-xs font-semibold">{nights} Night{nights > 1 ? 's' : ''}</span>
-                      <span className="text-xs">• ₹{(hotel.price * nights).toLocaleString()}</span>
+                       <span className="text-xs">• ₹{(hotel.basePrice * nights).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
+
+                {hotel.latitude && hotel.longitude ? (
+                  <div className="mt-6 rounded-xl overflow-hidden border border-border">
+                    <iframe
+                      title="Hotel location"
+                      src={`https://www.google.com/maps?q=${hotel.latitude},${hotel.longitude}&z=14&output=embed`}
+                      className="w-full h-48"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : null}
 
                 <div className="space-y-3 md:space-y-4">
                   {/* Mobile: Drawer inputs */}
@@ -628,11 +732,11 @@ const HotelDetails = () => {
                 <div className="mt-6 pt-6 border-t border-border">
                   <p className="text-sm text-muted-foreground mb-2">Need help with booking?</p>
                   <a
-                    href={`tel:${hotel.mentorContact}`}
+                    href={`tel:${"+91 00000 00000"}`}
                     className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
                   >
                     <Phone className="w-5 h-5" />
-                    <span className="font-medium">{hotel.mentorContact}</span>
+                    <span className="font-medium">Contact support</span>
                   </a>
                 </div>
               </div>
@@ -651,7 +755,7 @@ const HotelDetails = () => {
             <div className="p-4 bg-muted rounded-xl">
               <p className="text-sm text-muted-foreground">Room Price</p>
               <p className="text-2xl font-semibold text-foreground">
-                ₹{bookingRoom?.price.toLocaleString()}
+                ₹{bookingRoom?.pricePerNight.toLocaleString()}
                 <span className="text-muted-foreground font-normal text-sm">/night</span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">Up to {bookingRoom?.capacity} guests</p>
@@ -686,7 +790,7 @@ const HotelDetails = () => {
               variant="hero" 
               className="w-full" 
               size="lg"
-              onClick={() => bookingRoom && handleBooking({ type: bookingRoom.name, price: bookingRoom.price, capacity: bookingRoom.capacity, size: 0, beds: '' })}
+              onClick={() => bookingRoom && handleBooking(bookingRoom)}
               disabled={!checkIn || !checkOut || isProcessingPayment}
             >
               {isProcessingPayment ? "Processing..." : "Confirm Booking"}

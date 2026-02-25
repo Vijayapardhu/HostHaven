@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import api from "@/lib/api";
+import { vendorService } from "@/lib/vendor";
 import { useVendor } from "@/contexts/VendorContext";
 
 interface DashboardData {
@@ -60,7 +60,7 @@ const VendorDashboard = () => {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const response = await api.vendor.getDashboard();
+        const response = await vendorService.getDashboard();
         setData(response);
       } catch (error) {
         console.error("Failed to fetch dashboard:", error);

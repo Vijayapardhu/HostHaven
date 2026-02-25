@@ -23,7 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { bookingsService } from "@/lib/bookings";
+import LoadingState from "@/components/states/LoadingState";
+import ErrorState from "@/components/states/ErrorState";
 
 interface ReportData {
   totalBookings: number;
@@ -54,6 +56,7 @@ const VendorReports = () => {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState("30");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchReportData();
@@ -61,13 +64,14 @@ const VendorReports = () => {
 
   const fetchReportData = async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       const days = parseInt(dateRange);
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const response = await api.vendor.getBookings({
+      const response = await bookingsService.getBookings({
         startDate: startDate.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
       });
@@ -94,21 +98,8 @@ const VendorReports = () => {
       });
     } catch (error) {
       console.error("Failed to fetch report data:", error);
-      setReportData({
-        totalBookings: 0,
-        totalRevenue: 0,
-        totalGuests: 0,
-        averageRating: 0,
-        occupancyRate: 0,
-        previousPeriod: {
-          totalBookings: 0,
-          totalRevenue: 0,
-          totalGuests: 0,
-          occupancyRate: 0,
-        },
-        monthlyData: [],
-        topProperties: [],
-      });
+      setErrorMessage("Failed to load analytics report. Please try again.");
+      setReportData(null);
     } finally {
       setIsLoading(false);
     }
@@ -190,19 +181,13 @@ const VendorReports = () => {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="border-0 shadow-lg">
-              <CardContent className="p-6">
-                <div className="animate-pulse">
-                  <div className="h-12 w-12 bg-muted rounded-xl mb-4"></div>
-                  <div className="h-4 bg-muted rounded w-24 mb-2"></div>
-                  <div className="h-8 bg-muted rounded w-32"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <LoadingState message="Loading analytics..." />
+      ) : errorMessage ? (
+        <ErrorState
+          title="Unable to load reports"
+          description={errorMessage}
+          onRetry={fetchReportData}
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

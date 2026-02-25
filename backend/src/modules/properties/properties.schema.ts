@@ -1,13 +1,15 @@
 import { z } from 'zod';
 import { paginationSchema } from '../../utils/validators.util';
 
+export const allowedCitySchema = z.enum(['Vijayawada', 'Nandiyala', 'Vetlapalem']);
+
 export const createPropertySchema = z.object({
   type: z.enum(['HOTEL', 'HOME', 'TEMPLE']),
   name: z.string().min(3).max(200),
   description: z.string().min(10).max(5000),
   shortDesc: z.string().max(200).optional(),
   address: z.string().min(5).max(500),
-  city: z.string().min(2).max(100),
+  city: allowedCitySchema,
   state: z.string().min(2).max(100),
   pincode: z.string().regex(/^[1-9][0-9]{5}$/),
   latitude: z.coerce.number().min(-90).max(90).optional(),
@@ -28,7 +30,7 @@ export const updatePropertySchema = createPropertySchema.partial();
 
 export const propertyFilterSchema = paginationSchema.extend({
   type: z.enum(['HOTEL', 'HOME', 'TEMPLE']).optional(),
-  city: z.string().optional(),
+  city: allowedCitySchema.optional(),
   state: z.string().optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().positive().optional(),

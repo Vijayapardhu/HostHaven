@@ -1,29 +1,30 @@
-import { useEffect, useState } from "react"
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, User, Mail, Phone, Calendar, Shield, MapPin, Clock, CreditCard, BookOpen, Heart } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { ArrowLeft, BookOpen, CalendarDays, CheckCircle, CreditCard, Heart, Mail, Phone } from 'lucide-react'
+import { usersService, type User } from '../lib/users'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { PageLoader } from '../components/ui/PageLoader'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StateBanner } from '../components/ui/StateBanner'
 
-interface UserDetail {
-  id: string
-  name: string
-  email: string
-  phone: string
-  avatar?: string
-  role: string
-  isVerified: boolean
-  status: 'active' | 'suspended'
-  createdAt: string
-  lastLoginAt: string
-  totalBookings: number
-  totalSpent: number
-  wishlistCount: number
-  bookingHistory: {
+type UserStatus = 'active' | 'suspended'
+
+interface UserDetail extends User {
+  lastLoginAt?: string
+  totalSpent?: number
+  wishlistCount?: number
+  bookingHistory?: Array<{
     id: string
     propertyName: string
     checkIn: string
     checkOut: string
     status: string
     amount: number
-  }[]
+  }>
 }
 
 export default function UserDetails() {
@@ -31,230 +32,254 @@ export default function UserDetails() {
   const navigate = useNavigate()
   const [user, setUser] = useState<UserDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<UserStatus | null>(null)
+
+  const fetchUser = async () => {
+    if (!id) return
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await usersService.getUserById(id)
+      setUser(data as UserDetail)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load user details.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/users/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setUser(data.user)
-        } else {
-          setUser({
-            id: id || '1',
-            name: 'Rahul Sharma',
-            email: 'rahul@example.com',
-            phone: '+91 9876543210',
-            role: 'USER',
-            isVerified: true,
-            status: 'active',
-            createdAt: '2024-01-15',
-            lastLoginAt: '2024-03-20',
-            totalBookings: 5,
-            totalSpent: 45000,
-            wishlistCount: 12,
-            bookingHistory: [
-              { id: 'BK001', propertyName: 'Grand Palace Hotel', checkIn: '2024-03-20', checkOut: '2024-03-25', status: 'completed', amount: 25000 },
-              { id: 'BK002', propertyName: 'Beach Resort', checkIn: '2024-02-15', checkOut: '2024-02-18', status: 'completed', amount: 15000 },
-              { id: 'BK003', propertyName: 'Mountain Homestay', checkIn: '2024-01-10', checkOut: '2024-01-12', status: 'completed', amount: 5000 },
-            ]
-          })
-        }
-      } catch (error) {
-        setUser({
-          id: id || '1',
-          name: 'Rahul Sharma',
-          email: 'rahul@example.com',
-          phone: '+91 9876543210',
-          role: 'USER',
-          isVerified: true,
-          status: 'active',
-          createdAt: '2024-01-15',
-          lastLoginAt: '2024-03-20',
-          totalBookings: 5,
-          totalSpent: 45000,
-          wishlistCount: 12,
-          bookingHistory: [
-            { id: 'BK001', propertyName: 'Grand Palace Hotel', checkIn: '2024-03-20', checkOut: '2024-03-25', status: 'completed', amount: 25000 },
-          ]
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchUser()
   }, [id])
 
-  const handleStatusChange = async (newStatus: 'active' | 'suspended') => {
+  const handleStatusChange = (nextStatus: UserStatus) => {
+    setConfirmAction(nextStatus)
+  }
+
+  const confirmStatusChange = async () => {
+    if (!id || !confirmAction) return
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/users/${id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-      if (user) setUser({ ...user, status: newStatus })
-    } catch (error) {
-      console.error('Failed to update status')
+      if (confirmAction === 'suspended') {
+        await usersService.suspendUser(id)
+      } else {
+        await usersService.activateUser(id)
+      }
+      setUser((prev) => (prev ? { ...prev, status: confirmAction } : prev))
+      toast.success(`User ${confirmAction === 'suspended' ? 'suspended' : 'activated'} successfully.`)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to update user status.')
+    } finally {
+      setConfirmAction(null)
     }
   }
 
   if (isLoading) {
+    return <PageLoader rows={6} />
+  }
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <EmptyState
+        title="Unable to load user"
+        description={error}
+        action={
+          <button
+            type="button"
+            onClick={fetchUser}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+        }
+      />
     )
   }
 
-  if (!user) return <div>User not found</div>
+  if (!user) {
+    return <EmptyState title="User not found" description="This user record does not exist." />
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/users')} className="p-2 hover:bg-gray-100 rounded-lg">
-          <ArrowLeft className="w-5 h-5" />
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/users')}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
         </button>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Details</h1>
-          <p className="text-gray-600">View and manage user information</p>
-        </div>
+        <PageHeader
+          title={user.name || 'User details'}
+          description={`User ID: ${user.id}`}
+          actions={
+            <StatusBadge
+              label={user.status === 'active' ? 'Active' : 'Suspended'}
+              variant={user.status === 'active' ? 'success' : 'danger'}
+            />
+          }
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Personal Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <User className="w-5 h-5 text-gray-400" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-sm text-gray-500">Full Name</p>
-                  <p className="font-medium">{user.name}</p>
+                  <p className="text-xs font-semibold text-slate-500">Email</p>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <Mail className="h-4 w-4 text-slate-400" />
+                    {user.email || 'Not provided'}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Phone</p>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <Phone className="h-4 w-4 text-slate-400" />
+                    {user.phone}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Joined</p>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <CalendarDays className="h-4 w-4 text-slate-400" />
+                    {new Date(user.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Verification</p>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-slate-700">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    {user.isVerified ? 'Verified' : 'Pending'}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <p className="font-medium">{user.email}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Phone</p>
-                  <p className="font-medium">{user.phone}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Shield className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Verification</p>
-                  <p className={`font-medium ${user.isVerified ? 'text-green-600' : 'text-red-600'}`}>
-                    {user.isVerified ? 'Verified' : 'Not Verified'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Joined</p>
-                  <p className="font-medium">{new Date(user.createdAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Last Login</p>
-                  <p className="font-medium">{new Date(user.lastLoginAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Booking History</h2>
-            <div className="space-y-4">
-              {user.bookingHistory.map((booking) => (
-                <div key={booking.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{booking.propertyName}</p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(booking.checkIn).toLocaleDateString()} - {new Date(booking.checkOut).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">₹{booking.amount.toLocaleString()}</p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      booking.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {booking.status}
-                    </span>
-                  </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Booking history</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {user.bookingHistory && user.bookingHistory.length > 0 ? (
+                <div className="space-y-3">
+                  {user.bookingHistory.map((booking) => (
+                    <div
+                      key={booking.id}
+                      className="flex flex-col gap-2 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900">{booking.propertyName}</p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(booking.checkIn).toLocaleDateString()} -{' '}
+                          {new Date(booking.checkOut).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-sm text-slate-700">
+                        ₹{booking.amount.toLocaleString()}
+                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                          {booking.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              ) : (
+                <StateBanner title="No booking history" description="Bookings will appear once the user completes them." />
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Stats</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">Total Bookings</span>
+          <Card>
+            <CardHeader>
+              <CardTitle>User metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <BookOpen className="h-4 w-4" />
+                    Total bookings
+                  </div>
+                  <span className="font-semibold text-slate-900">{user.bookingsCount ?? 0}</span>
                 </div>
-                <span className="font-bold">{user.totalBookings}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">Total Spent</span>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <CreditCard className="h-4 w-4" />
+                    Total spent
+                  </div>
+                  <span className="font-semibold text-slate-900">₹{(user.totalSpent ?? 0).toLocaleString()}</span>
                 </div>
-                <span className="font-bold">₹{user.totalSpent.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">Wishlist Items</span>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <Heart className="h-4 w-4" />
+                    Wishlist items
+                  </div>
+                  <span className="font-semibold text-slate-900">{user.wishlistCount ?? 0}</span>
                 </div>
-                <span className="font-bold">{user.wishlistCount}</span>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-semibold mb-4">Actions</h2>
-            <div className="space-y-3">
-              <select
-                value={user.status}
-                onChange={(e) => handleStatusChange(e.target.value as 'active' | 'suspended')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-              </select>
-              <Link
-                to={`/support?user=${user.id}`}
-                className="block w-full px-4 py-2 text-center border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Create Support Ticket
-              </Link>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {user.status === 'active' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange('suspended')}
+                    className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    Suspend user
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange('active')}
+                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
+                  >
+                    Reactivate user
+                  </button>
+                )}
+                <Link
+                  to={`/support?user=${user.id}`}
+                  className="block w-full rounded-lg border border-slate-200 px-4 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Create support ticket
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null)
+        }}
+        title={confirmAction === 'suspended' ? 'Suspend this user?' : 'Reactivate this user?'}
+        description={
+          confirmAction === 'suspended'
+            ? 'The user will lose access until reactivated.'
+            : 'The user will regain access immediately.'
+        }
+        confirmText={confirmAction === 'suspended' ? 'Suspend user' : 'Reactivate user'}
+        variant={confirmAction === 'suspended' ? 'danger' : 'default'}
+        onConfirm={confirmStatusChange}
+      />
     </div>
   )
 }

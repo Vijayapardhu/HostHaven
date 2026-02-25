@@ -30,7 +30,7 @@ export class SupportService {
 
   async getMyTickets(userId: string, filters: { page: number; limit: number; status?: string }) {
     const skip = (filters.page - 1) * filters.limit;
-    const where: any = { userId };
+    const where: any = { userId, isDeleted: false };
     if (filters.status) where.status = filters.status;
 
     const [tickets, total] = await Promise.all([
@@ -56,7 +56,7 @@ export class SupportService {
 
   async getAllTickets(filters: { page: number; limit: number; status?: string }) {
     const skip = (filters.page - 1) * filters.limit;
-    const where: any = {};
+    const where: any = { isDeleted: false };
     if (filters.status) where.status = filters.status;
 
     const [tickets, total] = await Promise.all([
@@ -84,7 +84,7 @@ export class SupportService {
   }
 
   async updateTicket(id: string, data: { status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'; adminNotes?: string }) {
-    const existing = await prisma.supportTicket.findUnique({ where: { id } });
+    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
 
     if (!existing) {
       const error = new Error('Support ticket not found');

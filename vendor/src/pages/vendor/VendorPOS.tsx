@@ -1,3 +1,5 @@
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
@@ -36,7 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { bookingsService } from "@/lib/bookings";
+import { inventoryService } from "@/lib/inventory";
 import { useToast } from "@/hooks/use-toast";
 
 interface RoomBooking {
@@ -116,7 +119,7 @@ const VendorPOS = () => {
   const fetchInventory = async () => {
     setIsLoading(true);
     try {
-      const data = await api.vendor.getRoomInventory(currentDate);
+      const data = await inventoryService.getRoomInventory(currentDate);
       setInventory(data || []);
       if (data && data.length > 0) {
         setProperties(data.map((p: PropertyInventory) => ({ id: p.propertyId, name: p.propertyName })));
@@ -151,7 +154,7 @@ const VendorPOS = () => {
 
     setIsProcessing(true);
     try {
-      const result = await api.vendor.quickBooking({
+      const result = await bookingsService.quickBooking({
         propertyId: selectedProperty,
         roomId: bookingForm.roomId,
         guestName: bookingForm.guestName,
@@ -181,7 +184,7 @@ const VendorPOS = () => {
 
   const handleCheckIn = async (bookingId: string) => {
     try {
-      await api.vendor.checkIn(bookingId);
+      await bookingsService.checkIn(bookingId);
       toast({ title: "Guest checked in successfully" });
       fetchInventory();
     } catch (error: any) {
@@ -191,9 +194,9 @@ const VendorPOS = () => {
 
   const handleCheckOut = async (bookingId: string) => {
     try {
-      const invoice = await api.vendor.getInvoice(bookingId);
+      const invoice = await bookingsService.getInvoice(bookingId);
       setInvoiceData(invoice);
-      await api.vendor.checkOut(bookingId);
+      await bookingsService.checkOut(bookingId);
       toast({ title: "Guest checked out successfully" });
       setIsInvoiceOpen(true);
       fetchInventory();
@@ -204,7 +207,7 @@ const VendorPOS = () => {
 
   const handleViewInvoice = async (bookingId: string) => {
     try {
-      const invoice = await api.vendor.getInvoice(bookingId);
+      const invoice = await bookingsService.getInvoice(bookingId);
       setInvoiceData(invoice);
       setIsInvoiceOpen(true);
     } catch (error: any) {
@@ -370,9 +373,12 @@ const VendorPOS = () => {
                     <div className="text-center"><p className="text-2xl font-bold text-green-600">{room.availableRooms}</p><p className="text-xs text-muted-foreground">Available</p></div>
                     <div className="text-center"><p className="text-2xl font-bold">{room.totalRooms}</p><p className="text-xs text-muted-foreground">Total</p></div>
                   </div>
-                  <div className="h-2 bg-muted rounded-full mb-4 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-green-500 to-red-500" style={{ width: `${(room.filledRooms / room.totalRooms) * 100}%` }} />
-                  </div>
+                  <ProgressBar
+                    value={room.filledRooms}
+                    max={room.totalRooms}
+                    className="mb-4"
+                    barClassName="bg-gradient-to-r from-green-500 to-red-500"
+                  />
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {room.bookings.length > 0 ? room.bookings.map((booking) => (
                       <div key={booking.bookingId} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm">

@@ -25,6 +25,11 @@ export const updateServiceBookingStatusSchema = z.object({
   cancellationReason: z.string().max(500).optional(),
 });
 
+export const serviceBookingRefundSchema = z.object({
+  amount: z.coerce.number().positive(),
+  reason: z.string().max(500).optional(),
+});
+
 export const serviceBookingIdSchema = z.object({
   id: z.string().uuid(),
 });

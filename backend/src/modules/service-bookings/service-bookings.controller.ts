@@ -7,6 +7,7 @@ import {
   serviceBookingFilterSchema,
   serviceBookingIdSchema,
   updateServiceBookingStatusSchema,
+  serviceBookingRefundSchema,
 } from './service-bookings.schema';
 import serviceBookingsService from './service-bookings.service';
 
@@ -78,6 +79,40 @@ export const ServiceBookingsController = {
         return sendError(reply, error.code, error.message, 404);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update status', 500);
+    }
+  },
+
+  async getByIdForAdmin(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = serviceBookingIdSchema.parse(request.params);
+      const booking = await serviceBookingsService.getByIdForAdmin(id);
+      return sendSuccess(reply, booking);
+    } catch (error: any) {
+      logger.error({ error }, 'Get service booking failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch service booking', 500);
+    }
+  },
+
+  async refund(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = serviceBookingIdSchema.parse(request.params);
+      const body = serviceBookingRefundSchema.parse(request.body);
+
+      const result = await serviceBookingsService.refund(id, body.amount, body.reason);
+
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Refund service booking failed');
+      if (error.name === 'ZodError') {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+      }
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to process refund', 500);
     }
   },
 };

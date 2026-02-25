@@ -1,110 +1,80 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Star, MapPin, Search, Home, Users, Bed } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import api from "@/lib/api";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface RentalHome {
   id: string;
   name: string;
-  location: string;
-  price: number;
+  city: string;
+  basePrice: number;
   rating: number;
-  reviews: number;
-  image: string;
-  bedrooms: number;
-  guests: number;
+  reviewCount: number;
+  images: Array<string | { url?: string; isPrimary?: boolean }>;
+  rooms?: Array<{ capacity: number }>;
   amenities: string[];
 }
 
-const homes: RentalHome[] = [
-  {
-    id: "1",
-    name: "Krishna Riverside Villa",
-    location: "Vijayawada",
-    price: 4500,
-    rating: 4.7,
-    reviews: 89,
-    image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800",
-    bedrooms: 3,
-    guests: 6,
-    amenities: ["River View", "Kitchen", "Garden", "WiFi"],
-  },
-  {
-    id: "2",
-    name: "City Center Apartment",
-    location: "Vijayawada",
-    price: 3200,
-    rating: 4.5,
-    reviews: 67,
-    image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800",
-    bedrooms: 2,
-    guests: 4,
-    amenities: ["AC", "Kitchen", "Parking", "WiFi"],
-  },
-  {
-    id: "3",
-    name: "Heritage Cottage",
-    location: "Nandyala",
-    price: 2800,
-    rating: 4.4,
-    reviews: 56,
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800",
-    bedrooms: 2,
-    guests: 4,
-    amenities: ["Garden", "Kitchen", "Parking"],
-  },
-  {
-    id: "4",
-    name: "Traditional Home Stay",
-    location: "Nandyala",
-    price: 2200,
-    rating: 4.3,
-    reviews: 45,
-    image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800",
-    bedrooms: 3,
-    guests: 6,
-    amenities: ["Courtyard", "Kitchen", "Local Guide"],
-  },
-  {
-    id: "5",
-    name: "Seaside Home",
-    location: "Vetapalem",
-    price: 3500,
-    rating: 4.6,
-    reviews: 78,
-    image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800",
-    bedrooms: 3,
-    guests: 6,
-    amenities: ["Beach Access", "Kitchen", "Balcony", "WiFi"],
-  },
-  {
-    id: "6",
-    name: "Beach Cottage",
-    location: "Vetapalem",
-    price: 2900,
-    rating: 4.5,
-    reviews: 62,
-    image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800",
-    bedrooms: 2,
-    guests: 4,
-    amenities: ["Sea View", "Kitchen", "Parking"],
-  },
-];
-
 const Homes = () => {
+  const [homes, setHomes] = useState<RentalHome[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sortBy, setSortBy] = useState("popularity");
 
-  const locations = ["all", ...new Set(homes.map((h) => h.location))];
+  useEffect(() => {
+    const fetchHomes = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await api.properties.getAll({
+          type: "HOME",
+          page: page.toString(),
+          limit: "12",
+          search: searchQuery || undefined,
+          city: selectedLocation !== "all" ? selectedLocation : undefined,
+          sortBy: sortBy === "newest" ? "createdAt" : sortBy,
+        });
+        setHomes(result.properties || []);
+        setTotalPages(result.meta?.totalPages || 1);
+      } catch (err: any) {
+        setError(err?.message || "Failed to load homes");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const filteredHomes = homes.filter((home) => {
-    const matchesSearch = home.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      home.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesLocation = selectedLocation === "all" || home.location === selectedLocation;
-    return matchesSearch && matchesLocation;
-  });
+    fetchHomes();
+  }, [page, searchQuery, selectedLocation, sortBy]);
+
+  const locations = useMemo(() => {
+    const uniqueCities = new Set(homes.map((home) => home.city));
+    return ["all", ...Array.from(uniqueCities)];
+  }, [homes]);
+
+  const filteredHomes = useMemo(() => homes, [homes]);
+
+  const getHomeImage = (images: RentalHome["images"]) => {
+    if (!images?.length) return "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800";
+    const primary = images.find((image) => typeof image !== "string" && image.isPrimary);
+    const selected = primary || images[0];
+    if (typeof selected === "string") return selected;
+    return selected.url || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800";
+  };
 
   return (
     <Layout>
@@ -129,15 +99,35 @@ const Homes = () => {
                   type="text"
                   placeholder="Search homes..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setPage(1);
+                    setSearchQuery(e.target.value);
+                  }}
                   className="pl-10 h-12 bg-muted border-0 rounded-xl"
                 />
               </div>
               <div className="flex gap-2 flex-wrap">
+                <select
+                  value={sortBy}
+                  onChange={(event) => {
+                    setPage(1);
+                    setSortBy(event.target.value);
+                  }}
+                  className="h-12 rounded-xl bg-muted px-3 text-sm text-muted-foreground"
+                >
+                  <option value="popularity">Most booked</option>
+                  <option value="rating">Top rated</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                  <option value="newest">Newest</option>
+                </select>
                 {locations.map((loc) => (
                   <button
                     key={loc}
-                    onClick={() => setSelectedLocation(loc)}
+                    onClick={() => {
+                      setPage(1);
+                      setSelectedLocation(loc);
+                    }}
                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                       selectedLocation === loc
                         ? "gradient-gold text-primary-foreground shadow-gold"
@@ -152,57 +142,115 @@ const Homes = () => {
           </div>
 
           {/* Homes Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredHomes.map((home) => (
-              <Link
-                key={home.id}
-                to={`/homes/${home.id}`}
-                className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
-              >
-                <div className="relative h-52 overflow-hidden">
-                  <img
-                    src={home.image}
-                    alt={home.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
-                    <Star className="w-4 h-4 text-primary fill-primary" />
-                    <span className="text-sm font-medium">{home.rating}</span>
-                  </div>
-                </div>
-                <div className="p-5">
-                  <h3 className="font-serif font-semibold text-xl text-foreground group-hover:text-primary transition-colors">
-                    {home.name}
-                  </h3>
-                  <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
-                    <MapPin className="w-4 h-4" />
-                    {home.location}
-                  </div>
-                  <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Bed className="w-4 h-4" />
-                      {home.bedrooms} beds
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground">Loading homes...</div>
+          ) : error ? (
+            <div className="py-12 text-center">
+              <p className="text-lg font-semibold">Unable to load homes</p>
+              <p className="text-sm text-muted-foreground mt-2">{error}</p>
+            </div>
+          ) : filteredHomes.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">No homes match your filters.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredHomes.map((home) => {
+                const image = getHomeImage(home.images);
+                const maxGuests = home.rooms?.length
+                  ? Math.max(...home.rooms.map((room) => room.capacity))
+                  : 4;
+                return (
+                  <Link
+                    key={home.id}
+                    to={`/homes/${home.id}`}
+                    className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
+                  >
+                    <div className="relative h-52 overflow-hidden">
+                      <img
+                        src={image}
+                        alt={home.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                        <Star className="w-4 h-4 text-primary fill-primary" />
+                        <span className="text-sm font-medium">{home.rating}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {home.guests} guests
+                    <div className="p-5">
+                      <h3 className="font-serif font-semibold text-xl text-foreground group-hover:text-primary transition-colors">
+                        {home.name}
+                      </h3>
+                      <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
+                        <MapPin className="w-4 h-4" />
+                        {home.city}
+                      </div>
+                      <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Bed className="w-4 h-4" />
+                          {home.rooms?.length || 1} rooms
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users className="w-4 h-4" />
+                          {maxGuests} guests
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                        <div>
+                          <p className="text-xl font-semibold text-foreground">
+                            ₹{home.basePrice.toLocaleString()}
+                            <span className="text-muted-foreground font-normal text-sm">/night</span>
+                          </p>
+                        </div>
+                        <Button variant="gold" size="sm">
+                          View Details
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                    <div>
-                      <p className="text-xl font-semibold text-foreground">
-                        ₹{home.price.toLocaleString()}
-                        <span className="text-muted-foreground font-normal text-sm">/night</span>
-                      </p>
-                    </div>
-                    <Button variant="gold" size="sm">
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {!isLoading && !error && totalPages > 1 ? (
+            <div className="mt-8">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.max(1, prev - 1));
+                      }}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                    <PaginationItem key={pageNumber}>
+                      <PaginationLink
+                        href="#"
+                        isActive={page === pageNumber}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setPage(pageNumber);
+                        }}
+                      >
+                        {pageNumber}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setPage((prev) => Math.min(totalPages, prev + 1));
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          ) : null}
         </div>
       </div>
     </Layout>

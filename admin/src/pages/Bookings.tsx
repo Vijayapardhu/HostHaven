@@ -1,226 +1,272 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Calendar, User, Building2, CreditCard, RefreshCw, MoreVertical, Eye } from 'lucide-react'
+import { toast } from 'sonner'
+import { RefreshCw } from 'lucide-react'
+import { bookingsService, type Booking } from '../lib/bookings'
+import { FiltersBar } from '../components/ui/FiltersBar'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SearchInput } from '../components/ui/SearchInput'
+import { Pagination } from '../components/ui/Pagination'
+import { EmptyState } from '../components/ui/EmptyState'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
+import { PageLoader } from '../components/ui/PageLoader'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-interface Booking {
-  id: string
-  userName: string
-  userEmail: string
-  propertyName: string
-  propertyType: string
-  checkIn: string
-  checkOut: string
-  guests: number
-  totalAmount: number
-  paidAmount: number
-  status: 'confirmed' | 'pending' | 'completed' | 'cancelled'
-  paymentStatus: 'paid' | 'pending' | 'refunded'
-  createdAt: string
+type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled'
+type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'failed'
+
+const statusOptions: Array<{ label: string; value: 'all' | BookingStatus }> = [
+  { label: 'All status', value: 'all' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Confirmed', value: 'confirmed' },
+  { label: 'Checked-in', value: 'checked_in' },
+  { label: 'Checked-out', value: 'checked_out' },
+  { label: 'Cancelled', value: 'cancelled' },
+]
+
+const statusLabels: Record<BookingStatus, string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  checked_in: 'Checked-in',
+  checked_out: 'Checked-out',
+  cancelled: 'Cancelled',
+}
+
+const statusVariants: Record<BookingStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
+  pending: 'warning',
+  confirmed: 'success',
+  checked_in: 'info',
+  checked_out: 'neutral',
+  cancelled: 'danger',
+}
+
+const paymentVariants: Record<PaymentStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  completed: 'success',
+  pending: 'warning',
+  refunded: 'neutral',
+  failed: 'danger',
 }
 
 export default function Bookings() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'pending' | 'completed' | 'cancelled'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | BookingStatus>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [confirmRefund, setConfirmRefund] = useState<{ bookingId: string } | null>(null)
+
+  const fetchBookings = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await bookingsService.getBookings({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      })
+      setBookings(data.data ?? data.bookings ?? [])
+      setTotal(data.pagination?.total ?? data.total ?? 0)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to load bookings.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const token = localStorage.getItem('admin_token')
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/bookings`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          setBookings(data.bookings || [])
-        } else {
-          setBookings([
-            { id: '1', userName: 'Rahul Sharma', userEmail: 'rahul@example.com', propertyName: 'Grand Palace Hotel', propertyType: 'Hotel', checkIn: '2024-03-20', checkOut: '2024-03-25', guests: 2, totalAmount: 25000, paidAmount: 25000, status: 'confirmed', paymentStatus: 'paid', createdAt: '2024-03-15' },
-            { id: '2', userName: 'Priya Patel', userEmail: 'priya@example.com', propertyName: 'Beach Resort', propertyType: 'Hotel', checkIn: '2024-03-22', checkOut: '2024-03-27', guests: 4, totalAmount: 40000, paidAmount: 10000, status: 'pending', paymentStatus: 'pending', createdAt: '2024-03-16' },
-            { id: '3', userName: 'Amit Kumar', userEmail: 'amit@example.com', propertyName: 'Mountain Homestay', propertyType: 'Home', checkIn: '2024-03-18', checkOut: '2024-03-20', guests: 3, totalAmount: 7500, paidAmount: 7500, status: 'completed', paymentStatus: 'paid', createdAt: '2024-03-10' },
-            { id: '4', userName: 'Sneha Gupta', userEmail: 'sneha@example.com', propertyName: 'Luxury Villa', propertyType: 'Villa', checkIn: '2024-03-25', checkOut: '2024-03-30', guests: 6, totalAmount: 75000, paidAmount: 75000, status: 'cancelled', paymentStatus: 'refunded', createdAt: '2024-03-12' },
-          ])
-        }
-      } catch (error) {
-        setBookings([
-          { id: '1', userName: 'Rahul Sharma', userEmail: 'rahul@example.com', propertyName: 'Grand Palace Hotel', propertyType: 'Hotel', checkIn: '2024-03-20', checkOut: '2024-03-25', guests: 2, totalAmount: 25000, paidAmount: 25000, status: 'confirmed', paymentStatus: 'paid', createdAt: '2024-03-15' },
-          { id: '2', userName: 'Priya Patel', userEmail: 'priya@example.com', propertyName: 'Beach Resort', propertyType: 'Hotel', checkIn: '2024-03-22', checkOut: '2024-03-27', guests: 4, totalAmount: 40000, paidAmount: 10000, status: 'pending', paymentStatus: 'pending', createdAt: '2024-03-16' },
-          { id: '3', userName: 'Amit Kumar', userEmail: 'amit@example.com', propertyName: 'Mountain Homestay', propertyType: 'Home', checkIn: '2024-03-18', checkOut: '2024-03-20', guests: 3, totalAmount: 7500, paidAmount: 7500, status: 'completed', paymentStatus: 'paid', createdAt: '2024-03-10' },
-          { id: '4', userName: 'Sneha Gupta', userEmail: 'sneha@example.com', propertyName: 'Luxury Villa', propertyType: 'Villa', checkIn: '2024-03-25', checkOut: '2024-03-30', guests: 6, totalAmount: 75000, paidAmount: 75000, status: 'cancelled', paymentStatus: 'refunded', createdAt: '2024-03-12' },
-        ])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchBookings()
-  }, [])
+  }, [page, pageSize, searchTerm, statusFilter])
 
-  const filteredBookings = bookings.filter(booking =>
-    booking.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    booking.propertyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    booking.id.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const handleRefund = async (bookingId: string) => {
+  const confirmRefundAction = async () => {
+    if (!confirmRefund) return
     try {
-      const token = localStorage.getItem('admin_token')
-      await fetch(`${import.meta.env.VITE_API_URL}/admin/bookings/${bookingId}/refund`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      setBookings(bookings.map(b => b.id === bookingId ? { ...b, paymentStatus: 'refunded', status: 'cancelled' } : b))
-    } catch (error) {
-      console.error('Failed to process refund')
+      await bookingsService.processRefund(confirmRefund.bookingId, 0)
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === confirmRefund.bookingId
+            ? { ...booking, paymentStatus: 'refunded', status: 'cancelled' }
+            : booking
+        )
+      )
+      toast.success('Refund processed successfully.')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to process refund.')
+    } finally {
+      setConfirmRefund(null)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
+  const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
-        <p className="text-gray-600 mt-1">Manage all bookings on the platform</p>
-      </div>
+      <PageHeader
+        title="Bookings"
+        description="Track booking status, payments, and refunds."
+      />
 
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search bookings..."
+      <FiltersBar>
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1">
+            <SearchInput
+              placeholder="Search by booking ID, user, or property"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              onChange={(event) => {
+                setPage(1)
+                setSearchTerm(event.target.value)
+              }}
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value as 'all' | BookingStatus)
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
-            <option value="all">All Status</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="pending">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
+      </FiltersBar>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Booking ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredBookings.map((booking) => (
-                <tr key={booking.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-sm text-gray-900">#{booking.id}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">{booking.userName}</p>
-                      <p className="text-sm text-gray-500">{booking.userEmail}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">{booking.propertyName}</p>
-                      <p className="text-sm text-gray-500">{booking.propertyType}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm">
-                      <p className="text-gray-900">{new Date(booking.checkIn).toLocaleDateString()}</p>
-                      <p className="text-gray-500">to {new Date(booking.checkOut).toLocaleDateString()}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-medium text-gray-900">₹{booking.totalAmount.toLocaleString()}</p>
-                      <p className="text-sm text-green-600">Paid: ₹{booking.paidAmount.toLocaleString()}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      booking.status === 'confirmed' 
-                        ? 'bg-green-100 text-green-700' 
-                        : booking.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : booking.status === 'completed'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {booking.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      booking.paymentStatus === 'paid' 
-                        ? 'bg-green-100 text-green-700' 
-                        : booking.paymentStatus === 'pending'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {booking.paymentStatus}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        to={`/bookings/${booking.id}`}
-                        className="text-primary hover:underline text-sm"
+      {isLoading ? (
+        <PageLoader rows={6} />
+      ) : error ? (
+        <EmptyState
+          title="Unable to load bookings"
+          description={error}
+          action={
+            <button
+              type="button"
+              onClick={fetchBookings}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : bookings.length === 0 ? (
+        <EmptyState
+          title={hasFilters ? 'No bookings match your filters' : 'No bookings yet'}
+          description={
+            hasFilters ? 'Try adjusting your search or status filter.' : 'Bookings will appear here once created.'
+          }
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Booking</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>Property</TableHead>
+              <TableHead>Dates</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Payment</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {bookings.map((booking) => (
+              <TableRow key={booking.id}>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">#{booking.bookingNumber || booking.id}</p>
+                    <p className="text-xs text-slate-500">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{booking.user?.name || 'Guest'}</p>
+                    <p className="text-xs text-slate-500">{booking.user?.phone}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-semibold text-slate-900">{booking.property?.name}</p>
+                    <p className="text-xs text-slate-500">{booking.property?.type}</p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <p className="text-sm text-slate-700">
+                    {new Date(booking.checkInDate).toLocaleDateString()} -{' '}
+                    {new Date(booking.checkOutDate).toLocaleDateString()}
+                  </p>
+                </TableCell>
+                <TableCell>
+                  <p className="text-sm font-semibold text-slate-900">₹{booking.totalAmount.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Paid: ₹{(booking.amountPaid ?? 0).toLocaleString()}</p>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge label={statusLabels[booking.status]} variant={statusVariants[booking.status]} />
+                </TableCell>
+                <TableCell>
+                  <StatusBadge
+                    label={booking.paymentStatus}
+                    variant={paymentVariants[booking.paymentStatus]}
+                    className="capitalize"
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Link
+                      to={`/bookings/${booking.id}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      View
+                    </Link>
+                    {booking.paymentStatus === 'completed' && booking.status !== 'cancelled' ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRefund({ bookingId: booking.id })}
+                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                       >
-                        View
-                      </Link>
-                      {booking.paymentStatus === 'paid' && booking.status !== 'cancelled' && (
-                        <button
-                          onClick={() => handleRefund(booking.id)}
-                          className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                          Refund
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        <RefreshCw className="h-4 w-4" />
+                        Refund
+                      </button>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-        {filteredBookings.length === 0 && (
-          <div className="p-8 text-center text-gray-500">
-            No bookings found
-          </div>
-        )}
-      </div>
+      {!isLoading && !error && bookings.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPage(1)
+            setPageSize(size)
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirmRefund)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmRefund(null)
+        }}
+        title="Process refund?"
+        description="The booking will be marked cancelled and the refund will be triggered through Razorpay."
+        confirmText="Process refund"
+        variant="danger"
+        onConfirm={confirmRefundAction}
+      />
     </div>
   )
 }

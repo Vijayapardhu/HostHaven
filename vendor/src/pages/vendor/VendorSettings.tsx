@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVendor } from "@/contexts/VendorContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api";
+import { authService } from "@/lib/auth";
+import { vendorService } from "@/lib/vendor";
 
 const VendorSettings = () => {
   const { vendor, refreshVendor } = useVendor();
@@ -92,7 +93,7 @@ const VendorSettings = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await api.vendor.updateProfile(profileData);
+      await vendorService.updateProfile(profileData);
       await refreshVendor();
       toast({ title: "Profile updated successfully" });
     } catch (error: any) {
@@ -114,10 +115,7 @@ const VendorSettings = () => {
     }
     setIsLoading(true);
     try {
-      await api.post("/auth/change-password", {
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword,
-      });
+      await authService.changePassword(passwordData.currentPassword, passwordData.newPassword);
       toast({ title: "Password updated successfully" });
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (error: any) {
@@ -158,7 +156,10 @@ const VendorSettings = () => {
                       <User className="w-10 h-10 text-muted-foreground" />
                     )}
                   </div>
-                  <button className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors">
+                  <button
+                    className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+                    aria-label="Upload profile picture"
+                  >
                     <Camera className="w-4 h-4" />
                   </button>
                 </div>

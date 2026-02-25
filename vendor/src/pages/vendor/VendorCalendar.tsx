@@ -20,7 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { inventoryService } from "@/lib/inventory";
+import { vendorService } from "@/lib/vendor";
+import { useNavigate } from "react-router-dom";
 
 interface DayAvailability {
   date: string;
@@ -36,6 +38,7 @@ interface DayAvailability {
 }
 
 const VendorCalendar = () => {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [availability, setAvailability] = useState<DayAvailability[]>([]);
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
@@ -54,7 +57,7 @@ const VendorCalendar = () => {
 
   const fetchProperties = async () => {
     try {
-      const response = await api.vendor.getProperties();
+      const response = await vendorService.getProperties();
       const props = response.properties || [];
       setProperties(props.map((p: any) => ({ id: p.id, name: p.name })));
       if (props.length > 0) {
@@ -70,7 +73,7 @@ const VendorCalendar = () => {
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
-      const response = await api.vendor.getRoomInventory(`${year}-${month.toString().padStart(2, '0')}-01`);
+      const response = await inventoryService.getRoomInventory(`${year}-${month.toString().padStart(2, '0')}-01`);
       
       const days: DayAvailability[] = [];
       const daysInMonth = new Date(year, month, 0).getDate();
@@ -139,16 +142,19 @@ const VendorCalendar = () => {
           <h1 className="text-3xl font-serif font-bold text-foreground">Availability Calendar</h1>
           <p className="text-muted-foreground mt-1">View room availability across the month</p>
         </div>
-        <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select property" />
-          </SelectTrigger>
-          <SelectContent>
-            {properties.map((property) => (
-              <SelectItem key={property.id} value={property.id}>{property.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select property" />
+            </SelectTrigger>
+            <SelectContent>
+              {properties.map((property) => (
+                <SelectItem key={property.id} value={property.id}>{property.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={() => navigate("/vendor/calendar/block-dates")}>Block Dates</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
