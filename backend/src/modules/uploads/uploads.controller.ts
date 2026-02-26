@@ -1,89 +1,125 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { cloudinaryService } from '../../services/cloudinary.service';
-import { r2StorageService } from '../../services/r2.service';
-import { config } from '../../config';
-import { sendSuccess, sendError } from '../../utils/response.util';
-import { ERROR_CODES } from '../../constants/error-codes';
-import { logger } from '../../utils/logger.util';
-import { FileUpload } from '../../types';
+import { FastifyRequest, FastifyReply } from "fastify";
+import { cloudinaryService } from "../../services/cloudinary.service";
+import { r2StorageService } from "../../services/r2.service";
+import { config } from "../../config";
+import { sendSuccess, sendError } from "../../utils/response.util";
+import { ERROR_CODES } from "../../constants/error-codes";
+import { logger } from "../../utils/logger.util";
 
-// Determine which storage service to use
 const useR2 = (): boolean => {
-  return !!(config.r2.accountId && config.r2.accessKeyId && config.r2.bucketName);
+  // R2 is disabled - using Cloudinary instead
+  return false;
 };
 
 export const UploadsController = {
   async uploadSingle(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const file = (request as any).file as FileUpload | undefined;
-      
-      if (!file) {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'No file provided', 400);
+      const data = await request.file();
+
+      if (!data) {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "No file provided",
+          400,
+        );
       }
 
       const query = request.query as { folder?: string; resourceType?: string };
-      const folder = query.folder || 'hosthaven';
-      
-      // Use R2 if configured, otherwise fallback to Cloudinary
+      const folder = query.folder || "hosthaven";
+
+      const fileBuffer = await data.toBuffer();
+
       if (useR2()) {
-        const contentType = file.mimetype || 'application/octet-stream';
-        const result = await r2StorageService.upload(file.data, {
+        const contentType = data.mimetype || "application/octet-stream";
+        const result = await r2StorageService.upload(fileBuffer, {
           folder,
-          filename: file.filename,
+          filename: data.filename,
           contentType,
         });
 
-        return sendSuccess(reply, {
-          url: result.url,
-          key: result.key,
-          format: result.format,
-          bytes: result.bytes,
-        }, 201);
+        return sendSuccess(
+          reply,
+          {
+            url: result.url,
+            key: result.key,
+            format: result.format,
+            bytes: result.bytes,
+          },
+          201,
+        );
       } else {
-        const resourceType = query.resourceType || 'image';
-        const result = await cloudinaryService.uploadImage(file.data, {
+        const resourceType = query.resourceType || "image";
+        const result = await cloudinaryService.uploadImage(fileBuffer, {
           folder,
           resourceType: resourceType as any,
         });
 
-        return sendSuccess(reply, {
-          url: result.url,
-          publicId: result.publicId,
-          format: result.format,
-          width: result.width,
-          height: result.height,
-          bytes: result.bytes,
-        }, 201);
+        return sendSuccess(
+          reply,
+          {
+            url: result.url,
+            publicId: result.publicId,
+            format: result.format,
+            width: result.width,
+            height: result.height,
+            bytes: result.bytes,
+          },
+          201,
+        );
       }
     } catch (error: any) {
-      logger.error({ error }, 'Upload failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to upload file', 500);
+      logger.error({ error }, "Upload failed");
+      return sendError(
+        reply,
+        ERROR_CODES.INTERNAL_ERROR,
+        "Failed to upload file",
+        500,
+      );
     }
   },
 
   async uploadMultiple(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const files = (request as any).files as FileUpload[] | undefined;
-      
-      if (!files || files.length === 0) {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'No files provided', 400);
+      const files = await request.files();
+
+      const fileArray: any[] = [];
+      for await (const file of files) {
+        fileArray.push({
+          filename: file.filename,
+          mimetype: file.mimetype,
+          data: await file.toBuffer(),
+        });
+      }
+
+      if (fileArray.length === 0) {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "No files provided",
+          400,
+        );
       }
 
       const query = request.query as { folder?: string; resourceType?: string };
-      const folder = query.folder || 'hosthaven';
-      
-      // Use R2 if configured, otherwise fallback to Cloudinary
-      if (useR2()) {
-        const contentTypes = files.map(f => f.mimetype || 'application/octet-stream');
-        const filenames = files.map(f => f.filename);
-        
-        const results = await r2StorageService.uploadMultiple(files.map(f => f.data), {
-          folder,
-          filenames,
-          contentTypes,
-        });
+      const folder = query.folder || "hosthaven";
 
-        const formattedResults = results.map(result => ({
+      if (useR2()) {
+        const contentTypes = fileArray.map(
+          (f) => f.mimetype || "application/octet-stream",
+        );
+        const filenames = fileArray.map((f) => f.filename);
+
+        const results = await r2StorageService.uploadMultiple(
+          fileArray.map((f) => f.data),
+          {
+            folder,
+            filenames,
+            contentTypes,
+          },
+        );
+
+        const formattedResults = results.map((result) => ({
           url: result.url,
           key: result.key,
           format: result.format,
@@ -92,9 +128,9 @@ export const UploadsController = {
 
         return sendSuccess(reply, formattedResults, 201);
       } else {
-        const resourceType = query.resourceType || 'image';
+        const resourceType = query.resourceType || "image";
 
-        const uploadPromises = files.map(async (file) => {
+        const uploadPromises = fileArray.map(async (file) => {
           const result = await cloudinaryService.uploadImage(file.data, {
             folder,
             resourceType: resourceType as any,
@@ -114,20 +150,29 @@ export const UploadsController = {
         return sendSuccess(reply, results, 201);
       }
     } catch (error: any) {
-      logger.error({ error }, 'Multiple upload failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to upload files', 500);
+      logger.error({ error }, "Multiple upload failed");
+      return sendError(
+        reply,
+        ERROR_CODES.INTERNAL_ERROR,
+        "Failed to upload files",
+        500,
+      );
     }
   },
 
   async delete(request: FastifyRequest, reply: FastifyReply) {
     try {
-      // Support both R2 key and Cloudinary publicId
       const body = request.body as { publicId?: string; key?: string };
       const publicId = body.publicId;
       const key = body.key;
 
       if (!publicId && !key) {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'publicId or key is required', 400);
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "publicId or key is required",
+          400,
+        );
       }
 
       if (useR2() && key) {
@@ -136,22 +181,34 @@ export const UploadsController = {
         await cloudinaryService.deleteImage(publicId);
       }
 
-      return sendSuccess(reply, { message: 'File deleted successfully' });
+      return sendSuccess(reply, { message: "File deleted successfully" });
     } catch (error: any) {
-      logger.error({ error }, 'Delete file failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to delete file', 500);
+      logger.error({ error }, "Delete file failed");
+      return sendError(
+        reply,
+        ERROR_CODES.INTERNAL_ERROR,
+        "Failed to delete file",
+        500,
+      );
     }
   },
 
   async deleteMultiple(request: FastifyRequest, reply: FastifyReply) {
     try {
-      // Support both R2 keys and Cloudinary publicIds
       const body = request.body as { publicIds?: string[]; keys?: string[] };
       const publicIds = body.publicIds;
       const keys = body.keys;
 
-      if ((!publicIds || publicIds.length === 0) && (!keys || keys.length === 0)) {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'publicIds or keys array is required', 400);
+      if (
+        (!publicIds || publicIds.length === 0) &&
+        (!keys || keys.length === 0)
+      ) {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "publicIds or keys array is required",
+          400,
+        );
       }
 
       if (useR2() && keys && keys.length > 0) {
@@ -160,10 +217,15 @@ export const UploadsController = {
         await cloudinaryService.deleteMultiple(publicIds);
       }
 
-      return sendSuccess(reply, { message: 'Files deleted successfully' });
+      return sendSuccess(reply, { message: "Files deleted successfully" });
     } catch (error: any) {
-      logger.error({ error }, 'Delete files failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to delete files', 500);
+      logger.error({ error }, "Delete files failed");
+      return sendError(
+        reply,
+        ERROR_CODES.INTERNAL_ERROR,
+        "Failed to delete files",
+        500,
+      );
     }
   },
 };

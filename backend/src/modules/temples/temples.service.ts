@@ -1,8 +1,8 @@
-import prisma from '../../config/database';
-import { cacheService } from '../../services/cache.service';
-import { logger } from '../../utils/logger.util';
-import { ERROR_CODES } from '../../constants/error-codes';
-import { Prisma } from '@prisma/client';
+import prisma from "../../config/database";
+import { cacheService } from "../../services/cache.service";
+import { logger } from "../../utils/logger.util";
+import { ERROR_CODES } from "../../constants/error-codes";
+import { Prisma } from "@prisma/client";
 
 export class TemplesService {
   async getTemples(filters: {
@@ -19,7 +19,7 @@ export class TemplesService {
     const where: Prisma.TempleDetailsWhereInput = {};
 
     if (filters.deity) {
-      where.deity = { contains: filters.deity, mode: 'insensitive' };
+      where.deity = { contains: filters.deity, mode: "insensitive" };
     }
 
     if (filters.templeType) {
@@ -28,8 +28,8 @@ export class TemplesService {
 
     if (filters.state) {
       where.property = {
-        state: { equals: filters.state, mode: 'insensitive' },
-        status: 'ACTIVE',
+        state: { equals: filters.state, mode: "insensitive" },
+        status: "ACTIVE",
       };
     }
 
@@ -38,7 +38,7 @@ export class TemplesService {
         where,
         skip,
         take: limit,
-        orderBy: { deity: 'asc' },
+        orderBy: { deity: "asc" },
         include: {
           property: {
             select: {
@@ -73,7 +73,7 @@ export class TemplesService {
   async getById(id: string) {
     const cacheKey = `temple:${id}`;
     const cached = await cacheService.get<any>(cacheKey);
-    
+
     if (cached) {
       return cached;
     }
@@ -88,7 +88,7 @@ export class TemplesService {
             },
             reviews: {
               take: 10,
-              orderBy: { createdAt: 'desc' },
+              orderBy: { createdAt: "desc" },
               include: {
                 user: {
                   select: { id: true, name: true, avatarUrl: true },
@@ -107,14 +107,18 @@ export class TemplesService {
     });
 
     if (!temple) {
-      const error = new Error('Temple details not found');
+      const error = new Error("Temple details not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
 
     const result = this.sanitizeTemple(temple);
-    
-    await cacheService.set(cacheKey, result, cacheService.getTTL().PROPERTY_DETAIL);
+
+    await cacheService.set(
+      cacheKey,
+      result,
+      cacheService.getTTL().PROPERTY_DETAIL,
+    );
 
     return result;
   }
@@ -125,12 +129,41 @@ export class TemplesService {
     });
 
     if (!temple) {
-      const error = new Error('Temple details not found');
+      const error = new Error("Temple details not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
 
     return this.sanitizeTemple(temple);
+  }
+
+  async getBySlug(slug: string) {
+    const cacheKey = `temple:slug:${slug}`;
+    const cached = await cacheService.get<any>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    const temple = await prisma.temple.findUnique({
+      where: { slug },
+    });
+
+    if (!temple) {
+      const error = new Error("Temple not found");
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const result = this.sanitizeTemple(temple);
+
+    await cacheService.set(
+      cacheKey,
+      result,
+      cacheService.getTTL().PROPERTY_DETAIL,
+    );
+
+    return result;
   }
 
   async create(data: {
@@ -152,8 +185,8 @@ export class TemplesService {
       where: { id: data.propertyId },
     });
 
-    if (!property || property.type !== 'TEMPLE') {
-      const error = new Error('Property not found or is not a temple');
+    if (!property || property.type !== "TEMPLE") {
+      const error = new Error("Property not found or is not a temple");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -163,7 +196,7 @@ export class TemplesService {
     });
 
     if (existing) {
-      const error = new Error('Temple details already exist for this property');
+      const error = new Error("Temple details already exist for this property");
       (error as any).code = ERROR_CODES.RESOURCE_CONFLICT;
       throw error;
     }
@@ -188,32 +221,35 @@ export class TemplesService {
 
     await cacheService.del(cacheService.keys.property(data.propertyId));
 
-    logger.info({ templeId: temple.id }, 'Temple details created');
+    logger.info({ templeId: temple.id }, "Temple details created");
 
     return this.sanitizeTemple(temple);
   }
 
-  async update(id: string, data: Partial<{
-    deity: string;
-    templeType: string;
-    builtYear: string;
-    architecture: string;
-    darshanTimings: any[];
-    aartiTimings: any[];
-    specialEvents: any[];
-    dressCode: string;
-    entryFee: any[];
-    photography: boolean;
-    bestTimeToVisit: string;
-    festivals: any[];
-  }>) {
+  async update(
+    id: string,
+    data: Partial<{
+      deity: string;
+      templeType: string;
+      builtYear: string;
+      architecture: string;
+      darshanTimings: any[];
+      aartiTimings: any[];
+      specialEvents: any[];
+      dressCode: string;
+      entryFee: any[];
+      photography: boolean;
+      bestTimeToVisit: string;
+      festivals: any[];
+    }>,
+  ) {
     const temple = await prisma.templeDetails.findUnique({
       where: { id },
       include: { property: true },
     });
 
     if (!temple) {
-      const error = new Error('Temple details not found');
+      const error = new Error("Temple details not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -226,7 +262,7 @@ export class TemplesService {
     await cacheService.del(cacheService.keys.property(temple.propertyId));
     await cacheService.del(`temple:${id}`);
 
-    logger.info({ templeId: id }, 'Temple details updated');
+    logger.info({ templeId: id }, "Temple details updated");
 
     return this.sanitizeTemple(updated);
   }
@@ -238,22 +274,22 @@ export class TemplesService {
     });
 
     if (!temple) {
-      const error = new Error('Temple details not found');
+      const error = new Error("Temple details not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
 
     await prisma.property.update({
       where: { id: temple.propertyId },
-      data: { isDeleted: true, deletedAt: new Date(), status: 'INACTIVE' },
+      data: { isDeleted: true, deletedAt: new Date(), status: "INACTIVE" },
     });
 
     await cacheService.del(cacheService.keys.property(temple.propertyId));
     await cacheService.del(`temple:${id}`);
 
-    logger.info({ templeId: id }, 'Temple details deleted');
+    logger.info({ templeId: id }, "Temple details deleted");
 
-    return { message: 'Temple details deleted successfully' };
+    return { message: "Temple details deleted successfully" };
   }
 
   async getUpcomingEvents(templeId: string, days: number = 30) {
@@ -263,7 +299,7 @@ export class TemplesService {
     });
 
     if (!temple) {
-      const error = new Error('Temple details not found');
+      const error = new Error("Temple details not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -272,15 +308,19 @@ export class TemplesService {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + days);
 
-    const upcomingSpecialEvents = (temple.specialEvents as any[]).filter((event: any) => {
-      const eventDate = new Date(event.date);
-      return eventDate >= now && eventDate <= endDate;
-    });
+    const upcomingSpecialEvents = (temple.specialEvents as any[]).filter(
+      (event: any) => {
+        const eventDate = new Date(event.date);
+        return eventDate >= now && eventDate <= endDate;
+      },
+    );
 
-    const upcomingFestivals = (temple.festivals as any[]).filter((festival: any) => {
-      const festivalDate = new Date(festival.date);
-      return festivalDate >= now && festivalDate <= endDate;
-    });
+    const upcomingFestivals = (temple.festivals as any[]).filter(
+      (festival: any) => {
+        const festivalDate = new Date(festival.date);
+        return festivalDate >= now && festivalDate <= endDate;
+      },
+    );
 
     return {
       specialEvents: upcomingSpecialEvents,

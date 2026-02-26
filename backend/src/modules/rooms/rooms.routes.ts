@@ -3,10 +3,11 @@ import { RoomsController } from './rooms.controller';
 import { requireRole } from '../../middleware/auth.middleware';
 
 export default async function roomsRoutes(fastify: FastifyInstance) {
-  fastify.get('/', RoomsController.getAll);
+  // Specific routes must come before parameterized routes
   fastify.get('/property/:propertyId', RoomsController.getByProperty);
-  fastify.get('/:id', RoomsController.getById);
   fastify.get('/:id/availability', RoomsController.checkAvailability);
+  fastify.get('/:id', RoomsController.getById);
+  fastify.get('/', RoomsController.getAll);
 
   fastify.post(
     '/',

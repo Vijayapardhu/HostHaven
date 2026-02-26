@@ -7,6 +7,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { PageLoader } from '../components/ui/PageLoader'
 import { EmptyState } from '../components/ui/EmptyState'
+import { ImageUpload, type UploadedImage } from '../components/ui/ImageUpload'
 
 const serviceSchema = z.object({
   name: z.string().min(2, 'Service name is required.'),
@@ -16,6 +17,7 @@ const serviceSchema = z.object({
   advanceType: z.enum(['percentage', 'fixed']),
   advanceValue: z.number().min(0, 'Advance value is required.'),
   active: z.boolean(),
+  images: z.array(z.string()).optional(),
 })
 
 type ServiceFormValues = z.infer<typeof serviceSchema>
@@ -34,8 +36,14 @@ export default function AddService() {
     advanceType: 'percentage',
     advanceValue: 30,
     active: true,
+    images: [],
   })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [serviceImages, setServiceImages] = useState<UploadedImage[]>([
+    { url: '', alt: '', isPrimary: true },
+    { url: '', alt: '', isPrimary: false },
+    { url: '', alt: '', isPrimary: false },
+  ])
 
   const loadService = async () => {
     if (!id) return
@@ -88,11 +96,21 @@ export default function AddService() {
     if (!validateForm()) return
     setIsSaving(true)
     try {
+      // Filter out empty images and get URLs
+      const imageUrls = serviceImages
+        .filter(img => img.url.trim().length > 0)
+        .map(img => img.url)
+      
+      const payload = {
+        ...formValues,
+        images: imageUrls,
+      }
+      
       if (id) {
-        await servicesService.updateService(id, formValues)
+        await servicesService.updateService(id, payload)
         toast.success('Service updated successfully.')
       } else {
-        await servicesService.createService(formValues)
+        await servicesService.createService(payload)
         toast.success('Service created successfully.')
       }
       navigate('/services')
@@ -224,6 +242,22 @@ export default function AddService() {
                 ) : null}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Service Images</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ImageUpload
+              images={serviceImages}
+              onChange={setServiceImages}
+              maxImages={5}
+              minImages={1}
+              folder="hosthaven/services"
+              label="Service Photos"
+            />
           </CardContent>
         </Card>
 

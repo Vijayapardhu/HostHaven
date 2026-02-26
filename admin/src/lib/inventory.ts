@@ -20,6 +20,11 @@ export interface InventoryOverride {
   overrideRooms: number
 }
 
+const emptyInventoryResponse = {
+  data: [] as InventoryItem[],
+  pagination: { total: 0, page: 1, limit: 10, totalPages: 1 },
+}
+
 export const inventoryService = {
   getPropertyInventory: async (
     propertyId: string,
@@ -29,37 +34,26 @@ export const inventoryService = {
       roomTypeId?: string
     }
   ) => {
-    const response = await api.get(`/v1/admin/inventory/properties/${propertyId}`, { params })
-    return response.data
+    return emptyInventoryResponse
   },
 
   overrideInventory: async (propertyId: string, overrides: InventoryOverride[]) => {
-    const response = await api.post(`/v1/admin/inventory/properties/${propertyId}/override`, {
-      overrides,
-    })
-    return response.data
+    throw new Error('Inventory override by property is not available on the backend')
   },
 
   getInventoryByDate: async (
     propertyId: string,
     date: string
   ): Promise<InventoryItem[]> => {
-    const response = await api.get(`/v1/admin/inventory/properties/${propertyId}/${date}`)
-    return response.data
+    return []
   },
 
   getRoomInventory: async (propertyId: string, roomTypeId: string) => {
-    const response = await api.get(
-      `/v1/admin/inventory/properties/${propertyId}/rooms/${roomTypeId}`
-    )
-    return response.data
+    throw new Error('Room inventory endpoint is not available on the backend')
   },
 
   resetOverride: async (propertyId: string, roomTypeId: string, date: string) => {
-    const response = await api.delete(
-      `/v1/admin/inventory/properties/${propertyId}/rooms/${roomTypeId}/${date}`
-    )
-    return response.data
+    throw new Error('Inventory reset endpoint is not available on the backend')
   },
 
   bulkOverride: async (
@@ -70,7 +64,6 @@ export const inventoryService = {
       overrideRooms: number
     }>
   ) => {
-    const response = await api.post('/v1/admin/inventory/bulk-override', { overrides })
-    return response.data
+    throw new Error('Inventory bulk override endpoint is not available on the backend')
   },
 }

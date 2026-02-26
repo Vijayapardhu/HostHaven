@@ -1,0 +1,901 @@
+HostHaven Admin Panel - Enterprise Architecture
+Table of Contents
+1. System Overview (#system-overview)
+2. Role-Based Access Control (RBAC) (#role-based-access-control-rbac)
+3. Module Breakdown (#module-breakdown)
+   - Authentication Module
+   - Dashboard Module
+   - Vendors Module
+   - Properties Module
+   - Rooms Module
+   - Bookings Module
+   - Services Module
+   - Payments Module
+   - Users Module
+   - Reviews Module
+   - Coupons Module
+   - Notifications Module
+   - Analytics Module
+   - Settings Module
+   - Logs & Audits Module
+4. Advanced Admin Features (#advanced-admin-features)
+5. Navigation Structure (#navigation-structure)
+---
+System Overview
+Platform: HostHaven Admin Panel  
+Type: Enterprise SaaS Admin Dashboard  
+Architecture Pattern: Modular Monolith with Page-Based Navigation  
+Routing Strategy: Nested Routes with Breadcrumb Navigation  
+State Management: React Query + Context API  
+Design Principles
+- Page-First Design: Every major operation opens on its own dedicated page
+- No Modal-Only CRUD: All create/update operations have dedicated pages
+- Deep Linking: All entities support direct URL access
+- Audit Trail: Every action is logged and traceable
+---
+Role-Based Access Control (RBAC)
+Role Hierarchy
+Super Admin
+├── Platform Admin
+│   ├── Finance Admin
+│   ├── Support Admin
+│   └── Content Admin
+├── Property Manager
+│   ├── Front Desk
+│   └── Housekeeping
+└── Vendor Manager
+    └── Vendor Staff
+Role Permissions Matrix
+| Module | Super Admin | Platform Admin | Finance Admin | Property Manager | Vendor Manager |
+|--------|-------------|----------------|---------------|-----------------|----------------|
+| Authentication | Full | Full | View | View | View |
+| Dashboard | Full | Full | Full | Limited | Limited |
+| Vendors | Full | Full | View | View | Self Only |
+| Properties | Full | Full | View | Manage Own | View |
+| Rooms | Full | Full | View | Manage Own | View |
+| Bookings | Full | Full | Full | Manage Own | View |
+| Services | Full | Full | View | Manage Own | Manage Own |
+| Payments | Full | Full | Full | View Own | View |
+| Users | Full | Limited | View | View Own | View |
+| Reviews | Full | Full | View | Manage Own | Respond |
+| Coupons | Full | Full | Full | Manage Own | No Access |
+| Notifications | Full | Full | View | Send Own | Send Own |
+| Analytics | Full | Full | Full | Limited | Limited |
+| Settings | Full | Limited | Limited | Limited | No Access |
+| Logs & Audits | Full | Full | View | View Own | View Own |
+---
+Module Breakdown
+Authentication Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Login | /auth/login | Admin login portal with multi-factor authentication |
+| Forgot Password | /auth/forgot-password | Password recovery flow |
+| Reset Password | /auth/reset-password/:token | Set new password via token |
+| MFA Setup | /auth/mfa-setup | Configure multi-factor authentication |
+| MFA Verification | /auth/mfa-verify | Verify MFA code during login |
+| Session Management | /auth/sessions | View and manage active sessions |
+| Login History | /auth/login-history | Audit trail of all login attempts |
+CRUD Flow
+Login Flow:
+Login Page (/auth/login)
+  ↓
+[Enter Credentials]
+  ↓
+MFA Verification (/auth/mfa-verify) [if enabled]
+  ↓
+Dashboard (/dashboard)
+Password Reset Flow:
+Forgot Password (/auth/forgot-password)
+  ↓
+[Enter Email]
+  ↓
+Reset Password Email Sent
+  ↓
+Reset Password Page (/auth/reset-password/:token)
+  ↓
+[Set New Password]
+  ↓
+Login (/auth/login)
+Extra Capabilities
+- OAuth integration (Google, Microsoft, SAML)
+- Single Sign-On (SSO) support
+- IP whitelisting for admin access
+- Two-factor authentication (TOTP, SMS, Email)
+- Session timeout configuration
+- Concurrent session limits
+---
+Dashboard Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Main Dashboard | /dashboard | Central overview with KPIs and metrics |
+| Dashboard Widget Manager | /dashboard/widgets | Customize dashboard widgets and layout |
+| Quick Actions | /dashboard/actions | Bulk operations and quick links |
+CRUD Flow
+Main Dashboard Flow:
+Dashboard (/dashboard)
+  ↓
+[Select Date Range]
+  ↓
+[Choose Widgets]
+  ↓
+[View Metrics]
+  ↓
+[Click Widget] → Detailed Report Page
+Extra Capabilities
+- Customizable widget layout (drag-and-drop)
+- Real-time data updates via WebSocket
+- Date range filtering with presets
+- Export dashboard data to CSV/PDF
+- Scheduled dashboard snapshots
+- Comparison mode (period over period)
+---
+Vendors Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Vendor List | /vendors | Paginated list of all vendors with filters |
+| Vendor Create | /vendors/create | Add new vendor with details and documents |
+| Vendor Details | /vendors/:id | Full vendor profile and history |
+| Vendor Edit | /vendors/:id/edit | Update vendor information |
+| Vendor Properties | /vendors/:id/properties | Properties managed by vendor |
+| Vendor Payouts | /vendors/:id/payouts | Payout history and pending payments |
+| Vendor Documents | /vendors/:id/documents | License, certificates, contracts |
+| Vendor Commission | /vendors/:id/commission | Commission structure and rates |
+| Vendor Suspensions | /vendors/:id/suspensions | Suspension history and appeals |
+| Vendor Communications | /vendors/:id/communications | Email, notes, internal messages |
+CRUD Flow
+Create Vendor Flow:
+Vendor List (/vendors)
+  ↓
+[Click "Add Vendor"]
+  ↓
+Vendor Create (/vendors/create)
+  ↓
+[Step 1: Basic Information]
+  ↓
+[Step 2: Contact Details]
+  ↓
+[Step 3: Business Details]
+  ↓
+[Step 4: Documents Upload]
+  ↓
+[Step 5: Commission Setup]
+  ↓
+[Submit]
+  ↓
+Vendor Details (/vendors/:id)
+Edit Vendor Flow:
+Vendor Details (/vendors/:id)
+  ↓
+[Click "Edit"]
+  ↓
+Vendor Edit (/vendors/:id/edit)
+  ↓
+[Modify Sections]
+  ↓
+[Save Changes]
+  ↓
+Vendor Details (/vendors/:id) [updated]
+Vendor Suspension Flow:
+Vendor Details (/vendors/:id)
+  ↓
+[Click "Suspend"]
+  ↓
+Suspension Form Page (/vendors/:id/suspend)
+  ↓
+[Select Reason, Duration, Terms]
+  ↓
+[Confirm Suspension]
+  ↓
+Vendor Details (/vendors/:id) [suspended status]
+Extra Capabilities
+- Vendor verification workflow
+- Document expiration tracking
+- Automated commission calculations
+- Bulk vendor imports (CSV)
+- Vendor performance scoring
+- Tier-based commission structures
+---
+Properties Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Property List | /properties | All properties with advanced filters |
+| Property Create | /properties/create | Add new property with wizard |
+| Property Details | /properties/:id | Complete property information |
+| Property Edit | /properties/:id/edit | Modify property details |
+| Property Photos | /properties/:id/photos | Gallery management |
+| Property Amenities | /properties/:id/amenities | Amenities configuration |
+| Property Policies | /properties/:id/policies | Cancellation, check-in/out policies |
+| Property Pricing | /properties/:id/pricing | Base rates and seasonal pricing |
+| Property Availability | /properties/:id/availability | Calendar and blocking |
+| Property Documents | /properties/:id/documents | Legal documents, permits |
+| Property SEO | /properties/:id/seo | Meta tags, descriptions |
+| Property Reviews | /properties/:id/reviews | All reviews for property |
+CRUD Flow
+Create Property Flow:
+Property List (/properties)
+  ↓
+[Click "Add Property"]
+  ↓
+Property Create (/properties/create)
+  ↓
+[Step 1: Basic Details] → Name, Type, Description
+  ↓
+[Step 2: Location] → Address, Map, Area
+  ↓
+[Step 3: Classification] → Star rating, Category
+  ↓
+[Step 4: Contact] → Phone, Email, Website
+  ↓
+[Step 5: Media] → Photos, Videos
+  ↓
+[Step 6: Amenities] → Select amenities
+  ↓
+[Step 7: Policies] → Rules and regulations
+  ↓
+[Step 8: Pricing] → Base price configuration
+  ↓
+[Submit]
+  ↓
+Property Details (/properties/:id)
+Property Pricing Update Flow:
+Property Details (/properties/:id)
+  ↓
+[Click "Pricing"]
+  ↓
+Property Pricing (/properties/:id/pricing)
+  ↓
+[Select Season]
+  ↓
+[Configure Rates]
+  ↓
+[Set Special Offers]
+  ↓
+[Save]
+  ↓
+Property Details (/properties/:id)
+Extra Capabilities
+- Multi-language property descriptions
+- Dynamic pricing rules
+- Bulk property updates
+- Property comparison tool
+- Channel manager integration
+- Google Maps integration
+- Virtual tour embedding
+---
+Rooms Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Room List | /properties/:propertyId/rooms | All rooms for a property |
+| Room Create | /properties/:propertyId/rooms/create | Add new room type |
+| Room Details | /properties/:propertyId/rooms/:roomId | Room specifications |
+| Room Edit | /properties/:propertyId/rooms/:roomId/edit | Update room details |
+| Room Inventory | /properties/:propertyId/rooms/:roomId/inventory | Room count management |
+| Room Pricing | /properties/:propertyId/rooms/:roomId/pricing | Room-specific pricing |
+| Room Availability | /properties/:propertyId/rooms/:roomId/availability | Room calendar |
+CRUD Flow
+Create Room Flow:
+Property Details (/properties/:id)
+  ↓
+[Click "Add Room"]
+  ↓
+Room Create (/properties/:propertyId/rooms/create)
+  ↓
+[Step 1: Room Type & Name]
+  ↓
+[Step 2: Capacity & Beds]
+  ↓
+[Step 3: Amenities]
+  ↓
+[Step 4: Photos]
+  ↓
+[Step 5: Pricing]
+  ↓
+[Submit]
+  ↓
+Room Details (/properties/:propertyId/rooms/:roomId)
+Extra Capabilities
+- Room inventory tracking
+- Room-specific restrictions
+- Dynamic room pricing
+- Room condition tracking
+- Maintenance scheduling
+---
+Bookings Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Booking List | /bookings | All bookings with filters |
+| Booking Details | /bookings/:id | Complete booking information |
+| Booking Create | /bookings/create | Manual booking creation |
+| Booking Edit | /bookings/:id/edit | Modify booking details |
+| Booking Calendar | /bookings/calendar | Visual calendar view |
+| Booking Queue | /bookings/queue | Pending confirmations |
+| Check-In | /bookings/:id/check-in | Guest check-in process |
+| Check-Out | /bookings/:id/check-out | Guest check-out process |
+| Booking Cancellation | /bookings/:id/cancel | Cancellation request |
+| Booking Refund | /bookings/:id/refund | Process refund |
+| Booking Modification | /bookings/:id/modify | Date/room changes |
+CRUD Flow
+Manual Booking Flow:
+Booking List (/bookings)
+  ↓
+[Click "New Booking"]
+  ↓
+Booking Create (/bookings/create)
+  ↓
+[Step 1: Search Property & Room]
+  ↓
+[Step 2: Select Dates]
+  ↓
+[Step 3: Guest Information]
+  ↓
+[Step 4: Add-ons & Services]
+  ↓
+[Step 5: Payment Method]
+  ↓
+[Step 6: Review & Confirm]
+  ↓
+[Submit]
+  ↓
+Booking Details (/bookings/:id)
+Check-In Flow:
+Booking List (/bookings)
+  ↓
+[Select Booking]
+  ↓
+Booking Details (/bookings/:id)
+  ↓
+[Click "Check-In"]
+  ↓
+Check-In Page (/bookings/:id/check-in)
+  ↓
+[Verify Guest ID]
+  ↓
+[Collect Security Deposit]
+  ↓
+[Assign Room Keys]
+  ↓
+[Confirm Check-In]
+  ↓
+Booking Details (/bookings/:id) [checked-in status]
+Booking Modification Flow:
+Booking Details (/bookings/:id)
+  ↓
+[Click "Modify"]
+  ↓
+Booking Modification (/bookings/:id/modify)
+  ↓
+[Change Dates/Room]
+  ↓
+[Recalculate Pricing]
+  ↓
+[Guest Confirmation]
+  ↓
+[Save Changes]
+  ↓
+Booking Details (/bookings/:id) [updated]
+Extra Capabilities
+- Real-time availability checking
+- Partial payment support
+- Booking source tracking
+- Waitlist management
+- Group bookings
+- Recurring bookings
+- No-show tracking
+---
+Services Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Service List | /services | All additional services |
+| Service Create | /services/create | Create new service |
+| Service Details | /services/:id | Service information |
+| Service Edit | /services/:id/edit | Modify service |
+| Service Pricing | /services/:id/pricing | Service pricing tiers |
+| Service Bookings | /services/:id/bookings | Service usage history |
+CRUD Flow
+Create Service Flow:
+Service List (/services)
+  ↓
+[Click "Add Service"]
+  ↓
+Service Create (/services/create)
+  ↓
+[Enter Details]
+  ↓
+[Configure Pricing]
+  ↓
+[Set Availability]
+  ↓
+[Submit]
+  ↓
+Service Details (/services/:id)
+Extra Capabilities
+- Service scheduling
+- Inventory tracking for physical services
+- Service combo packages
+- Seasonal service availability
+---
+Payments Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Payment List | /payments | All payment transactions |
+| Payment Details | /payments/:id | Complete payment breakdown |
+| Payment Create | /payments/create | Manual payment entry |
+| Payment Refund | /payments/:id/refund | Process refund |
+| Payment Invoice | /payments/:id/invoice | Generate/view invoice |
+| Payout List | /payouts | Vendor payout history |
+| Payout Details | /payouts/:id | Individual payout breakdown |
+| Payout Create | /payouts/create | Initiate manual payout |
+| Payout Settings | /payouts/settings | Payout preferences |
+| Commission Report | /payments/commissions | Commission calculations |
+| Refund List | /refunds | All refund requests |
+| Refund Settings | /refunds/settings | Refund policies |
+CRUD Flow
+Manual Payment Flow:
+Booking Details (/bookings/:id)
+  ↓
+[Click "Process Payment"]
+  ↓
+Payment Create (/payments/create)
+  ↓
+[Select Payment Method]
+  ↓
+[Enter Amount]
+  ↓
+[Process Transaction]
+  ↓
+Payment Details (/payments/:id)
+  ↓
+Booking Details (/bookings/:id) [paid status]
+Refund Flow:
+Booking Details (/bookings/:id)
+  ↓
+[Click "Refund"]
+  ↓
+Payment Refund (/payments/:id/refund)
+  ↓
+[Select Refund Amount]
+  ↓
+[Select Reason]
+  ↓
+[Confirm Refund]
+  ↓
+Processing...
+  ↓
+Payment Details (/payments/:id) [refunded status]
+Payout Flow:
+Payout List (/payouts)
+  ↓
+[Click "Create Payout"]
+  ↓
+Payout Create (/payouts/create)
+  ↓
+[Select Vendor]
+  ↓
+[Review Earnings]
+  ↓
+[Confirm Amount]
+  ↓
+[Process Payout]
+  ↓
+Payout Details (/payouts/:id)
+Extra Capabilities
+- Multiple payment gateway integration
+- Automatic refund calculations
+- Tax handling
+- Multi-currency support
+- Payment retry logic
+- Installment payments
+- Escrow management
+---
+Users Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| User List | /users | All platform users |
+| User Create | /users/create | Create new user account |
+| User Details | /users/:id | Complete user profile |
+| User Edit | /users/:id/edit | Modify user details |
+| User Bookings | /users/:id/bookings | User's booking history |
+| User Payments | /users/:id/payments | Payment history |
+| User Documents | /users/:id/documents | ID verification docs |
+| User Preferences | /users/:id/preferences | Notification settings |
+| User Suspensions | /users/:id/suspensions | Suspension management |
+| User Communications | /users/:id/communications | Message history |
+CRUD Flow
+Create User Flow:
+User List (/users)
+  ↓
+[Click "Add User"]
+  ↓
+User Create (/users/create)
+  ↓
+[Step 1: Personal Information]
+  ↓
+[Step 2: Contact Details]
+  ↓
+[Step 3: Role Assignment]
+  ↓
+[Step 4: Verification]
+  ↓
+[Submit]
+  ↓
+User Details (/users/:id)
+Extra Capabilities
+- User verification workflow
+- KYC/AML compliance
+- User activity scoring
+- Bulk user imports
+- Preference management
+---
+Reviews Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Review List | /reviews | All platform reviews |
+| Review Details | /reviews/:id | Full review content |
+| Review Moderation | /reviews/:id/moderate | Approve/reject/reply |
+| Review Response | /reviews/:id/respond | Vendor/admin response |
+| Review Analytics | /reviews/analytics | Review statistics |
+| Review Settings | /reviews/settings | Moderation rules |
+CRUD Flow
+Review Moderation Flow:
+Review List (/reviews)
+  ↓
+[Filter: Pending]
+  ↓
+[Select Review]
+  ↓
+Review Moderation (/reviews/:id/moderate)
+  ↓
+[Read Content]
+  ↓
+[Approve/Reject/Flag]
+  ↓
+[Submit Decision]
+  ↓
+Review Details (/reviews/:id)
+Extra Capabilities
+- Automated sentiment analysis
+- Review response templates
+- Review scoring algorithms
+- Bulk review import
+- Review analytics dashboard
+---
+Coupons Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Coupon List | /coupons | All coupons and promotions |
+| Coupon Create | /coupons/create | Create new coupon |
+| Coupon Details | /coupons/:id | Coupon configuration |
+| Coupon Edit | /coupons/:id/edit | Modify coupon |
+| Coupon Usage | /coupons/:id/usage | Usage history |
+| Campaign List | /coupons/campaigns | Marketing campaigns |
+| Campaign Create | /coupons/campaigns/create | Create campaign |
+CRUD Flow
+Create Coupon Flow:
+Coupon List (/coupons)
+  ↓
+[Click "Create Coupon"]
+  ↓
+Coupon Create (/coupons/create)
+  ↓
+[Step 1: Code & Type]
+  ↓
+[Step 2: Discount Details]
+  ↓
+[Step 3: Usage Limits]
+  ↓
+[Step 4: Eligibility]
+  ↓
+[Step 5: Validity Period]
+  ↓
+[Submit]
+  ↓
+Coupon Details (/coupons/:id)
+Extra Capabilities
+- Auto-generated coupon codes
+- Referral codes
+- First-time user discounts
+- Dynamic coupon targeting
+- A/B testing coupons
+---
+Notifications Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Notification List | /notifications | All notifications sent |
+| Notification Create | /notifications/create | Send new notification |
+| Notification Templates | /notifications/templates | Template management |
+| Template Create | /notifications/templates/create | Create template |
+| Template Edit | /notifications/templates/:id/edit | Edit template |
+| Notification Settings | /notifications/settings | Global notification settings |
+| Push Notification Manager | /notifications/push | Push notification config |
+CRUD Flow
+Send Notification Flow:
+Notification List (/notifications)
+  ↓
+[Click "Send Notification"]
+  ↓
+Notification Create (/notifications/create)
+  ↓
+[Select Recipients]
+  ↓
+[Choose Template]
+  ↓
+[Customize Message]
+  ↓
+[Schedule/Send Now]
+  ↓
+[Confirm]
+  ↓
+Notification List (/notifications)
+Extra Capabilities
+- Scheduled notifications
+- Push notifications
+- Email templates
+- SMS notifications
+- In-app notifications
+- Notification analytics
+- User preference-based delivery
+---
+Analytics Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| Analytics Overview | /analytics | Platform-wide analytics |
+| Revenue Analytics | /analytics/revenue | Revenue breakdown |
+| Booking Analytics | /analytics/bookings | Booking trends |
+| Property Performance | /analytics/properties | Property metrics |
+| User Analytics | /analytics/users | User behavior |
+| Marketing Analytics | /analytics/marketing | Campaign performance |
+| Geographic Analytics | /analytics/geographic | Location-based data |
+| Report Builder | /analytics/reports | Custom report generation |
+| Report Scheduler | /analytics/reports/schedule | Automated reports |
+| Export Center | /analytics/exports | Download reports |
+CRUD Flow
+Custom Report Flow:
+Analytics Overview (/analytics)
+  ↓
+[Click "Report Builder"]
+  ↓
+Report Builder (/analytics/reports)
+  ↓
+[Select Metrics]
+  ↓
+[Set Filters]
+  ↓
+[Choose Visualization]
+  ↓
+[Preview]
+  ↓
+[Save/Export/Schedule]
+Extra Capabilities
+- Real-time analytics
+- Custom date ranges
+- Drill-down analysis
+- Predictive analytics
+- Benchmark comparisons
+- Data export (CSV, Excel, PDF)
+---
+Settings Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| General Settings | /settings/general | Platform name, logo, timezone |
+| Company Settings | /settings/company | Business information |
+| Email Settings | /settings/email | SMTP configuration |
+| SMS Settings | /settings/sms | SMS gateway config |
+| Payment Gateway Settings | /settings/payments | Gateway credentials |
+| Tax Settings | /settings/taxes | Tax rate configuration |
+| Commission Settings | /settings/commissions | Default commission rates |
+| Currency Settings | /settings/currencies | Supported currencies |
+| Language Settings | /settings/languages | Platform languages |
+| Maintenance Mode | /settings/maintenance | Site maintenance toggle |
+| API Settings | /settings/api | API keys and webhooks |
+| Webhook Manager | /settings/webhooks | Webhook configuration |
+CRUD Flow
+Update Payment Gateway Flow:
+Settings Module
+  ↓
+[Click "Payment Gateway Settings"]
+  ↓
+Payment Gateway Settings (/settings/payments)
+  ↓
+[Select Gateway]
+  ↓
+[Enter Credentials]
+  ↓
+[Test Connection]
+  ↓
+[Save Configuration]
+Extra Capabilities
+- Environment configurations (dev/staging/prod)
+- Feature flags
+- A/B testing configuration
+- Cache settings
+- Backup configuration
+---
+Logs & Audits Module
+Page List
+| Page | Route | Purpose |
+|------|-------|---------|
+| System Logs | /logs/system | System-level logs |
+| Access Logs | /logs/access | User access logs |
+| API Logs | /logs/api | API request logs |
+| Error Logs | /logs/errors | Error tracking |
+| Audit Log | /logs/audit | Comprehensive audit trail |
+| Audit Details | /logs/audit/:id | Single audit entry |
+| Log Search | /logs/search | Advanced log search |
+| Log Archive | /logs/archive | Archived logs |
+| Report Security | /logs/security | Security events |
+CRUD Flow
+Search Logs Flow:
+System Logs (/logs/system)
+  ↓
+[Click "Advanced Search"]
+  ↓
+Log Search (/logs/search)
+  ↓
+[Set Filters]
+  ↓
+[Apply]
+  ↓
+[View Results]
+  ↓
+[Export]
+Extra Capabilities
+- Real-time log streaming
+- Log retention policies
+- Automated alert rules
+- Log categorization
+- Performance metrics from logs
+---
+Advanced Admin Features
+1. Multi-Tenancy Support
+- White-label administration
+- Sub-admin creation
+- Tenant-specific configurations
+- Resource allocation limits
+2. Workflow Automation
+- Approval workflows
+- Auto-escalation rules
+- Scheduled tasks
+- Trigger-based actions
+3. Data Management
+- Bulk data import/export
+- Data validation rules
+- Archive management
+- Data retention policies
+4. Communication Center
+- Announcement system
+- Newsletter management
+- Email campaigns
+- SMS broadcasts
+5. Compliance & Legal
+- GDPR data export
+- Consent management
+- Terms acceptance tracking
+- Legal document storage
+6. Disaster Recovery
+- Backup management
+- Failover configuration
+- Data restoration
+- Incident reporting
+7. Performance Monitoring
+- Server health metrics
+- Database performance
+- API latency tracking
+- Resource utilization
+---
+Navigation Structure
+Sidebar Navigation
+├── Dashboard
+│   └── Main Dashboard
+│   └── Widget Manager
+├── Vendors
+│   ├── Vendor List
+│   ├── Add Vendor
+│   └── [Vendor ID] → Details/Edit/Properties/Payouts/Documents
+├── Properties
+│   ├── Property List
+│   ├── Add Property
+│   └── [Property ID] → Details/Edit/Rooms/Pricing/Availability/Documents
+├── Rooms
+│   ├── [Property ID] → Room List
+│   └── [Room ID] → Details/Edit/Inventory/Pricing
+├── Bookings
+│   ├── Booking List
+│   ├── New Booking
+│   ├── Calendar View
+│   └── [Booking ID] → Details/Check-In/Check-Out/Modify/Cancel
+├── Services
+│   ├── Service List
+│   ├── Add Service
+│   └── [Service ID] → Details/Pricing/Bookings
+├── Payments
+│   ├── Payment List
+│   ├── Payout List
+│   ├── Commission Report
+│   └── Refund Management
+├── Users
+│   ├── User List
+│   ├── Add User
+│   └── [User ID] → Details/Bookings/Payments/Documents
+├── Reviews
+│   ├── Review List
+│   ├── Moderation Queue
+│   └── Analytics
+├── Coupons
+│   ├── Coupon List
+│   ├── Create Coupon
+│   ├── Campaigns
+│   └── [Coupon ID] → Details/Usage
+├── Notifications
+│   ├── Notification List
+│   ├── Send Notification
+│   └── Templates
+├── Analytics
+│   ├── Overview
+│   ├── Revenue
+│   ├── Bookings
+│   ├── Properties
+│   ├── Users
+│   ├── Marketing
+│   └── Report Builder
+├── Settings
+│   ├── General
+│   ├── Company
+│   ├── Email
+│   ├── SMS
+│   ├── Payment Gateways
+│   ├── Taxes
+│   ├── Commissions
+│   ├── Currencies
+│   ├── Languages
+│   ├── API Keys
+│   └── Webhooks
+├── Logs & Audits
+│   ├── System Logs
+│   ├── Access Logs
+│   ├── API Logs
+│   ├── Error Logs
+│   ├── Audit Log
+│   └── Search
+└── Profile
+    ├── My Profile
+    ├── Security
+    └── Preferences
+---
+Route Naming Conventions
+| Pattern | Example | Usage |
+|---------|---------|-------|
+| /module | /vendors | List page |
+| /module/create | /vendors/create | Create page |
+| /module/:id | /vendors/123 | Details page |
+| /module/:id/edit | /vendors/123/edit | Edit page |
+| /module/:id/sub-resource | /vendors/123/properties | Sub-resource list |
+| /module/:id/sub-resource/:subId | /vendors/123/properties/456 | Sub-resource details |
+| /module/bulk | /vendors/bulk | Bulk operations |
+| /module/search | /vendors/search | Advanced search |
+---
+Summary Statistics
+| Metric | Value |
+|--------|-------|
+| Total Modules | 15 |
+| Total Pages | ~95 |
+| CRUD Flows | 40+ |
+| User Roles | 7 |
+| Permission Categories | 15 |
+---
+Document Version: 1.0  
+Last Updated: February 2026  
+Architecture: Enterprise SaaS Admin Panel

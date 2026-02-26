@@ -3,6 +3,24 @@ import path from 'path';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+const normalizeDatabaseUrl = (url: string) => {
+  if (!url) return url;
+
+  const isSupabaseHost = /\.supabase\.co(?::\d+)?/i.test(url);
+  const hasSslMode = /[?&]sslmode=/i.test(url);
+
+  if (isSupabaseHost && !hasSslMode) {
+    return `${url}${url.includes('?') ? '&' : '?'}sslmode=require`;
+  }
+
+  return url;
+};
+
+const normalizedDatabaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL || '');
+if (normalizedDatabaseUrl) {
+  process.env.DATABASE_URL = normalizedDatabaseUrl;
+}
+
 export const config = {
   app: {
     nodeEnv: process.env.NODE_ENV || 'development',
@@ -13,7 +31,7 @@ export const config = {
   },
 
   database: {
-    url: process.env.DATABASE_URL!,
+    url: normalizedDatabaseUrl,
   },
 
   redis: {
@@ -54,6 +72,16 @@ export const config = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
   },
 
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  },
+
+  openrouter: {
+    apiKey: process.env.OPENROUTER_API_KEY || '',
+    model: process.env.OPENROUTER_MODEL || 'arcee-ai/trinity-large-preview:free',
+  },
+
   // Cloudflare R2 Storage
   r2: {
     accountId: process.env.R2_ACCOUNT_ID || '',
@@ -69,7 +97,7 @@ export const config = {
     anonKey: process.env.SUPABASE_ANON_KEY || '',
     serviceKey: process.env.SUPABASE_SERVICE_KEY || '',
     // Direct PostgreSQL connection (for Prisma)
-    databaseUrl: process.env.DATABASE_URL || '',
+    databaseUrl: normalizedDatabaseUrl,
   },
 
   rateLimit: {

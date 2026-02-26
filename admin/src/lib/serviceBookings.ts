@@ -29,6 +29,22 @@ export interface ServiceBooking {
   updatedAt: string
 }
 
+const normalizeList = (payload: any) => {
+  const data = payload?.data ?? payload?.serviceBookings ?? payload?.bookings ?? []
+  const meta = payload?.meta ?? payload?.pagination
+  return {
+    data: Array.isArray(data) ? data : [],
+    pagination: meta
+      ? {
+          total: meta.total ?? 0,
+          page: meta.page ?? 1,
+          limit: meta.limit ?? 10,
+          totalPages: meta.totalPages ?? meta.pages ?? 1,
+        }
+      : { total: 0, page: 1, limit: 10, totalPages: 1 },
+  }
+}
+
 export const serviceBookingsService = {
   getServiceBookings: async (params?: {
     page?: number
@@ -36,26 +52,26 @@ export const serviceBookingsService = {
     status?: string
   }) => {
     const response = await api.get('/v1/services/bookings/admin', { params })
-    return response.data
+    return normalizeList(response.data)
   },
 
   getServiceBookingById: async (id: string) => {
     const response = await api.get<ServiceBooking>(`/v1/services/bookings/admin/${id}`)
-    return response.data
+    return response.data?.data ?? response.data
   },
 
   acceptServiceBooking: async (bookingId: string) => {
     const response = await api.put(`/v1/services/bookings/admin/${bookingId}/status`, {
       status: 'CONFIRMED',
     })
-    return response.data
+    return response.data?.data ?? response.data
   },
 
   completeServiceBooking: async (bookingId: string) => {
     const response = await api.put(`/v1/services/bookings/admin/${bookingId}/status`, {
       status: 'COMPLETED',
     })
-    return response.data
+    return response.data?.data ?? response.data
   },
 
   cancelServiceBooking: async (bookingId: string, reason?: string) => {
@@ -63,7 +79,7 @@ export const serviceBookingsService = {
       status: 'CANCELLED',
       cancellationReason: reason,
     })
-    return response.data
+    return response.data?.data ?? response.data
   },
 
   rejectServiceBooking: async (bookingId: string, reason: string) => {
@@ -71,7 +87,7 @@ export const serviceBookingsService = {
       status: 'CANCELLED',
       cancellationReason: reason,
     })
-    return response.data
+    return response.data?.data ?? response.data
   },
 
   processServiceRefund: async (bookingId: string, amount: number, reason?: string) => {
@@ -79,6 +95,6 @@ export const serviceBookingsService = {
       amount,
       reason,
     })
-    return response.data
+    return response.data?.data ?? response.data
   },
 }

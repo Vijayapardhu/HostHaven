@@ -1,10 +1,14 @@
 import buildApp from './app';
 import { config } from './config';
+import prisma from './config/database';
 import { logger } from './utils/logger.util';
 import './jobs/email.job';
 
 const start = async () => {
   try {
+    await prisma.$connect();
+    logger.info('Database connection established');
+
     const app = await buildApp();
 
     // Start server

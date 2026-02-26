@@ -9,6 +9,7 @@ import {
   vendorLoginSchema,
   vendorIdSchema,
   vendorFilterSchema,
+  adminCreateVendorOnboardingSchema,
 } from './vendor.schema';
 
 export const VendorController = {
@@ -141,6 +142,26 @@ export const AdminVendorController = {
         return sendError(reply, error.code, error.message, 404);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to approve vendor', 500);
+    }
+  },
+
+  async createOnboardingVendor(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = adminCreateVendorOnboardingSchema.parse(request.body);
+      const adminId = (request as any).user.id;
+
+      const result = await vendorService.adminCreateOnboarding(data, adminId);
+
+      return sendSuccess(reply, result, 201);
+    } catch (error: any) {
+      logger.error({ error }, 'Admin onboarding vendor creation failed');
+      if (error.code === ERROR_CODES.RESOURCE_CONFLICT) {
+        return sendError(reply, error.code, error.message, 409);
+      }
+      if (error.name === 'ZodError' || error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, error.message || 'Invalid input data', 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to create onboarding vendor', 500);
     }
   },
 };

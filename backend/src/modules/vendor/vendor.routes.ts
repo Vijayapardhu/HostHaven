@@ -59,6 +59,12 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
     AdminVendorController.getAllVendors
   );
 
+  fastify.post(
+    '/admin/onboarding',
+    { preHandler: [fastify.authenticate, requireRole('ADMIN')] },
+    AdminVendorController.createOnboardingVendor
+  );
+
   fastify.put(
     '/:id/approve',
     { preHandler: [fastify.authenticate, requireRole('ADMIN')] },

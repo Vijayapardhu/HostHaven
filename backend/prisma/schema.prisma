@@ -30,6 +30,7 @@ enum City {
   VIJAYAWADA
   NANDIYALA
   VETLAPALEM
+  TIRUPATI
 }
 
 enum PropertyStatus {
@@ -371,6 +372,125 @@ model TempleDetails {
 }
 
 // ============================================
+// TEMPLE MANAGEMENT (Standalone)
+// ============================================
+
+model Temple {
+  id              String    @id @default(uuid())
+  
+  // Basic Info
+  name            String
+  slug            String    @unique
+  city            City
+  fullAddress     String
+  landmark        String?
+  description     String    @db.Text
+  shortDesc       String?
+  latitude        Float?
+  longitude       Float?
+  deityName       String
+  
+  // Spiritual & Historical
+  templeType      String?
+  builtYear       String?
+  founder         String?
+  mythologicalSignificance String? @db.Text
+  historicalSignificance  String? @db.Text
+  architectureStyle       String?
+  uniqueFeatures         String?
+  sacredNearby          String?
+  associatedLegends      String? @db.Text
+  
+  // Timings
+  darshanTimings  Json      // [{ day, morningOpen, morningClose, eveningOpen, eveningClose }]
+  morningAarti    String?
+  afternoonAarti  String?
+  eveningAarti    String?
+  specialSevas    String?
+  festivalSpecificTimings String?
+  
+  // Entry & Facilities
+  generalEntryFee String?
+  specialDarshanFee String?
+  vipDarshanFee    String?
+  parkingAvailable Boolean @default(false)
+  wheelchairAccessible Boolean @default(false)
+  cloakroomAvailable Boolean @default(false)
+  restroomsAvailable Boolean @default(false)
+  drinkingWaterAvailable Boolean @default(false)
+  prasadamCounterAvailable Boolean @default(false)
+  photographyAllowed Boolean @default(true)
+  mobileRestrictions String?
+  dressCodeMen    String?
+  dressCodeWomen  String?
+  securityNotes   String?
+  
+  // Festivals
+  majorFestivals  String?
+  festivalDates   String?
+  annualBrahmotsavam String?
+  rathotsavamDetails String?
+  crowdExpectationLevel String?
+  specialPoojas   String?
+  specialDecorationDays String?
+  
+  // Best Time
+  bestMonths      String?
+  bestTimeOfDay   String?
+  peakCrowdDays  String?
+  avoidDays       String?
+  weatherConditions String?
+  
+  // Nearby
+  nearbyTemples   String?
+  nearbyBeachesOrHills String?
+  nearbyRestaurants String?
+  nearbyHotels    String?
+  distanceRailwayStation String?
+  distanceBusStand String?
+  distanceAirport String?
+  
+  // Media
+  images          Json      // [{ url, alt, isPrimary }]
+  videos          Json?
+  virtualTourUrl  String?
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  searchKeywords  String?
+  canonicalUrl    String?
+  openGraphImage  String?
+  structuredDataJsonLd String?
+  
+  // Devotee Experience
+  devoteeTips     String?   @db.Text
+  thingsToCarry   String?
+  thingsNotAllowed String?
+  idealVisitDuration String?
+  suggestedItinerary String? @db.Text
+  localFoodRecommendations String?
+  faqs            Json?
+  
+  // Emergency
+  emergencyContact String?
+  templeOfficePhone String?
+  lostAndFoundDesk String?
+  medicalFacilityNearby String?
+  policeStationNearby String?
+  
+  // Status
+  active          Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([city])
+  @@index([active])
+  @@map("temples")
+}
+
+// ============================================
 // BOOKING MANAGEMENT
 // ============================================
 
@@ -649,6 +769,9 @@ model Service {
   
   price           Decimal  @db.Decimal(10, 2)
   priceUnit       String   @default("per_person")
+  
+  advanceType     String   @default("percentage") // percentage or fixed
+  advanceValue    Decimal  @default(30) @db.Decimal(5, 2) // 30% or fixed amount
   
   images          Json?
   duration        String?

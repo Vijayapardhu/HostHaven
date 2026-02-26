@@ -17,7 +17,11 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   fastify.put('/users/:id/status', AdminController.updateUserStatus);
 
   fastify.get('/properties', AdminController.getAllProperties);
+  fastify.post('/properties', AdminController.createProperty);
   fastify.put('/properties/:id/status', AdminController.updatePropertyStatus);
+
+  fastify.get('/vendors', AdminController.getAllVendors);
+  fastify.put('/vendors/:id/status', AdminController.updateVendorStatus);
 
   fastify.get('/bookings', AdminController.getAllBookings);
   fastify.put('/bookings/:id/refund', AdminController.refundBooking);

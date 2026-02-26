@@ -3,6 +3,11 @@ import { config, isDevelopment } from '../config';
 
 const prismaClientSingleton = () => {
   return new PrismaClient({
+    datasources: {
+      db: {
+        url: config.database.url,
+      },
+    },
     log: isDevelopment
       ? ['query', 'error', 'warn']
       : ['error'],

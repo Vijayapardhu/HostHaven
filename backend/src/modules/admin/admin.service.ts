@@ -78,6 +78,12 @@ export class AdminService {
       recentBookings,
       recentVendors,
       pendingProperties,
+      activeProperties,
+      totalVendors,
+      pendingVendors,
+      totalServiceBookings,
+      totalSupportTickets,
+      openTickets,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.property.count(),
@@ -102,18 +108,36 @@ export class AdminService {
         },
       }),
       prisma.property.count({ where: { status: 'PENDING' } }),
+      prisma.property.count({ where: { status: 'ACTIVE' } }),
+      prisma.vendor.count(),
+      prisma.vendor.count({ where: { isApproved: false } }),
+      prisma.serviceBooking.count(),
+      prisma.supportTicket.count(),
+      prisma.supportTicket.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
     ]);
 
-    const pendingVendors = await prisma.vendor.count({ where: { isApproved: false } });
+    const newBookingsToday = await prisma.booking.count({
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+        },
+      },
+    });
 
     return {
       stats: {
         totalUsers,
         totalProperties,
+        activeProperties,
         totalBookings,
         totalRevenue: totalRevenue._sum.amount?.toNumber() || 0,
         pendingProperties,
         pendingVendors,
+        totalVendors,
+        totalServiceBookings,
+        totalSupportTickets,
+        openTickets,
+        newBookingsToday,
       },
       recentBookings: recentBookings.map((b: any) => ({
         id: b.id,
@@ -349,6 +373,73 @@ export class AdminService {
     };
   }
 
+  async createProperty(data: any) {
+    const slug = data.name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-') + '-' + Date.now()
+
+    const property = await prisma.property.create({
+      data: {
+        name: data.name,
+        slug,
+        type: data.type || 'HOTEL',
+        status: data.status || 'DRAFT',
+        description: data.description,
+        address: data.address,
+        city: data.city || 'VIJAYAWADA',
+        state: data.state || 'Andhra Pradesh',
+        pincode: data.pincode,
+        basePrice: new Prisma.Decimal(data.basePrice || 0),
+        amenities: data.amenities || [],
+        images: data.images || [],
+        mapLocation: data.mapLocation || undefined,
+      },
+    });
+
+    logger.info({ propertyId: property.id }, 'Property created by admin');
+
+    return {
+      id: property.id,
+      name: property.name,
+      slug: property.slug,
+      status: property.status,
+    };
+  }
+
+  async updateVendorStatus(vendorId: string, status: string, reason?: string) {
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+
+    if (!vendor) {
+      const error = new Error('Vendor not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updateData: any = {};
+    if (status === 'APPROVED') {
+      updateData.isApproved = true;
+      updateData.approvedAt = new Date();
+    } else if (status === 'REJECTED') {
+      updateData.isApproved = false;
+    }
+
+    const updated = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: updateData,
+    });
+
+    logger.info({ vendorId, status }, 'Vendor status updated');
+
+    return {
+      id: updated.id,
+      isApproved: updated.isApproved,
+      approvedAt: updated.approvedAt,
+    };
+  }
+
   async getAllBookings(filters: {
     page?: number;
     limit?: number;
@@ -401,6 +492,69 @@ export class AdminService {
         status: b.status,
         paymentStatus: b.payment?.status,
         createdAt: b.createdAt,
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAllVendors(filters: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    
+    if (filters.status === 'PENDING') {
+      where.isApproved = false;
+    } else if (filters.status === 'APPROVED') {
+      where.isApproved = true;
+    }
+    
+    if (filters.search) {
+      where.OR = [
+        { businessName: { contains: filters.search, mode: 'insensitive' } },
+        { user: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { user: { email: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [vendors, total] = await Promise.all([
+      prisma.vendor.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          properties: { select: { id: true, name: true, status: true } },
+          _count: { select: { properties: true } },
+        },
+      }),
+      prisma.vendor.count({ where }),
+    ]);
+
+    return {
+      vendors: vendors.map((v: any) => ({
+        id: v.id,
+        businessName: v.businessName,
+        email: v.user?.email,
+        phone: v.phone,
+        isApproved: v.isApproved,
+        approvedAt: v.approvedAt,
+        propertiesCount: v._count.properties,
+        properties: v.properties,
+        user: v.user,
+        createdAt: v.createdAt,
       })),
       meta: {
         page,

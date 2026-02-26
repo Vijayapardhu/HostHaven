@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { Prisma } from '@prisma/client';
 import authService from './auth.service';
 import { sendError, sendSuccess } from '../../utils/response.util';
 import { ERROR_CODES } from '../../constants/error-codes';
@@ -48,6 +49,16 @@ export const AuthController = {
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Login failed');
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        return sendError(
+          reply,
+          ERROR_CODES.DATABASE_ERROR,
+          'Database unavailable. Please check database connectivity and try again.',
+          503
+        );
+      }
+
       const statusCode = 
         error.code === ERROR_CODES.ACCOUNT_LOCKED ? 423 :
         error.code === ERROR_CODES.ACCOUNT_DISABLED ? 403 :

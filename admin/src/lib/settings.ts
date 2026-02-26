@@ -33,11 +33,11 @@ export interface PlatformSettings {
 export const settingsService = {
   getSettings: async () => {
     const response = await api.get<PlatformSettings>('/v1/admin/settings')
-    return response.data
+    return response.data?.data ?? response.data
   },
 
   updateSettings: async (payload: PlatformSettings) => {
     const response = await api.put<PlatformSettings>('/v1/admin/settings', payload)
-    return response.data
+    return response.data?.data ?? response.data
   },
 }

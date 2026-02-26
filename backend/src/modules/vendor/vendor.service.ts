@@ -5,6 +5,17 @@ import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
 import notificationsService from '../notifications/notifications.service';
 import { webPushService } from '../../services/webpush.service';
+import type { AdminCreateVendorOnboardingInput } from './vendor.schema';
+
+const toStartOfDayUtc = (dateString: string) => {
+  const date = new Date(`${dateString}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    const error = new Error(`Invalid block date: ${dateString}`);
+    (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+    throw error;
+  }
+  return date;
+};
 
 export class VendorService {
   async register(data: {
@@ -394,6 +405,203 @@ export class VendorService {
       id: updated.id,
       isApproved: updated.isApproved,
       approvedAt: updated.approvedAt,
+    };
+  }
+
+  async adminCreateOnboarding(data: AdminCreateVendorOnboardingInput, adminId: string) {
+    const {
+      account,
+      businessInfo,
+      payout,
+      hotel,
+      rooms,
+      inventory,
+      adminControls,
+    } = data;
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: account.email }, { phone: account.phoneNumber }],
+      },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      const error = new Error('Vendor account already exists with this email or phone');
+      (error as any).code = ERROR_CODES.RESOURCE_CONFLICT;
+      throw error;
+    }
+
+    const existingProperty = await prisma.property.findUnique({
+      where: { slug: hotel.slug },
+      select: { id: true },
+    });
+
+    if (existingProperty) {
+      const error = new Error('Hotel slug already exists');
+      (error as any).code = ERROR_CODES.RESOURCE_CONFLICT;
+      throw error;
+    }
+
+    const normalizedImages = hotel.images.map((image, index) => ({
+      url: image.url,
+      alt: image.alt || hotel.hotelName,
+      isPrimary: image.isPrimary ?? index === 0,
+    }));
+
+    if (!normalizedImages.some((image) => image.isPrimary)) {
+      normalizedImages[0].isPrimary = true;
+    }
+
+    const totalRoomCapacity = rooms.reduce((sum, room) => sum + room.totalRooms, 0);
+    if (inventory.totalRoomsAvailable > totalRoomCapacity) {
+      const error = new Error('Total rooms available cannot exceed sum of room inventories');
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const blockDates = inventory.blockDates ?? [];
+
+    const created = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          name: account.fullName,
+          email: account.email,
+          phone: account.phoneNumber,
+          passwordHash: await hashPassword(account.password),
+          role: 'VENDOR',
+          isActive: !(adminControls?.suspensionStatus ?? false),
+        },
+      });
+
+      const vendor = await tx.vendor.create({
+        data: {
+          userId: user.id,
+          businessName: account.businessName,
+          businessAddress: businessInfo.businessAddress,
+          gstNumber: businessInfo.gstNumber,
+          panNumber: businessInfo.panNumber,
+          bankAccount: {
+            bankName: payout.bankName,
+            accountHolderName: payout.accountHolderName,
+            accountNumber: payout.accountNumber,
+            ifscCode: payout.ifscCode,
+            upiId: payout.upiId,
+          },
+          commissionRate: new Prisma.Decimal(adminControls?.commissionRate ?? 10),
+          isApproved: adminControls?.vendorApproved ?? false,
+          approvedBy: (adminControls?.vendorApproved ?? false) ? adminId : null,
+          approvedAt: (adminControls?.vendorApproved ?? false) ? new Date() : null,
+        },
+      });
+
+      const property = await tx.property.create({
+        data: {
+          vendorId: vendor.id,
+          type: 'HOTEL',
+          status: adminControls?.approvalStatus ?? 'PENDING',
+          name: hotel.hotelName,
+          slug: hotel.slug,
+          description: hotel.description,
+          shortDesc: hotel.shortDescription,
+          address: hotel.fullAddress,
+          city: businessInfo.city,
+          state: businessInfo.state,
+          pincode: businessInfo.pincode,
+          latitude: new Prisma.Decimal(hotel.latitude),
+          longitude: new Prisma.Decimal(hotel.longitude),
+          images: normalizedImages,
+          videos: hotel.videos,
+          amenities: hotel.amenities,
+          highlights: hotel.highlights ?? [],
+          basePrice: new Prisma.Decimal(hotel.basePrice),
+        },
+      });
+
+      const createdRooms = [] as Array<{ id: string; name: string }>;
+      for (const room of rooms) {
+        const createdRoom = await tx.room.create({
+          data: {
+            propertyId: property.id,
+            name: room.roomName,
+            type: room.roomName.toLowerCase().replace(/\s+/g, '-'),
+            capacity: room.capacity,
+            extraBedCapacity: room.extraBedCapacity,
+            pricePerNight: new Prisma.Decimal(room.pricePerNight),
+            weekendPrice: room.weekendPrice ? new Prisma.Decimal(room.weekendPrice) : null,
+            amenities: room.roomAmenities,
+            images: room.roomImages,
+            totalRooms: room.totalRooms,
+            availableRooms: room.totalRooms,
+          },
+        });
+
+        createdRooms.push({ id: createdRoom.id, name: createdRoom.name });
+
+        for (const blocked of blockDates) {
+          const blockedRooms = Math.min(
+            blocked.blockedRooms ?? room.totalRooms,
+            room.totalRooms,
+          );
+
+          await tx.inventoryDay.upsert({
+            where: {
+              roomId_date: {
+                roomId: createdRoom.id,
+                date: toStartOfDayUtc(blocked.date),
+              },
+            },
+            create: {
+              roomId: createdRoom.id,
+              date: toStartOfDayUtc(blocked.date),
+              totalRooms: room.totalRooms,
+              availableRooms: Math.max(0, room.totalRooms - blockedRooms),
+            },
+            update: {
+              totalRooms: room.totalRooms,
+              availableRooms: Math.max(0, room.totalRooms - blockedRooms),
+            },
+          });
+        }
+      }
+
+      return {
+        user,
+        vendor,
+        property,
+        rooms: createdRooms,
+      };
+    });
+
+    logger.info(
+      {
+        adminId,
+        vendorId: created.vendor.id,
+        propertyId: created.property.id,
+        roomCount: created.rooms.length,
+      },
+      'Admin created vendor onboarding package',
+    );
+
+    return {
+      vendor: {
+        id: created.vendor.id,
+        businessName: created.vendor.businessName,
+        isApproved: created.vendor.isApproved,
+        commissionRate: created.vendor.commissionRate.toNumber(),
+      },
+      account: {
+        userId: created.user.id,
+        email: created.user.email,
+        phone: created.user.phone,
+      },
+      hotel: {
+        propertyId: created.property.id,
+        name: created.property.name,
+        slug: created.property.slug,
+        status: created.property.status,
+      },
+      rooms: created.rooms,
     };
   }
 }

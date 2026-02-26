@@ -1,28 +1,45 @@
-import { FastifyInstance } from 'fastify';
-import { TemplesController } from './temples.controller';
-import { requireRole } from '../../middleware/auth.middleware';
+import { FastifyInstance } from "fastify";
+import { TemplesController } from "./temples.controller";
+import { authMiddleware, requireRole } from "../../middleware/auth.middleware";
 
 export default async function templesRoutes(fastify: FastifyInstance) {
-  fastify.get('/', TemplesController.getTemples);
-  fastify.get('/:id', TemplesController.getById);
-  fastify.get('/property/:propertyId', TemplesController.getByProperty);
-  fastify.get('/:id/events', TemplesController.getUpcomingEvents);
+  fastify.get("/", TemplesController.getTemples);
 
   fastify.post(
-    '/',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR', 'ADMIN')] },
-    TemplesController.create
+    "/ai/autofill",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.aiAutofill,
+  );
+
+  fastify.get("/:idOrSlug", TemplesController.getById);
+
+  fastify.post(
+    "/",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.create,
   );
 
   fastify.put(
-    '/:id',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR', 'ADMIN')] },
-    TemplesController.update
+    "/:id",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.update,
+  );
+
+  fastify.patch(
+    "/:id/activate",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.activate,
+  );
+
+  fastify.patch(
+    "/:id/deactivate",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.deactivate,
   );
 
   fastify.delete(
-    '/:id',
-    { preHandler: [fastify.authenticate, requireRole('ADMIN')] },
-    TemplesController.delete
+    "/:id",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.delete,
   );
 }

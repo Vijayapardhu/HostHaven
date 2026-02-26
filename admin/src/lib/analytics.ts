@@ -19,6 +19,6 @@ export const analyticsService = {
     const response = await api.get<AnalyticsData>('/v1/admin/analytics', {
       params: { range },
     })
-    return response.data
+    return response.data?.data ?? response.data
   },
 }

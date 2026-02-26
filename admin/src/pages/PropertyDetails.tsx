@@ -1,80 +1,99 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
-import { ArrowLeft, MapPin, Star } from 'lucide-react'
-import { propertiesService, type Property } from '../lib/properties'
-import { PageHeader } from '../components/ui/PageHeader'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
-import { PageLoader } from '../components/ui/PageLoader'
-import { StatusBadge } from '../components/ui/StatusBadge'
-import { ConfirmDialog } from '../components/ui/ConfirmDialog'
-import { EmptyState } from '../components/ui/EmptyState'
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  MapPin,
+  Star,
+  Image as ImageIcon,
+  Pencil,
+} from "lucide-react";
+import { propertiesService, type Property } from "../lib/properties";
+import { PageHeader } from "../components/ui/PageHeader";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/Card";
+import { PageLoader } from "../components/ui/PageLoader";
+import { StatusBadge } from "../components/ui/StatusBadge";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { EmptyState } from "../components/ui/EmptyState";
 
-type PropertyStatus = 'approved' | 'pending' | 'rejected' | 'inactive'
+type PropertyStatus = "approved" | "pending" | "rejected" | "inactive";
 
 export default function PropertyDetails() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const [property, setProperty] = useState<Property | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [confirmAction, setConfirmAction] = useState<PropertyStatus | null>(null)
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [property, setProperty] = useState<Property | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<PropertyStatus | null>(
+    null,
+  );
 
   const fetchProperty = async () => {
-    if (!id) return
-    setIsLoading(true)
-    setError(null)
+    if (!id) return;
+    setIsLoading(true);
+    setError(null);
     try {
-      const data = await propertiesService.getPropertyById(id)
-      setProperty(data)
+      const data = await propertiesService.getPropertyById(id);
+      setProperty(data);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to load property details.')
+      setError(
+        err?.response?.data?.message || "Unable to load property details.",
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchProperty()
-  }, [id])
+    fetchProperty();
+  }, [id]);
 
   const statusLabel = useMemo(() => {
-    if (!property) return ''
-    if (property.status === 'approved') return 'Approved'
-    if (property.status === 'pending') return 'Pending'
-    if (property.status === 'rejected') return 'Rejected'
-    return 'Inactive'
-  }, [property])
+    if (!property) return "";
+    if (property.status === "approved") return "Approved";
+    if (property.status === "pending") return "Pending";
+    if (property.status === "rejected") return "Rejected";
+    return "Inactive";
+  }, [property]);
 
   const statusVariant = useMemo(() => {
-    if (!property) return 'neutral' as const
-    if (property.status === 'approved') return 'success' as const
-    if (property.status === 'pending') return 'warning' as const
-    if (property.status === 'rejected') return 'danger' as const
-    return 'neutral' as const
-  }, [property])
+    if (!property) return "neutral" as const;
+    if (property.status === "approved") return "success" as const;
+    if (property.status === "pending") return "warning" as const;
+    if (property.status === "rejected") return "danger" as const;
+    return "neutral" as const;
+  }, [property]);
 
   const confirmStatusChange = async () => {
-    if (!property || !confirmAction) return
+    if (!property || !confirmAction) return;
     try {
-      if (confirmAction === 'approved') {
-        await propertiesService.approveProperty(property.id)
-      } else if (confirmAction === 'rejected') {
-        await propertiesService.rejectProperty(property.id)
+      if (confirmAction === "approved") {
+        await propertiesService.approveProperty(property.id);
+      } else if (confirmAction === "rejected") {
+        await propertiesService.rejectProperty(property.id);
       } else {
-        await propertiesService.updateProperty(property.id, { status: confirmAction })
+        await propertiesService.updateProperty(property.id, {
+          status: confirmAction,
+        });
       }
-      setProperty({ ...property, status: confirmAction })
-      toast.success('Property status updated.')
+      setProperty({ ...property, status: confirmAction });
+      toast.success("Property status updated.");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Unable to update property status.')
+      toast.error(
+        err?.response?.data?.message || "Unable to update property status.",
+      );
     } finally {
-      setConfirmAction(null)
+      setConfirmAction(null);
     }
-  }
+  };
 
   if (isLoading) {
-    return <PageLoader rows={6} />
+    return <PageLoader rows={6} />;
   }
 
   if (error) {
@@ -92,11 +111,16 @@ export default function PropertyDetails() {
           </button>
         }
       />
-    )
+    );
   }
 
   if (!property) {
-    return <EmptyState title="Property not found" description="This property record does not exist." />
+    return (
+      <EmptyState
+        title="Property not found"
+        description="This property record does not exist."
+      />
+    );
   }
 
   return (
@@ -104,7 +128,7 @@ export default function PropertyDetails() {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={() => navigate('/properties')}
+          onClick={() => navigate("/properties")}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -113,7 +137,18 @@ export default function PropertyDetails() {
         <PageHeader
           title={property.name}
           description={property.address}
-          actions={<StatusBadge label={statusLabel} variant={statusVariant} />}
+          actions={
+            <div className="flex items-center gap-2">
+              <StatusBadge label={statusLabel} variant={statusVariant} />
+              <Link
+                to={`/properties/${property.id}/edit`}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            </div>
+          }
         />
       </div>
 
@@ -136,6 +171,39 @@ export default function PropertyDetails() {
 
           <Card>
             <CardHeader>
+              <CardTitle>Property Images</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(property.images ?? []).length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  {property.images?.map((img, index) => (
+                    <div
+                      key={index}
+                      className="overflow-hidden rounded-lg border border-slate-200"
+                    >
+                      <img
+                        src={img}
+                        alt={`Property ${index + 1}`}
+                        className="h-32 w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-300 py-8">
+                  <div className="text-center">
+                    <ImageIcon className="mx-auto h-8 w-8 text-slate-400" />
+                    <p className="mt-2 text-sm text-slate-500">
+                      No images uploaded yet
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Amenities</CardTitle>
             </CardHeader>
             <CardContent>
@@ -150,7 +218,9 @@ export default function PropertyDetails() {
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm text-slate-500">No amenities listed yet.</span>
+                  <span className="text-sm text-slate-500">
+                    No amenities listed yet.
+                  </span>
                 )}
               </div>
             </CardContent>
@@ -174,13 +244,13 @@ export default function PropertyDetails() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Base price</span>
                   <span className="font-semibold text-slate-900">
-                    ₹{property.pricing?.basePrice?.toLocaleString() ?? '—'}
+                    ₹{property.pricing?.basePrice?.toLocaleString() ?? "—"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Weekend price</span>
                   <span className="font-semibold text-slate-900">
-                    ₹{property.pricing?.weekendPrice?.toLocaleString() ?? '—'}
+                    ₹{property.pricing?.weekendPrice?.toLocaleString() ?? "—"}
                   </span>
                 </div>
               </div>
@@ -193,39 +263,47 @@ export default function PropertyDetails() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {property.status === 'approved' ? (
+                {property.status === "approved" ? (
                   <button
                     type="button"
-                    onClick={() => setConfirmAction('inactive')}
+                    onClick={() => setConfirmAction("inactive")}
                     className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
                   >
                     Deactivate property
                   </button>
-                ) : property.status === 'inactive' ? (
+                ) : property.status === "inactive" ? (
                   <button
                     type="button"
-                    onClick={() => setConfirmAction('approved')}
+                    onClick={() => setConfirmAction("approved")}
                     className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
                   >
                     Activate property
                   </button>
-                ) : property.status === 'pending' ? (
+                ) : property.status === "pending" ? (
                   <div className="grid gap-2">
                     <button
                       type="button"
-                      onClick={() => setConfirmAction('approved')}
+                      onClick={() => setConfirmAction("approved")}
                       className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                     >
                       Approve property
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirmAction('rejected')}
+                      onClick={() => setConfirmAction("rejected")}
                       className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
                     >
                       Reject property
                     </button>
                   </div>
+                ) : property.status === "rejected" ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction("approved")}
+                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
+                  >
+                    Approve property
+                  </button>
                 ) : null}
               </div>
             </CardContent>
@@ -236,32 +314,32 @@ export default function PropertyDetails() {
       <ConfirmDialog
         open={Boolean(confirmAction)}
         onOpenChange={(open) => {
-          if (!open) setConfirmAction(null)
+          if (!open) setConfirmAction(null);
         }}
         title={
-          confirmAction === 'inactive'
-            ? 'Deactivate this property?'
-            : confirmAction === 'approved'
-            ? 'Approve this property?'
-            : 'Reject this property?'
+          confirmAction === "inactive"
+            ? "Deactivate this property?"
+            : confirmAction === "approved"
+              ? "Approve this property?"
+              : "Reject this property?"
         }
         description={
-          confirmAction === 'inactive'
-            ? 'The property will be hidden from listings.'
-            : confirmAction === 'approved'
-            ? 'The property will go live for users.'
-            : 'The property will be rejected.'
+          confirmAction === "inactive"
+            ? "The property will be hidden from listings."
+            : confirmAction === "approved"
+              ? "The property will go live for users."
+              : "The property will be rejected."
         }
         confirmText={
-          confirmAction === 'inactive'
-            ? 'Deactivate property'
-            : confirmAction === 'approved'
-            ? 'Approve property'
-            : 'Reject property'
+          confirmAction === "inactive"
+            ? "Deactivate property"
+            : confirmAction === "approved"
+              ? "Approve property"
+              : "Reject property"
         }
-        variant={confirmAction === 'approved' ? 'default' : 'danger'}
+        variant={confirmAction === "approved" ? "default" : "danger"}
         onConfirm={confirmStatusChange}
       />
     </div>
-  )
+  );
 }

@@ -1,11 +1,11 @@
-import { FastifyRequest, FastifyReply, HookHandlerDoneFunction } from 'fastify';
-import { verifyAccessToken } from '../utils/token.util';
-import { sendError } from '../utils/response.util';
-import { ERROR_CODES } from '../constants/error-codes';
-import { logger } from '../utils/logger.util';
-import prisma from '../config/database';
+import { FastifyRequest, FastifyReply, HookHandlerDoneFunction } from "fastify";
+import { verifyAccessToken } from "../utils/token.util";
+import { sendError } from "../utils/response.util";
+import { ERROR_CODES } from "../constants/error-codes";
+import { logger } from "../utils/logger.util";
+import prisma from "../config/database";
 
-declare module 'fastify' {
+declare module "fastify" {
   interface FastifyRequest {
     user?: {
       id: string;
@@ -18,20 +18,30 @@ declare module 'fastify' {
 
 export const authMiddleware = async (
   request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ) => {
   try {
     const authHeader = request.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authorization header missing', 401);
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return sendError(
+        reply,
+        ERROR_CODES.UNAUTHORIZED,
+        "Authorization header missing",
+        401,
+      );
     }
 
     const token = authHeader.substring(7);
     const decoded = verifyAccessToken(token);
 
     if (!decoded) {
-      return sendError(reply, ERROR_CODES.INVALID_TOKEN, 'Invalid or expired token', 401);
+      return sendError(
+        reply,
+        ERROR_CODES.INVALID_TOKEN,
+        "Invalid or expired token",
+        401,
+      );
     }
 
     request.user = {
@@ -40,7 +50,7 @@ export const authMiddleware = async (
       role: decoded.role,
     };
 
-    if (decoded.role === 'VENDOR') {
+    if (decoded.role === "VENDOR") {
       const vendor = await prisma.vendor.findUnique({
         where: { userId: decoded.userId },
         select: { id: true },
@@ -50,19 +60,24 @@ export const authMiddleware = async (
       }
     }
   } catch (error) {
-    logger.error({ error }, 'Auth middleware error');
-    return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication failed', 401);
+    logger.error({ error }, "Auth middleware error");
+    return sendError(
+      reply,
+      ERROR_CODES.UNAUTHORIZED,
+      "Authentication failed",
+      401,
+    );
   }
 };
 
 export const optionalAuthMiddleware = async (
   request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ) => {
   try {
     const authHeader = request.headers.authorization;
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
       const decoded = verifyAccessToken(token);
 
@@ -73,7 +88,7 @@ export const optionalAuthMiddleware = async (
           role: decoded.role,
         };
 
-        if (decoded.role === 'VENDOR') {
+        if (decoded.role === "VENDOR") {
           const vendor = await prisma.vendor.findUnique({
             where: { userId: decoded.userId },
             select: { id: true },
@@ -92,21 +107,39 @@ export const optionalAuthMiddleware = async (
 export const requireRole = (...roles: string[]) => {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (!request.user) {
-      return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      return sendError(
+        reply,
+        ERROR_CODES.UNAUTHORIZED,
+        "Authentication required",
+        401,
+      );
     }
 
-    if (!roles.includes(request.user.role)) {
-      return sendError(reply, ERROR_CODES.FORBIDDEN, 'Insufficient permissions', 403);
+    const userRole = request.user.role.toUpperCase();
+    const hasRole = roles.some((role) => role.toUpperCase() === userRole);
+
+    if (!hasRole) {
+      return sendError(
+        reply,
+        ERROR_CODES.FORBIDDEN,
+        "Insufficient permissions",
+        403,
+      );
     }
   };
 };
 
 export const requireVerified = async (
   request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ) => {
   if (!request.user) {
-    return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+    return sendError(
+      reply,
+      ERROR_CODES.UNAUTHORIZED,
+      "Authentication required",
+      401,
+    );
   }
 
   // This would need to check the user's isVerified status from database
