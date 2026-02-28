@@ -11,6 +11,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/forgot-password', AuthController.forgotPassword);
   fastify.post('/reset-password', AuthController.resetPassword);
 
+  // Vendor routes
+  fastify.post('/vendor/login', AuthController.vendorLogin);
+  fastify.post('/vendor/forgot-password', AuthController.vendorForgotPassword);
+  fastify.post('/vendor/reset-password', AuthController.vendorResetPassword);
+
   // Google OAuth routes
   fastify.get('/google', AuthController.googleAuthUrl);
   fastify.get('/google/callback', AuthController.googleCallback);

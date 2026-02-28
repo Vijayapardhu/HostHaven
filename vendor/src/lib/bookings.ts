@@ -1,7 +1,22 @@
 import api from "@/lib/api";
 
+export interface Booking {
+  id: string;
+  bookingNumber?: string;
+  user?: { name: string; email: string };
+  property?: { name: string; city: string };
+  checkInDate: string;
+  checkOutDate: string;
+  adults?: number;
+  children?: number;
+  totalAmount?: number;
+  status: string;
+  paymentStatus?: string;
+  createdAt?: string;
+}
+
 export const bookingsService = {
-  getBookings: async (params?: Record<string, string>) => {
+  getBookings: async (params?: Record<string, string | number>) => {
     const response = await api.get("/v1/vendor/bookings", { params });
     return response.data;
   },
@@ -12,7 +27,9 @@ export const bookingsService = {
   },
 
   updateBookingStatus: async (id: string, status: string) => {
-    const response = await api.patch(`/v1/vendor/bookings/${id}/status`, { status });
+    const response = await api.patch(`/v1/vendor/bookings/${id}/status`, {
+      status,
+    });
     return response.data;
   },
 
@@ -22,12 +39,12 @@ export const bookingsService = {
   },
 
   checkIn: async (id: string) => {
-    const response = await api.post(`/v1/vendor/bookings/${id}/check-in`);
+    const response = await api.patch(`/v1/vendor/bookings/${id}/checkin`);
     return response.data;
   },
 
   checkOut: async (id: string) => {
-    const response = await api.post(`/v1/vendor/bookings/${id}/check-out`);
+    const response = await api.patch(`/v1/vendor/bookings/${id}/checkout`);
     return response.data;
   },
 

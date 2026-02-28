@@ -20,8 +20,10 @@ import { PageLoader } from "../components/ui/PageLoader";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { EmptyState } from "../components/ui/EmptyState";
+import { RoomManagementCard } from "../components/properties/RoomManagementCard";
+import { CancellationPolicyCard } from "../components/properties/CancellationPolicyCard";
 
-type PropertyStatus = "approved" | "pending" | "rejected" | "inactive";
+type PropertyStatus = "approved" | "pending" | "rejected" | "inactive" | "deleted";
 
 export default function PropertyDetails() {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +78,11 @@ export default function PropertyDetails() {
         await propertiesService.approveProperty(property.id);
       } else if (confirmAction === "rejected") {
         await propertiesService.rejectProperty(property.id);
+      } else if (confirmAction === "deleted") {
+        await propertiesService.deleteProperty(property.id);
+        toast.success("Property soft-deleted securely.");
+        navigate("/properties");
+        return;
       } else {
         await propertiesService.updateProperty(property.id, {
           status: confirmAction,
@@ -89,6 +96,34 @@ export default function PropertyDetails() {
       );
     } finally {
       setConfirmAction(null);
+    }
+  };
+
+  const toggleFeature = async () => {
+    if (!property) return;
+    try {
+      const next = !property.isFeatured;
+      await propertiesService.updateProperty(property.id, { isFeatured: next });
+      setProperty({ ...property, isFeatured: next });
+      toast.success(`Property ${next ? "featured" : "unfeatured"}.`);
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || "Unable to update property feature status.",
+      );
+    }
+  };
+
+  const toggleVerify = async () => {
+    if (!property) return;
+    try {
+      const next = !property.isVerified;
+      await propertiesService.updateProperty(property.id, { isVerified: next });
+      setProperty({ ...property, isVerified: next });
+      toast.success(`Property ${next ? "verified" : "unverified"}.`);
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || "Unable to update property verification status.",
+      );
     }
   };
 
@@ -139,6 +174,16 @@ export default function PropertyDetails() {
           description={property.address}
           actions={
             <div className="flex items-center gap-2">
+              {property.isFeatured && (
+                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                  Featured
+                </span>
+              )}
+              {property.isVerified && (
+                <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                  Verified
+                </span>
+              )}
               <StatusBadge label={statusLabel} variant={statusVariant} />
               <Link
                 to={`/properties/${property.id}/edit`}
@@ -225,6 +270,15 @@ export default function PropertyDetails() {
               </div>
             </CardContent>
           </Card>
+
+          {property.rooms && property.rooms.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-slate-900 mt-6">Room Inventory & Configuration</h3>
+              {property.rooms.map((room) => (
+                <RoomManagementCard key={room.id} room={room} onUpdate={fetchProperty} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -257,6 +311,48 @@ export default function PropertyDetails() {
             </CardContent>
           </Card>
 
+          <CancellationPolicyCard
+            propertyId={property.id}
+            cancellationPolicy={property.cancellationPolicy}
+            onUpdate={fetchProperty}
+          />
+
+          {property.type === 'home' && property.houseDetails && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Home Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  {property.houseDetails.houseType && (
+                    <div className="flex justify-between"><span className="text-slate-500">House Type</span><span className="font-semibold text-slate-900">{property.houseDetails.houseType}</span></div>
+                  )}
+                  {property.houseDetails.listingType && (
+                    <div className="flex justify-between"><span className="text-slate-500">Listing Type</span><span className="font-semibold text-slate-900">{property.houseDetails.listingType}</span></div>
+                  )}
+                  {property.houseDetails.viewType && (
+                    <div className="flex justify-between"><span className="text-slate-500">View</span><span className="font-semibold text-slate-900">{property.houseDetails.viewType}</span></div>
+                  )}
+                  {property.houseDetails.totalGuests && (
+                    <div className="flex justify-between"><span className="text-slate-500">Max Guests</span><span className="font-semibold text-slate-900">{property.houseDetails.totalGuests}</span></div>
+                  )}
+                  {property.houseDetails.bedrooms && (
+                    <div className="flex justify-between"><span className="text-slate-500">Bedrooms</span><span className="font-semibold text-slate-900">{property.houseDetails.bedrooms}</span></div>
+                  )}
+                  {property.houseDetails.bathrooms && (
+                    <div className="flex justify-between"><span className="text-slate-500">Bathrooms</span><span className="font-semibold text-slate-900">{property.houseDetails.bathrooms}</span></div>
+                  )}
+                  {property.houseDetails.checkInTime && (
+                    <div className="flex justify-between"><span className="text-slate-500">Check-in</span><span className="font-semibold text-slate-900">{property.houseDetails.checkInTime}</span></div>
+                  )}
+                  {property.houseDetails.checkOutTime && (
+                    <div className="flex justify-between"><span className="text-slate-500">Check-out</span><span className="font-semibold text-slate-900">{property.houseDetails.checkOutTime}</span></div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Actions</CardTitle>
@@ -267,7 +363,7 @@ export default function PropertyDetails() {
                   <button
                     type="button"
                     onClick={() => setConfirmAction("inactive")}
-                    className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                    className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 mb-2"
                   >
                     Deactivate property
                   </button>
@@ -275,12 +371,12 @@ export default function PropertyDetails() {
                   <button
                     type="button"
                     onClick={() => setConfirmAction("approved")}
-                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
+                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 mb-2"
                   >
                     Activate property
                   </button>
                 ) : property.status === "pending" ? (
-                  <div className="grid gap-2">
+                  <div className="grid gap-2 mb-2">
                     <button
                       type="button"
                       onClick={() => setConfirmAction("approved")}
@@ -300,11 +396,39 @@ export default function PropertyDetails() {
                   <button
                     type="button"
                     onClick={() => setConfirmAction("approved")}
-                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50"
+                    className="w-full rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 mb-2"
                   >
                     Approve property
                   </button>
                 ) : null}
+
+                <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleFeature}
+                    className="w-full rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
+                  >
+                    {property.isFeatured ? "Remove Featured Tag" : "Mark as Featured"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={toggleVerify}
+                    className="w-full rounded-lg bg-sky-50 border border-sky-200 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                  >
+                    {property.isVerified ? "Remove Verification" : "Verify Property"}
+                  </button>
+                </div>
+
+                <div className="border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAction("deleted")}
+                    className="w-full rounded-lg bg-rose-50 border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition-all hover:bg-rose-100 hover:border-rose-300"
+                  >
+                    Soft Delete Property
+                  </button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -321,21 +445,27 @@ export default function PropertyDetails() {
             ? "Deactivate this property?"
             : confirmAction === "approved"
               ? "Approve this property?"
-              : "Reject this property?"
+              : confirmAction === "deleted"
+                ? "Soft Delete this property?"
+                : "Reject this property?"
         }
         description={
           confirmAction === "inactive"
             ? "The property will be hidden from listings."
             : confirmAction === "approved"
               ? "The property will go live for users."
-              : "The property will be rejected."
+              : confirmAction === "deleted"
+                ? "The property will be safely soft-deleted from the platform preventing further active interactions."
+                : "The property will be rejected."
         }
         confirmText={
           confirmAction === "inactive"
             ? "Deactivate property"
             : confirmAction === "approved"
               ? "Approve property"
-              : "Reject property"
+              : confirmAction === "deleted"
+                ? "Delete property"
+                : "Reject property"
         }
         variant={confirmAction === "approved" ? "default" : "danger"}
         onConfirm={confirmStatusChange}

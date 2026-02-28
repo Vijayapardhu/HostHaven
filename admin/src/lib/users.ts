@@ -5,35 +5,63 @@ export interface User {
   phone: string
   name?: string
   email?: string
-  status: 'active' | 'suspended'
+  status: 'active' | 'suspended' | 'deleted'
+  isVerified?: boolean
   createdAt: string
   updatedAt: string
   bookingsCount?: number
   reviewsCount?: number
 }
 
+export interface UserDetail extends User {
+  avatarUrl?: string
+  role?: string
+  emailVerifiedAt?: string
+  isDeleted?: boolean
+  deletedAt?: string
+  lastLoginAt?: string
+  lastLoginIp?: string
+  totalSpent?: number
+  _count?: { bookings: number; reviews: number; serviceBookings: number; wishlistItems: number }
+  bookings?: Array<{
+    id: string; checkInDate: string; checkOutDate: string; status: string
+    totalAmount: number; createdAt: string
+    property: { id: string; name: string; type: string }
+  }>
+  reviews?: Array<{
+    id: string; rating: number; comment: string; createdAt: string
+    property: { id: string; name: string }
+  }>
+  serviceBookings?: Array<{
+    id: string; status: string; serviceDate: string; totalAmount: number
+    service: { id: string; name: string }
+  }>
+}
+
+export interface UserSession {
+  id: string; userAgent?: string; ipAddress?: string; deviceType?: string
+  location?: string; isActive: boolean; expiresAt: string; createdAt: string
+}
+
 export interface PaginatedResponse<T> {
   data: T[]
-  pagination: {
-    total: number
-    page: number
-    limit: number
-    pages: number
-  }
+  pagination: { total: number; page: number; limit: number; pages: number }
 }
 
 const mapUser = (user: any): User => {
   const isActive = Boolean(user.isActive ?? true)
+  const isDeleted = Boolean(user.isDeleted ?? false)
   return {
     id: user.id,
     phone: user.phone ?? '',
     name: user.name ?? undefined,
     email: user.email ?? undefined,
-    status: isActive ? 'active' : 'suspended',
+    status: isDeleted ? 'deleted' : isActive ? 'active' : 'suspended',
+    isVerified: user.isVerified,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt ?? user.createdAt,
-    bookingsCount: user.bookingsCount,
-    reviewsCount: user.reviewsCount,
+    bookingsCount: user.bookingsCount ?? user._count?.bookings,
+    reviewsCount: user.reviewsCount ?? user._count?.reviews,
   }
 }
 
@@ -43,27 +71,22 @@ const normalizeList = (payload: any): PaginatedResponse<User> => {
   return {
     data: Array.isArray(data) ? data.map(mapUser) : [],
     pagination: {
-      total: meta?.total ?? 0,
-      page: meta?.page ?? 1,
-      limit: meta?.limit ?? 10,
-      pages: meta?.totalPages ?? meta?.pages ?? 1,
+      total: meta?.total ?? 0, page: meta?.page ?? 1,
+      limit: meta?.limit ?? 10, pages: meta?.totalPages ?? meta?.pages ?? 1,
     },
   }
 }
 
 export const usersService = {
-  getUsers: async (params?: {
-    page?: number
-    limit?: number
-    search?: string
-    status?: string
-  }) => {
+  getUsers: async (params?: { page?: number; limit?: number; search?: string; status?: string }) => {
     const response = await api.get('/v1/admin/users', { params })
     return normalizeList(response.data)
   },
 
-  getUserById: async (id: string) => {
-    throw new Error('User detail endpoint is not available for admin users')
+  getUserById: async (id: string): Promise<UserDetail> => {
+    const response = await api.get(`/v1/admin/users/${id}`)
+    const raw = response.data?.data ?? response.data
+    return { ...mapUser(raw), ...raw } as UserDetail
   },
 
   suspendUser: async (id: string) => {
@@ -77,6 +100,22 @@ export const usersService = {
   },
 
   deleteUser: async (id: string) => {
-    throw new Error('Delete user endpoint is not available for admin users')
+    const response = await api.delete(`/v1/admin/users/${id}`)
+    return response.data?.data ?? response.data
+  },
+
+  verifyEmail: async (id: string) => {
+    const response = await api.put(`/v1/admin/users/${id}/verify-email`)
+    return response.data?.data ?? response.data
+  },
+
+  resetPassword: async (id: string) => {
+    const response = await api.post(`/v1/admin/users/${id}/reset-password`)
+    return response.data?.data ?? response.data
+  },
+
+  getSessions: async (id: string): Promise<UserSession[]> => {
+    const response = await api.get(`/v1/admin/users/${id}/sessions`)
+    return response.data?.data ?? response.data ?? []
   },
 }

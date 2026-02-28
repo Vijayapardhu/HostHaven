@@ -6,6 +6,7 @@ import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
 import notificationsService from '../notifications/notifications.service';
 import { webPushService } from '../../services/webpush.service';
+import adminService from '../admin/admin.service';
 
 export class BookingsService {
   async create(data: {
@@ -498,7 +499,7 @@ export class BookingsService {
 
   async updateStatus(id: string, status: string, vendorId?: string) {
     const where: Prisma.BookingWhereInput = { id };
-    
+
     if (vendorId) {
       where.property = { vendorId };
     }
@@ -755,6 +756,9 @@ export class BookingsService {
     });
 
     await this.sendBookingNotifications(updated, updated.property, 'CHECKED_OUT');
+
+    // Calculate commission for the vendor
+    await adminService.calculateCommission(bookingId);
 
     return this.sanitizeBooking(updated);
   }

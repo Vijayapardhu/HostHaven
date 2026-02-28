@@ -37,6 +37,11 @@ interface DashboardData {
     activeBookings: number;
     totalRevenue: number;
     pendingPayouts: number;
+    totalBookingsThisMonth: number;
+    todaysCheckIns: number;
+    todaysCheckOuts: number;
+    pendingBookings: number;
+    occupancyRate: number;
   };
   recentBookings: Array<{
     id: string;
@@ -49,6 +54,23 @@ interface DashboardData {
     totalAmount: number;
     status: string;
     createdAt: string;
+  }>;
+  recentReviews?: Array<{
+    id: string;
+    rating: number;
+    comment: string;
+    user: string;
+    avatarUrl?: string;
+    propertyName: string;
+    createdAt: string;
+  }>;
+  payoutStatus?: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    periodStart: string;
+    periodEnd: string;
+    processedAt?: string;
   }>;
 }
 
@@ -158,39 +180,14 @@ const VendorDashboard = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Card className="border-0 shadow-lg shadow-primary/5">
+          <Card className="border-0 shadow-lg shadow-primary/5 h-full">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-primary-foreground" />
+                  <CalendarDays className="w-6 h-6 text-primary-foreground" />
                 </div>
-                <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
-                  <ArrowUpRight className="w-4 h-4" />
-                  +12%
-                </span>
-              </div>
-              <div className="mt-4">
-                <p className="text-3xl font-bold">{data?.stats?.propertiesCount || 0}</p>
-                <p className="text-muted-foreground text-sm">Total Hotels</p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="border-0 shadow-lg shadow-blue-500/5">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                  <CalendarDays className="w-6 h-6 text-white" />
-                </div>
-                <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
-                  <ArrowUpRight className="w-4 h-4" />
-                  +8%
+                <span className="flex items-center gap-1 text-primary text-sm font-medium">
+                  {data?.stats?.totalBookingsThisMonth || 0} This Month
                 </span>
               </div>
               <div className="mt-4">
@@ -204,17 +201,42 @@ const VendorDashboard = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card className="border-0 shadow-lg shadow-blue-500/5 h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="flex items-center gap-1 text-blue-600 text-sm font-medium">
+                    <ArrowUpRight className="w-4 h-4" />
+                    {data?.stats?.todaysCheckOuts || 0} Out
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4">
+                <p className="text-3xl font-bold">{data?.stats?.todaysCheckIns || 0}</p>
+                <p className="text-muted-foreground text-sm">Today's Check-ins</p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <Card className="border-0 shadow-lg shadow-green-500/5">
+          <Card className="border-0 shadow-lg shadow-green-500/5 h-full">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
                   <Wallet className="w-6 h-6 text-white" />
                 </div>
-                <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
-                  <ArrowUpRight className="w-4 h-4" />
-                  +23%
+                <span className="flex items-center gap-1 text-green-600 text-sm font-medium text-right">
+                  After Comm.
                 </span>
               </div>
               <div className="mt-4">
@@ -230,20 +252,19 @@ const VendorDashboard = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="border-0 shadow-lg shadow-purple-500/5">
+          <Card className="border-0 shadow-lg shadow-purple-500/5 h-full">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-white" />
+                  <Hotel className="w-6 h-6 text-white" />
                 </div>
                 <span className="flex items-center gap-1 text-amber-600 text-sm font-medium">
-                  <Clock className="w-4 h-4" />
-                  Pending
+                  {data?.stats?.occupancyRate || 0}% Occ.
                 </span>
               </div>
               <div className="mt-4">
-                <p className="text-3xl font-bold">₹{(data?.stats?.pendingPayouts || 0).toLocaleString()}</p>
-                <p className="text-muted-foreground text-sm">Pending Payouts</p>
+                <p className="text-3xl font-bold">{data?.stats?.pendingBookings || 0}</p>
+                <p className="text-muted-foreground text-sm">Pending Bookings</p>
               </div>
             </CardContent>
           </Card>
@@ -347,38 +368,104 @@ const VendorDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Hotel Overview */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-      >
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Your Hotels</CardTitle>
-            <Link to="/vendor/properties">
-              <Button variant="ghost" size="sm">
-                Manage All
-                <ArrowUpRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Link
-                to="/vendor/properties"
-                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/50 hover:border-primary/50 hover:bg-muted/50 transition-all min-h-[280px]"
-              >
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Building2 className="w-8 h-8 text-primary" />
-                </div>
-                <p className="font-medium">Add New Hotel</p>
-                <p className="text-sm text-muted-foreground">Expand your hotel portfolio</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Recent Reviews */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Card className="border-0 shadow-lg h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Recent Reviews</CardTitle>
+              <Link to="/vendor/reviews">
+                <Button variant="ghost" size="sm">
+                  View All
+                  <ArrowUpRight className="w-4 h-4 ml-1" />
+                </Button>
               </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+            </CardHeader>
+            <CardContent>
+              {data?.recentReviews && data.recentReviews.length > 0 ? (
+                <div className="space-y-4">
+                  {data.recentReviews.slice(0, 3).map((review) => (
+                    <div
+                      key={review.id}
+                      className="p-4 rounded-xl bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-semibold text-sm">{review.propertyName}</p>
+                        <div className="flex items-center text-amber-500">
+                          <Star className="w-4 h-4 fill-current" />
+                          <span className="ml-1 text-sm font-medium">{review.rating}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{review.comment}</p>
+                      <p className="text-xs text-muted-foreground mt-2">— {review.user}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Star className="w-10 h-10 text-muted mx-auto mb-3" />
+                  <p className="text-muted-foreground">No recent reviews</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Payout Status */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <Card className="border-0 shadow-lg h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Recent Payouts</CardTitle>
+              <Link to="/vendor/earnings">
+                <Button variant="ghost" size="sm">
+                  View Earnings
+                  <ArrowUpRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {data?.payoutStatus && data.payoutStatus.length > 0 ? (
+                <div className="space-y-4">
+                  {data.payoutStatus.slice(0, 3).map((payout) => (
+                    <div
+                      key={payout.id}
+                      className="flex items-center justify-between p-4 rounded-xl bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${payout.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                          {payout.status === 'completed' ? <CheckCircle className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <p className="font-medium capitalize">{payout.status} Payout</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(payout.periodStart).toLocaleDateString()} - {new Date(payout.periodEnd).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">₹{payout.amount.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Wallet className="w-10 h-10 text-muted mx-auto mb-3" />
+                  <p className="text-muted-foreground">No payout history</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
     </div>
   );
 };

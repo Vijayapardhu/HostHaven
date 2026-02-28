@@ -69,4 +69,51 @@ export const SupportController = {
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update support ticket', 500);
     }
   },
+
+  async getTicketById(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = supportTicketIdSchema.parse(request.params);
+      const ticket = await supportService.getTicketById(id);
+      return sendSuccess(reply, ticket);
+    } catch (error: any) {
+      logger.error({ error }, 'Get support ticket by ID failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to get ticket', 500);
+    }
+  },
+
+  async addNote(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = supportTicketIdSchema.parse(request.params);
+      const { content } = request.body as { content: string };
+      if (!content || !content.trim()) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Note content is required', 400);
+      }
+      const adminName = (request as any).user?.name || 'Admin';
+      const ticket = await supportService.addNote(id, content.trim(), adminName);
+      return sendSuccess(reply, ticket);
+    } catch (error: any) {
+      logger.error({ error }, 'Add note to support ticket failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to add note', 500);
+    }
+  },
+
+  async reopenTicket(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = supportTicketIdSchema.parse(request.params);
+      const ticket = await supportService.reopenTicket(id);
+      return sendSuccess(reply, ticket);
+    } catch (error: any) {
+      logger.error({ error }, 'Reopen support ticket failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to reopen ticket', 500);
+    }
+  },
 };

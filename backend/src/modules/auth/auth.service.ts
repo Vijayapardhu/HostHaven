@@ -132,6 +132,145 @@ export class AuthService {
   }
 
   // ==========================================
+  // VENDOR AUTHENTICATION
+  // ==========================================
+
+  async loginVendorWithEmail(data: {
+    email: string;
+    password: string;
+    ipAddress: string;
+    userAgent: string;
+  }) {
+    const normalizedEmail = data.email.toLowerCase();
+
+    const user = await prisma.user.findFirst({
+      where: { email: normalizedEmail, isDeleted: false },
+    });
+
+    if (!user || user.role !== 'VENDOR') {
+      const error = new Error('Invalid email or password');
+      (error as any).code = ERROR_CODES.INVALID_CREDENTIALS;
+      throw error;
+    }
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const error = new Error('Account is temporarily locked. Please try again later.');
+      (error as any).code = ERROR_CODES.ACCOUNT_LOCKED;
+      throw error;
+    }
+
+    if (!user.passwordHash) {
+      const error = new Error('This account uses Google sign-in. Please continue with Google.');
+      (error as any).code = ERROR_CODES.OAUTH_ONLY_ACCOUNT;
+      throw error;
+    }
+
+    const isValid = await verifyPassword(user.passwordHash, data.password);
+
+    if (!isValid) {
+      await this.handleFailedLogin(user);
+      const error = new Error('Invalid email or password');
+      (error as any).code = ERROR_CODES.INVALID_CREDENTIALS;
+      throw error;
+    }
+
+    if (!user.isActive) {
+      const error = new Error('Account has been disabled. Please contact support.');
+      (error as any).code = ERROR_CODES.ACCOUNT_DISABLED;
+      throw error;
+    }
+
+    const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: 0,
+        lastLoginAt: new Date(),
+        lastLoginIp: data.ipAddress,
+      },
+    });
+
+    logger.info({ userId: user.id, email: user.email }, 'Vendor logged in');
+
+    return {
+      user: this.sanitizeUser(user),
+      tokens,
+    };
+  }
+
+  async forgotVendorPassword(email: string) {
+    const user = await prisma.user.findFirst({
+      where: { email: email.toLowerCase(), isDeleted: false, role: 'VENDOR' },
+    });
+
+    if (!user) {
+      return { message: 'If the email exists, a password reset link will be sent' };
+    }
+
+    const resetToken = generateSecureToken(32);
+    const resetExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
+      },
+    });
+
+    const vendorAppUrl = process.env.VENDOR_URL || 'http://localhost:5174';
+    const resetUrl = `${vendorAppUrl}/reset-password?token=${resetToken}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset Your Vendor Password - HostHaven',
+      template: 'password-reset',
+      data: {
+        name: user.name,
+        resetUrl,
+        expiresIn: '1 hour',
+      },
+    });
+
+    return { message: 'Password reset email sent' };
+  }
+
+  async resetVendorPassword(token: string, newPassword: string) {
+    const user = await prisma.user.findFirst({
+      where: { passwordResetToken: token, role: 'VENDOR' },
+    });
+
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      const error = new Error('Invalid or expired reset token');
+      (error as any).code = ERROR_CODES.INVALID_TOKEN;
+      throw error;
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        lockedUntil: null,
+        failedLoginAttempts: 0,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    await prisma.session.updateMany({
+      where: { userId: user.id, isActive: true },
+      data: { isActive: false },
+    });
+
+    logger.info({ userId: user.id }, 'Vendor password reset');
+
+    return { message: 'Password reset successfully' };
+  }
+
+  // ==========================================
   // GOOGLE OAUTH
   // ==========================================
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Download } from 'lucide-react'
 import { bookingsService, type Booking } from '../lib/bookings'
 import { FiltersBar } from '../components/ui/FiltersBar'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -12,8 +12,9 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
 import { PageLoader } from '../components/ui/PageLoader'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { downloadCsvExport } from '../lib/export'
 
-type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled'
+type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled' | 'refunded'
 type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'failed'
 
 const statusOptions: Array<{ label: string; value: 'all' | BookingStatus }> = [
@@ -31,6 +32,7 @@ const statusLabels: Record<BookingStatus, string> = {
   checked_in: 'Checked-in',
   checked_out: 'Checked-out',
   cancelled: 'Cancelled',
+  refunded: 'Refunded',
 }
 
 const statusVariants: Record<BookingStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
@@ -39,6 +41,7 @@ const statusVariants: Record<BookingStatus, 'success' | 'warning' | 'danger' | '
   checked_in: 'info',
   checked_out: 'neutral',
   cancelled: 'danger',
+  refunded: 'neutral',
 }
 
 const paymentVariants: Record<PaymentStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
@@ -69,8 +72,8 @@ export default function Bookings() {
         search: searchTerm || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
       })
-      setBookings(data.data ?? data.bookings ?? [])
-      setTotal(data.pagination?.total ?? data.total ?? 0)
+      setBookings(data.data ?? [])
+      setTotal(data.pagination?.total ?? 0)
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to load bookings.')
     } finally {
@@ -101,6 +104,15 @@ export default function Bookings() {
     }
   }
 
+  const handleExport = async () => {
+    try {
+      await downloadCsvExport('bookings')
+      toast.success('Export started successfully')
+    } catch (err) {
+      toast.error('Failed to export bookings data')
+    }
+  }
+
   const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
@@ -108,6 +120,14 @@ export default function Bookings() {
       <PageHeader
         title="Bookings"
         description="Track booking status, payments, and refunds."
+        actions={
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </button>
+        }
       />
 
       <FiltersBar>

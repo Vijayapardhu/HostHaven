@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { CalendarDays, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { bookingsService } from "@/lib/bookings";
 import LoadingState from "@/components/states/LoadingState";
 import EmptyState from "@/components/states/EmptyState";
@@ -26,9 +34,12 @@ interface BookingRecord {
 }
 
 const VendorBookingsIndex = () => {
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,8 +58,18 @@ const VendorBookingsIndex = () => {
         params.status = statusFilter;
       }
 
+      if (dateFrom) {
+        params.dateFrom = dateFrom;
+      }
+
+      if (dateTo) {
+        params.dateTo = dateTo;
+      }
+
       const response = await bookingsService.getBookings(params);
-      const bookingList = Array.isArray(response) ? response : response?.bookings || [];
+      const bookingList = Array.isArray(response)
+        ? response
+        : response?.bookings || [];
       setBookings(bookingList);
       setTotalPages(response?.meta?.totalPages || 1);
     } catch (error: any) {
@@ -60,7 +81,7 @@ const VendorBookingsIndex = () => {
 
   useEffect(() => {
     void loadBookings();
-  }, [currentPage, statusFilter]);
+  }, [currentPage, statusFilter, dateFrom, dateTo]);
 
   const filteredBookings = bookings.filter((booking) => {
     const query = search.trim().toLowerCase();
@@ -77,11 +98,20 @@ const VendorBookingsIndex = () => {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
-      CONFIRMED: { label: "Confirmed", className: "bg-green-100 text-green-700" },
+      CONFIRMED: {
+        label: "Confirmed",
+        className: "bg-green-100 text-green-700",
+      },
       PENDING: { label: "Pending", className: "bg-amber-100 text-amber-700" },
       CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-700" },
-      CHECKED_IN: { label: "Checked In", className: "bg-blue-100 text-blue-700" },
-      CHECKED_OUT: { label: "Checked Out", className: "bg-gray-100 text-gray-700" },
+      CHECKED_IN: {
+        label: "Checked In",
+        className: "bg-blue-100 text-blue-700",
+      },
+      CHECKED_OUT: {
+        label: "Checked Out",
+        className: "bg-gray-100 text-gray-700",
+      },
     };
 
     const config = statusMap[status] || { label: status, className: "" };
@@ -89,12 +119,37 @@ const VendorBookingsIndex = () => {
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
+  const getPaymentBadge = (status: string) => {
+    const paymentMap: Record<string, { label: string; className: string }> = {
+      COMPLETED: { label: "Paid", className: "bg-green-100 text-green-700" },
+      PENDING: { label: "Pending", className: "bg-amber-100 text-amber-700" },
+      REFUNDED: { label: "Refunded", className: "bg-blue-100 text-blue-700" },
+      FAILED: { label: "Failed", className: "bg-red-100 text-red-700" },
+    };
+
+    const config = paymentMap[status] || {
+      label: status || "N/A",
+      className: "bg-gray-100 text-gray-700",
+    };
+
+    return <Badge className={config.className}>{config.label}</Badge>;
+  };
+
+  const clearDateFilter = () => {
+    setDateFrom("");
+    setDateTo("");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Bookings</h1>
-          <p className="text-muted-foreground mt-1">Manage and track all bookings</p>
+          <h1 className="text-3xl font-serif font-bold text-foreground">
+            Bookings
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage and track all bookings
+          </p>
         </div>
       </div>
 
@@ -123,12 +178,49 @@ const VendorBookingsIndex = () => {
         </Select>
       </div>
 
+      <div className="flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="dateFrom" className="text-sm">
+            Check-in Date From
+          </Label>
+          <Input
+            id="dateFrom"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full md:w-[180px]"
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="dateTo" className="text-sm">
+            Check-in Date To
+          </Label>
+          <Input
+            id="dateTo"
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full md:w-[180px]"
+          />
+        </div>
+        {(dateFrom || dateTo) && (
+          <Button variant="ghost" onClick={clearDateFilter} className="text-sm">
+            Clear Dates
+          </Button>
+        )}
+      </div>
+
       <Card className="border-0 shadow-lg">
         <CardContent className="p-0">
           {isLoading ? (
             <LoadingState className="p-8" message="Loading bookings..." />
           ) : errorMessage ? (
-            <ErrorState className="p-8" title="Unable to load bookings" description={errorMessage} onRetry={loadBookings} />
+            <ErrorState
+              className="p-8"
+              title="Unable to load bookings"
+              description={errorMessage}
+              onRetry={loadBookings}
+            />
           ) : filteredBookings.length === 0 ? (
             <EmptyState
               className="py-12"
@@ -146,32 +238,59 @@ const VendorBookingsIndex = () => {
                     <th className="text-left p-4 font-semibold">Hotel</th>
                     <th className="text-left p-4 font-semibold">Dates</th>
                     <th className="text-left p-4 font-semibold">Amount</th>
+                    <th className="text-left p-4 font-semibold">Payment</th>
                     <th className="text-left p-4 font-semibold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredBookings.map((booking) => (
-                    <tr key={booking.id} className="border-b hover:bg-muted/30 transition-colors">
+                    <tr
+                      key={booking.id}
+                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/vendor/bookings/${booking.id}`)}
+                    >
                       <td className="p-4">
-                        <p className="font-mono font-medium text-sm">{booking.bookingNumber || booking.id}</p>
+                        <p className="font-mono font-medium text-sm">
+                          {booking.bookingNumber || booking.id}
+                        </p>
                         {booking.createdAt && (
-                          <p className="text-xs text-muted-foreground">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(booking.createdAt).toLocaleDateString()}
+                          </p>
                         )}
                       </td>
                       <td className="p-4">
-                        <p className="font-medium">{booking.user?.name || "N/A"}</p>
-                        <p className="text-sm text-muted-foreground">{booking.user?.email || ""}</p>
+                        <p className="font-medium">
+                          {booking.user?.name || "N/A"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {booking.user?.email || ""}
+                        </p>
                       </td>
                       <td className="p-4">
-                        <p className="font-medium">{booking.property?.name || "N/A"}</p>
-                        <p className="text-sm text-muted-foreground">{booking.property?.city || ""}</p>
+                        <p className="font-medium">
+                          {booking.property?.name || "N/A"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {booking.property?.city || ""}
+                        </p>
                       </td>
                       <td className="p-4">
-                        <p className="text-sm">{new Date(booking.checkInDate).toLocaleDateString()}</p>
-                        <p className="text-sm text-muted-foreground">to {new Date(booking.checkOutDate).toLocaleDateString()}</p>
+                        <p className="text-sm">
+                          {new Date(booking.checkInDate).toLocaleDateString()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          to{" "}
+                          {new Date(booking.checkOutDate).toLocaleDateString()}
+                        </p>
                       </td>
                       <td className="p-4">
-                        <p className="font-bold">₹{(booking.totalAmount || 0).toLocaleString()}</p>
+                        <p className="font-bold">
+                          ₹{(booking.totalAmount || 0).toLocaleString()}
+                        </p>
+                      </td>
+                      <td className="p-4">
+                        {getPaymentBadge(booking.paymentStatus || "")}
                       </td>
                       <td className="p-4">{getStatusBadge(booking.status)}</td>
                     </tr>
@@ -198,7 +317,9 @@ const VendorBookingsIndex = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
                   disabled={currentPage === totalPages}
                 >
                   <ChevronRight className="w-4 h-4" />

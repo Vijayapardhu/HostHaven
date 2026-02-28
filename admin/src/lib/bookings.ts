@@ -59,10 +59,10 @@ const mapBooking = (booking: any): Booking => ({
   propertyId: booking.property?.id ?? booking.propertyId,
   property: booking.property
     ? {
-        id: booking.property.id,
-        name: booking.property.name,
-        type: booking.property.type?.toLowerCase() ?? 'hotel',
-      }
+      id: booking.property.id,
+      name: booking.property.name,
+      type: booking.property.type?.toLowerCase() ?? 'hotel',
+    }
     : undefined,
   roomTypeId: booking.roomTypeId ?? booking.room?.id,
   checkInDate: booking.checkInDate,
@@ -87,11 +87,11 @@ const normalizeList = (payload: any) => {
     data: Array.isArray(data) ? data.map(mapBooking) : [],
     pagination: meta
       ? {
-          total: meta.total ?? 0,
-          page: meta.page ?? 1,
-          limit: meta.limit ?? 10,
-          totalPages: meta.totalPages ?? meta.pages ?? 1,
-        }
+        total: meta.total ?? 0,
+        page: meta.page ?? 1,
+        limit: meta.limit ?? 10,
+        totalPages: meta.totalPages ?? meta.pages ?? 1,
+      }
       : { total: 0, page: 1, limit: 10, totalPages: 1 },
   }
 }
@@ -104,12 +104,14 @@ export const bookingsService = {
     status?: string
     userId?: string
     propertyId?: string
+    vendorId?: string
   }) => {
     const response = await api.get('/v1/admin/bookings', {
       params: {
         page: params?.page,
         limit: params?.limit,
         status: mapStatusToApi(params?.status),
+        vendorId: params?.vendorId,
       },
     })
     const normalized = normalizeList(response.data)
@@ -133,18 +135,19 @@ export const bookingsService = {
   },
 
   getBookingById: async (id: string) => {
-    const response = await api.get(`/v1/bookings/${id}`)
+    const response = await api.get(`/v1/admin/bookings/${id}`)
     const payload = response.data?.data ?? response.data
-    return mapBooking(payload)
+    return mapBooking({ ...payload, payment: undefined }) // We map payment separately if needed or just use raw hook
   },
 
-  cancelBooking: async (bookingId: string, reason?: string) => {
-    const response = await api.put(`/v1/bookings/${bookingId}/cancel`, { reason })
+  updateBookingStatus: async (bookingId: string, status: string) => {
+    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, { status })
     return response.data?.data ?? response.data
   },
 
-  confirmBooking: async (bookingId: string) => {
-    throw new Error('Confirm booking endpoint is not available for admin')
+  getPaymentDetails: async (bookingId: string) => {
+    const response = await api.get(`/v1/admin/bookings/${bookingId}/payment`)
+    return response.data?.data ?? response.data
   },
 
   processRefund: async (bookingId: string, amount: number, reason?: string) => {
@@ -153,14 +156,6 @@ export const bookingsService = {
       reason,
     })
     return response.data?.data ?? response.data
-  },
-
-  checkIn: async (bookingId: string) => {
-    throw new Error('Check-in endpoint is not available for admin')
-  },
-
-  checkOut: async (bookingId: string) => {
-    throw new Error('Check-out endpoint is not available for admin')
   },
 
   exportBookings: async (params?: Record<string, any>) => {

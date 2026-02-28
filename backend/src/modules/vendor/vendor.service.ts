@@ -1,11 +1,13 @@
 import prisma from '../../config/database';
-import { hashPassword, generateToken } from '../../utils/hash.util';
+import { hashPassword, verifyPassword } from '../../utils/hash.util';
+import { generateTokens } from '../../utils/token.util';
 import { logger } from '../../utils/logger.util';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
 import notificationsService from '../notifications/notifications.service';
 import { webPushService } from '../../services/webpush.service';
 import type { AdminCreateVendorOnboardingInput } from './vendor.schema';
+import roomsService from '../rooms/rooms.service';
 
 const toStartOfDayUtc = (dateString: string) => {
   const date = new Date(`${dateString}T00:00:00.000Z`);
@@ -63,8 +65,7 @@ export class VendorService {
       },
     });
 
-    const accessToken = generateToken({ id: user.id, email: user.email, role: user.role });
-    const refreshToken = generateToken({ id: user.id }, 'refresh');
+    const { accessToken, refreshToken } = generateTokens({ userId: user.id, email: user.email, role: user.role });
 
     await prisma.session.create({
       data: {
@@ -105,7 +106,7 @@ export class VendorService {
       throw error;
     }
 
-    const isValid = await Bun.password.verify(password, user.passwordHash);
+    const isValid = await verifyPassword(user.passwordHash, password);
     if (!isValid) {
       const error = new Error('Invalid credentials');
       (error as any).code = ERROR_CODES.UNAUTHORIZED;
@@ -118,8 +119,7 @@ export class VendorService {
       throw error;
     }
 
-    const accessToken = generateToken({ id: user.id, email: user.email, role: user.role });
-    const refreshToken = generateToken({ id: user.id }, 'refresh');
+    const { accessToken, refreshToken } = generateTokens({ userId: user.id, email: user.email, role: user.role });
 
     await prisma.session.create({
       data: {
@@ -169,12 +169,29 @@ export class VendorService {
       throw error;
     }
 
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
     const [
       propertiesCount,
       activeBookings,
       totalRevenue,
       recentBookings,
       pendingPayouts,
+      totalBookingsThisMonth,
+      todaysCheckIns,
+      todaysCheckOuts,
+      pendingBookings,
+      recentReviews,
+      payoutStatusList,
+      totalRoomsAggr
     ] = await Promise.all([
       prisma.property.count({ where: { vendorId } }),
       prisma.booking.count({
@@ -183,13 +200,10 @@ export class VendorService {
           status: { in: ['CONFIRMED', 'CHECKED_IN'] },
         },
       }),
-      prisma.booking.aggregate({
-        where: {
-          property: { vendorId },
-          status: { in: ['CHECKED_OUT'] },
-          payment: { status: 'COMPLETED' },
-        },
-        _sum: { totalAmount: true },
+      // Total Revenue (after commission) from CommissionLedger
+      prisma.commissionLedger.aggregate({
+        where: { vendorId },
+        _sum: { vendorEarning: true }
       }),
       prisma.booking.findMany({
         where: { property: { vendorId } },
@@ -201,11 +215,67 @@ export class VendorService {
           room: { select: { name: true } },
         },
       }),
-      prisma.payout.findMany({
-        where: { vendorId, status: 'pending' },
-        orderBy: { createdAt: 'desc' },
+      prisma.payout.count({
+        where: { vendorId, status: 'pending' }
       }),
+      // New fields
+      prisma.booking.count({
+        where: {
+          property: { vendorId },
+          createdAt: { gte: startOfMonth },
+          status: { not: 'CANCELLED' }
+        }
+      }),
+      prisma.booking.count({
+        where: {
+          property: { vendorId },
+          checkInDate: { gte: todayStart, lte: todayEnd },
+          status: { not: 'CANCELLED' }
+        }
+      }),
+      prisma.booking.count({
+        where: {
+          property: { vendorId },
+          checkOutDate: { gte: todayStart, lte: todayEnd },
+          status: { not: 'CANCELLED' }
+        }
+      }),
+      prisma.booking.count({
+        where: { property: { vendorId }, status: 'PENDING' }
+      }),
+      prisma.review.findMany({
+        where: { property: { vendorId } },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { name: true, avatarUrl: true } },
+          property: { select: { name: true } }
+        }
+      }),
+      prisma.payout.findMany({
+        where: { vendorId },
+        take: 5,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.room.aggregate({
+        where: { property: { vendorId } },
+        _sum: { totalRooms: true }
+      })
     ]);
+
+    // Occupancy Rate calculation
+    const todaysOccupiedBookings = await prisma.booking.aggregate({
+      where: {
+        property: { vendorId },
+        checkInDate: { lte: todayEnd },
+        checkOutDate: { gt: todayStart },
+        status: { in: ['CONFIRMED', 'CHECKED_IN'] }
+      },
+      _count: { id: true }
+    });
+
+    const totalRoomCapacity = totalRoomsAggr._sum.totalRooms || 0;
+    const occupancyRate = totalRoomCapacity > 0 ? (todaysOccupiedBookings._count.id / totalRoomCapacity) * 100 : 0;
 
     return {
       vendor: {
@@ -218,8 +288,13 @@ export class VendorService {
       stats: {
         propertiesCount,
         activeBookings,
-        totalRevenue: totalRevenue._sum.totalAmount?.toNumber() || 0,
-        pendingPayouts: pendingPayouts.length,
+        totalRevenue: totalRevenue._sum.vendorEarning?.toNumber() || 0,
+        pendingPayouts,
+        totalBookingsThisMonth,
+        todaysCheckIns,
+        todaysCheckOuts,
+        pendingBookings,
+        occupancyRate: Math.round(occupancyRate * 100) / 100,
       },
       recentBookings: recentBookings.map((b: any) => ({
         id: b.id,
@@ -233,6 +308,67 @@ export class VendorService {
         status: b.status,
         createdAt: b.createdAt,
       })),
+      recentReviews: recentReviews.map((r: any) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        user: r.user.name,
+        avatarUrl: r.user.avatarUrl,
+        propertyName: r.property.name,
+        createdAt: r.createdAt
+      })),
+      payoutStatus: payoutStatusList.map((p: any) => ({
+        id: p.id,
+        amount: p.amount.toNumber(),
+        status: p.status,
+        periodStart: p.periodStart,
+        periodEnd: p.periodEnd,
+        processedAt: p.processedAt
+      }))
+    };
+  }
+
+  async getAnalytics(vendorId: string) {
+    // Generate empty/stub analytics for the past 6 months
+    const months = [];
+    const revenueByMonth = [];
+    const date = new Date();
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(date.getFullYear(), date.getMonth() - i, 1);
+      const monthStr = d.toLocaleString('default', { month: 'short' });
+
+      const start = new Date(d);
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const aggregated = await prisma.commissionLedger.aggregate({
+        where: {
+          vendorId,
+          createdAt: { gte: start, lte: end }
+        },
+        _sum: { vendorEarning: true }
+      });
+
+      revenueByMonth.push({
+        month: monthStr,
+        revenue: aggregated._sum.vendorEarning?.toNumber() || 0
+      });
+    }
+
+    const bookingsByStatus = await prisma.booking.groupBy({
+      by: ['status'],
+      where: { property: { vendorId } },
+      _count: { id: true }
+    });
+
+    const statusObj = bookingsByStatus.reduce((acc: any, curr) => {
+      acc[curr.status.toLowerCase()] = curr._count.id;
+      return acc;
+    }, {});
+
+    return {
+      revenueByMonth,
+      bookingsByStatus: statusObj
     };
   }
 
@@ -280,6 +416,8 @@ export class VendorService {
     gstNumber?: string;
     panNumber?: string;
     aadhaarNumber?: string;
+    passportPhoto?: string;
+    companyLogo?: string;
     bankAccount?: any;
   }) {
     const vendor = await prisma.vendor.findUnique({
@@ -306,6 +444,8 @@ export class VendorService {
       gstNumber: updated.gstNumber,
       panNumber: updated.panNumber,
       aadhaarNumber: updated.aadhaarNumber,
+      passportPhoto: updated.passportPhoto,
+      companyLogo: updated.companyLogo,
       bankAccount: updated.bankAccount,
     };
   }
@@ -347,6 +487,9 @@ export class VendorService {
         businessName: v.businessName,
         businessAddress: v.businessAddress,
         gstNumber: v.gstNumber,
+        panNumber: v.panNumber,
+        aadhaarNumber: v.aadhaarNumber,
+        bankAccount: v.bankAccount,
         isApproved: v.isApproved,
         approvedAt: v.approvedAt,
         commissionRate: v.commissionRate.toNumber(),
@@ -603,6 +746,199 @@ export class VendorService {
       },
       rooms: created.rooms,
     };
+  }
+
+  async getHotel(vendorId: string) {
+    const property = await prisma.property.findFirst({
+      where: { vendorId },
+      include: {
+        rooms: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            capacity: true,
+            pricePerNight: true,
+            totalRooms: true,
+            availableRooms: true,
+            isActive: true,
+          }
+        },
+      }
+    });
+
+    if (!property) {
+      const error = new Error('No hotel found for this vendor');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return property;
+  }
+
+  async updateHotel(vendorId: string, data: any) {
+    const property = await prisma.property.findFirst({
+      where: { vendorId }
+    });
+
+    if (!property) {
+      const error = new Error('No hotel found for this vendor');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updated = await prisma.property.update({
+      where: { id: property.id },
+      data: {
+        name: data.name,
+        description: data.description,
+        amenities: data.amenities,
+        highlights: data.highlights,
+        policies: data.policies,
+      } as any,
+    });
+
+    logger.info({ propertyId: property.id, vendorId }, 'Vendor hotel updated');
+    return updated;
+  }
+
+  async uploadHotelImage(vendorId: string, fileData: { filename: string; data: Buffer; mimetype: string }) {
+    const property = await prisma.property.findFirst({
+      where: { vendorId }
+    });
+
+    if (!property) {
+      const error = new Error('No hotel found for this vendor');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    // You can swap to real cloudinaryService.uploadImage instead, but for now we mimic with r2Service / cloudinary
+    // Let's import the one you have, assuming Cloudinary is ready to go or another file service.
+    const cloudinaryService = require('../../services/cloudinary.service').default;
+    const uploaded = await cloudinaryService.uploadImage(fileData.data, {
+      folder: `hosthaven/properties/${property.id}`,
+      resourceType: fileData.mimetype.startsWith('video') ? 'video' : 'image',
+    });
+
+    const newImage = {
+      url: uploaded.url,
+      alt: fileData.filename,
+      isPrimary: !property.images || (property.images as any[]).length === 0,
+      resourceType: fileData.mimetype.startsWith('video') ? 'video' : 'image',
+      id: uploaded.publicId, // Or derive a unique ID
+    };
+
+    let updatedImages = property.images ? [...(property.images as any[])] : [];
+    let updatedVideos = property.videos ? [...(property.videos as any[])] : [];
+
+    if (newImage.resourceType === 'video') {
+      updatedVideos.push(newImage);
+    } else {
+      updatedImages.push(newImage);
+    }
+
+    const updated = await prisma.property.update({
+      where: { id: property.id },
+      data: { images: updatedImages, videos: updatedVideos }
+    });
+
+    return { image: newImage, hotel: updated };
+  }
+
+  async deleteHotelImage(vendorId: string, imgId: string) {
+    const property = await prisma.property.findFirst({
+      where: { vendorId }
+    });
+
+    if (!property) {
+      const error = new Error('No hotel found for this vendor');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    let updatedImages = (property.images as any[])?.filter((img: any) => img.id !== imgId && img.url !== imgId) || [];
+    let updatedVideos = (property.videos as any[])?.filter((vid: any) => vid.id !== imgId && vid.url !== imgId) || [];
+
+    await prisma.property.update({
+      where: { id: property.id },
+      data: { images: updatedImages, videos: updatedVideos }
+    });
+
+    return true;
+  }
+  async getRoomsByProperty(vendorId: string, propertyId: string) {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId, isDeleted: false }
+    });
+    if (!property || property.vendorId !== vendorId) {
+      const error = new Error('Unauthorized');
+      (error as any).code = ERROR_CODES.UNAUTHORIZED;
+      throw error;
+    }
+
+    return roomsService.getByProperty(propertyId);
+  }
+
+  async createRoom(vendorId: string, propertyId: string, data: any) {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId, isDeleted: false }
+    });
+    if (!property || property.vendorId !== vendorId) {
+      const error = new Error('Unauthorized');
+      (error as any).code = ERROR_CODES.UNAUTHORIZED;
+      throw error;
+    }
+
+    const payload = {
+      ...data,
+      propertyId,
+      availableRooms: data.availableRooms !== undefined ? data.availableRooms : data.totalRooms,
+      images: data.images || []
+    };
+
+    return roomsService.create(payload);
+  }
+
+  async updateRoom(vendorId: string, propertyId: string, roomId: string, data: any) {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId, isDeleted: false }
+    });
+    if (!property || property.vendorId !== vendorId) {
+      const error = new Error('Unauthorized');
+      (error as any).code = ERROR_CODES.UNAUTHORIZED;
+      throw error;
+    }
+
+    // Verify room belongs to property
+    const room = await prisma.room.findUnique({ where: { id: roomId, isDeleted: false } });
+    if (!room || room.propertyId !== propertyId) {
+      const error = new Error('Room not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return roomsService.update(roomId, data);
+  }
+
+  async deleteRoom(vendorId: string, propertyId: string, roomId: string) {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId, isDeleted: false }
+    });
+    if (!property || property.vendorId !== vendorId) {
+      const error = new Error('Unauthorized');
+      (error as any).code = ERROR_CODES.UNAUTHORIZED;
+      throw error;
+    }
+
+    const room = await prisma.room.findUnique({ where: { id: roomId, isDeleted: false } });
+    if (!room || room.propertyId !== propertyId) {
+      const error = new Error('Room not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return roomsService.delete(roomId);
   }
 }
 

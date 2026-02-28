@@ -33,6 +33,7 @@ import VendorForgotPassword from "./pages/VendorForgotPassword";
 import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 import ScrollToTop from "./components/ScrollToTop";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import VendorLayout from "./pages/vendor/VendorLayout";
 import VendorDashboard from "./pages/vendor/VendorDashboard";
 import VendorProperties from "./pages/vendor/VendorProperties";
@@ -62,6 +63,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <ScrollToTop />
+            <PWAInstallPrompt />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/hotels" element={<Hotels />} />
@@ -88,7 +90,7 @@ const App = () => (
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/support" element={<Support />} />
-              
+
               {/* Vendor Protected Routes */}
               <Route path="/vendor" element={<VendorProvider><VendorLayout /></VendorProvider>}>
                 <Route path="dashboard" element={<VendorDashboard />} />
@@ -109,7 +111,7 @@ const App = () => (
                 <Route path="earnings" element={<VendorEarnings />} />
                 <Route path="settings" element={<VendorSettings />} />
               </Route>
-              
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

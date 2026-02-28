@@ -57,10 +57,50 @@ export const ReviewsController = {
         parseInt(query.limit || '10')
       );
 
-      return sendSuccess(reply, result.reviews, 200, result.meta, result.stats);
+      return sendSuccess(reply, { reviews: result.reviews, stats: result.stats }, 200, result.meta);
     } catch (error: any) {
       logger.error({ error }, 'Get property reviews failed');
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch reviews', 500);
+    }
+  },
+
+  async getVendorReviews(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const vendorId = (request as any).user.vendorId;
+      const query = request.query as { page?: string; limit?: string };
+
+      const result = await reviewsService.getVendorReviews(
+        vendorId,
+        parseInt(query.page || '1'),
+        parseInt(query.limit || '10')
+      );
+
+      return sendSuccess(reply, result.reviews, 200, result.meta);
+    } catch (error: any) {
+      logger.error({ error }, 'Get vendor reviews failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch reviews', 500);
+    }
+  },
+
+  async respondToReview(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = reviewIdSchema.parse(request.params);
+      const vendorId = (request as any).user.vendorId;
+      const data = request.body as { responseText: string };
+
+      if (!data.responseText) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Response text is required', 400);
+      }
+
+      const review = await reviewsService.respondToReview(id, vendorId, data.responseText);
+
+      return sendSuccess(reply, review);
+    } catch (error: any) {
+      logger.error({ error }, 'Respond to review failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to respond to review', 500);
     }
   },
 

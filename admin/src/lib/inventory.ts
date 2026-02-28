@@ -20,11 +20,6 @@ export interface InventoryOverride {
   overrideRooms: number
 }
 
-const emptyInventoryResponse = {
-  data: [] as InventoryItem[],
-  pagination: { total: 0, page: 1, limit: 10, totalPages: 1 },
-}
-
 export const inventoryService = {
   getPropertyInventory: async (
     propertyId: string,
@@ -34,36 +29,50 @@ export const inventoryService = {
       roomTypeId?: string
     }
   ) => {
-    return emptyInventoryResponse
+    // Note: The global property inventory list might not exist yet, 
+    // but we have getRoomInventory. I'll implement getRoomInventory for now.
+    const response = await api.get(`/v1/admin/rooms/${propertyId}/inventory`, { params })
+    return response.data?.data ?? response.data
   },
 
-  overrideInventory: async (propertyId: string, overrides: InventoryOverride[]) => {
-    throw new Error('Inventory override by property is not available on the backend')
+  getRoomInventory: async (roomId: string, startDate: string, endDate: string) => {
+    const response = await api.get(`/v1/admin/rooms/${roomId}/inventory`, {
+      params: { startDate, endDate }
+    })
+    return response.data?.data ?? response.data
   },
 
-  getInventoryByDate: async (
-    propertyId: string,
-    date: string
-  ): Promise<InventoryItem[]> => {
-    return []
+  overrideInventory: async (roomId: string, date: string, availableRooms: number) => {
+    const response = await api.put(`/v1/admin/rooms/${roomId}/inventory/override`, {
+      date,
+      availableRooms
+    })
+    return response.data?.data ?? response.data
   },
 
-  getRoomInventory: async (propertyId: string, roomTypeId: string) => {
-    throw new Error('Room inventory endpoint is not available on the backend')
+  blockDates: async (roomId: string, checkInDate: string, checkOutDate: string, quantity: number) => {
+    const response = await api.post(`/v1/admin/rooms/${roomId}/block`, {
+      checkInDate,
+      checkOutDate,
+      quantity
+    })
+    return response.data?.data ?? response.data
   },
 
-  resetOverride: async (propertyId: string, roomTypeId: string, date: string) => {
-    throw new Error('Inventory reset endpoint is not available on the backend')
+  releaseLocks: async (roomId: string, lockId?: string) => {
+    const response = await api.delete(`/v1/admin/rooms/${roomId}/locks`, {
+      params: { lockId }
+    })
+    return response.data?.data ?? response.data
   },
 
-  bulkOverride: async (
-    overrides: Array<{
-      propertyId: string
-      roomTypeId: string
-      date: string
-      overrideRooms: number
-    }>
-  ) => {
-    throw new Error('Inventory bulk override endpoint is not available on the backend')
+  cleanupLocks: async () => {
+    const response = await api.post('/v1/admin/inventory/cleanup')
+    return response.data?.data ?? response.data
+  },
+
+  resetOverride: async () => {
+    // For now using releaseLocks or overrideInventory(totalRooms)
+    throw new Error('Use overrideInventory with totalRooms to reset.')
   },
 }

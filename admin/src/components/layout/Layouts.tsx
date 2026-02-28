@@ -23,6 +23,7 @@ import {
   Shield,
   Truck,
   Boxes,
+  IndianRupee,
 } from "lucide-react";
 
 interface NavItem {
@@ -133,11 +134,27 @@ const navigationConfig: NavItem[] = [
     permission: "rooms:view",
   },
   {
-    name: "Payments",
+    name: "Finance",
     href: "/payments",
     icon: CreditCard,
     section: "management",
     permission: "payments:view",
+    children: [
+      {
+        name: "Transactions",
+        href: "/payments",
+        icon: CreditCard,
+        section: "management",
+        permission: "payments:view",
+      },
+      {
+        name: "Vendor Payouts",
+        href: "/finance/earnings",
+        icon: IndianRupee,
+        section: "management",
+        permission: "payments:full",
+      },
+    ],
   },
   {
     name: "Users",

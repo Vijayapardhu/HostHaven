@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Ban, CheckCircle, Eye, Pencil, Star } from "lucide-react";
+import { Ban, CheckCircle, Eye, Pencil, Star, Download } from "lucide-react";
 import { propertiesService, type Property } from "../lib/properties";
 import { FiltersBar } from "../components/ui/FiltersBar";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -19,6 +19,7 @@ import {
 } from "../components/ui/Table";
 import { PageLoader } from "../components/ui/PageLoader";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { downloadCsvExport } from "../lib/export";
 
 type PropertyStatus = "approved" | "pending" | "rejected" | "inactive";
 type PropertyType = "hotel" | "home";
@@ -82,8 +83,8 @@ export default function Properties() {
         status: statusFilter === "all" ? undefined : statusFilter,
         type: typeFilter === "all" ? undefined : typeFilter,
       });
-      setProperties(data.data ?? data.properties ?? []);
-      setTotal(data.pagination?.total ?? data.total ?? 0);
+      setProperties(data.data ?? []);
+      setTotal(data.pagination?.total ?? 0);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Unable to load properties.");
     } finally {
@@ -132,6 +133,15 @@ export default function Properties() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      await downloadCsvExport('properties');
+      toast.success('Export started successfully');
+    } catch (err) {
+      toast.error('Failed to export properties data');
+    }
+  };
+
   const hasFilters = useMemo(
     () =>
       searchTerm.length > 0 || statusFilter !== "all" || typeFilter !== "all",
@@ -144,7 +154,27 @@ export default function Properties() {
         title="Properties"
         description="Manage hotels and homes across all approved cities."
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+              title="Export Properties to CSV"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            <Link
+              to="/properties/add-hotel"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              + Add Hotel
+            </Link>
+            <Link
+              to="/properties/add-house"
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+            >
+              + Add House
+            </Link>
             <Link
               to="/properties/add"
               className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600"
@@ -352,7 +382,7 @@ export default function Properties() {
                       src={
                         typeof property.images[0] === "string"
                           ? property.images[0]
-                          : property.images[0]?.url
+                          : (property.images[0] as any)?.url || ""
                       }
                       alt={property.name}
                       className="h-20 w-20 flex-shrink-0 rounded-lg object-cover"

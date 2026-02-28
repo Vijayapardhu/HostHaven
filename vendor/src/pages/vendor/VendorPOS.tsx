@@ -1,5 +1,4 @@
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { ProgressBar } from "@/components/ui/progress-bar";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
@@ -355,7 +354,7 @@ const VendorPOS = () => {
 
       {/* Room Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{[1,2,3,4].map((i) => (<div key={i} className="h-48 bg-muted rounded-2xl animate-pulse"></div>))}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{[1, 2, 3, 4].map((i) => (<div key={i} className="h-48 bg-muted rounded-2xl animate-pulse"></div>))}</div>
       ) : rooms.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {rooms.map((room) => (

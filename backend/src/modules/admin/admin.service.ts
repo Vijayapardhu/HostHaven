@@ -56,9 +56,9 @@ export class AdminService {
 
     const updated = existing
       ? await prisma.platformSetting.update({
-          where: { id: existing.id },
-          data: payload,
-        })
+        where: { id: existing.id },
+        data: payload,
+      })
       : await prisma.platformSetting.create({ data: payload });
 
     logger.info({ settingsId: updated.id }, 'Platform settings updated');
@@ -160,7 +160,7 @@ export class AdminService {
 
   async getSystemStats(startDate?: Date, endDate?: Date) {
     const where: any = {};
-    
+
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) where.createdAt.gte = startDate;
@@ -210,6 +210,7 @@ export class AdminService {
     limit?: number;
     role?: string;
     search?: string;
+    status?: string;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 10;
@@ -228,6 +229,18 @@ export class AdminService {
       ];
     }
 
+    if (filters.status) {
+      if (filters.status === 'active') {
+        where.isActive = true;
+        where.isDeleted = false;
+      } else if (filters.status === 'suspended') {
+        where.isActive = false;
+        where.isDeleted = false;
+      } else if (filters.status === 'deleted') {
+        where.isDeleted = true;
+      }
+    }
+
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
@@ -241,6 +254,7 @@ export class AdminService {
           phone: true,
           role: true,
           isActive: true,
+          isDeleted: true,
           isVerified: true,
           createdAt: true,
         },
@@ -281,12 +295,122 @@ export class AdminService {
     };
   }
 
+  async getUserById(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, email: true, name: true, phone: true, role: true,
+        isActive: true, isVerified: true, emailVerifiedAt: true,
+        isDeleted: true, deletedAt: true,
+        lastLoginAt: true, lastLoginIp: true,
+        avatarUrl: true, createdAt: true, updatedAt: true,
+        bookings: {
+          orderBy: { createdAt: 'desc' }, take: 20,
+          select: {
+            id: true, checkInDate: true, checkOutDate: true, status: true,
+            totalAmount: true, createdAt: true,
+            property: { select: { id: true, name: true, type: true } },
+          },
+        },
+        reviews: {
+          orderBy: { createdAt: 'desc' }, take: 20,
+          select: {
+            id: true, rating: true, comment: true, createdAt: true,
+            property: { select: { id: true, name: true } },
+          },
+        },
+        serviceBookings: {
+          orderBy: { createdAt: 'desc' }, take: 20,
+          select: {
+            id: true, status: true, serviceDate: true, totalAmount: true,
+            service: { select: { id: true, name: true } },
+          },
+        },
+        wishlistItems: { select: { id: true } },
+        _count: { select: { bookings: true, reviews: true, serviceBookings: true, wishlistItems: true } },
+      },
+    });
+    if (!user) {
+      const error = new Error('User not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    const totalSpent = await prisma.booking.aggregate({
+      where: { userId, status: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] } },
+      _sum: { totalAmount: true },
+    });
+    return { ...user, totalSpent: totalSpent._sum.totalAmount ?? 0 };
+  }
+
+  async softDeleteUser(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      const error = new Error('User not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { isDeleted: true, deletedAt: new Date(), isActive: false },
+    });
+    logger.info({ userId }, 'User soft-deleted');
+    return { id: updated.id, isDeleted: true };
+  }
+
+  async verifyUserEmail(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      const error = new Error('User not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { isVerified: true, emailVerifiedAt: new Date(), emailVerificationToken: null },
+    });
+    logger.info({ userId }, 'User email verified by admin');
+    return { id: updated.id, isVerified: true };
+  }
+
+  async resetUserPassword(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      const error = new Error('User not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    // Generate a temporary token — in production this should send an email
+    const crypto = await import('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 3600000); // 1 hour
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordResetToken: resetToken, passwordResetExpires: expires },
+    });
+    logger.info({ userId }, 'Password reset initiated by admin');
+    return { id: userId, resetToken, expiresAt: expires };
+  }
+
+  async getUserSessions(userId: string) {
+    const sessions = await prisma.session.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true, userAgent: true, ipAddress: true, deviceType: true,
+        location: true, isActive: true, expiresAt: true, createdAt: true,
+      },
+    });
+    return sessions;
+  }
+
   async getAllProperties(filters: {
     page?: number;
     limit?: number;
     status?: string;
     type?: string;
     search?: string;
+    vendorId?: string;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 10;
@@ -302,11 +426,20 @@ export class AdminService {
       where.type = filters.type;
     }
 
+    if (filters.vendorId) {
+      where.vendorId = filters.vendorId;
+    }
+
     if (filters.search) {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
         { city: { contains: filters.search, mode: 'insensitive' } },
       ];
+    }
+
+    // Default hiding soft-deleted
+    if (where.isDeleted === undefined && where.status !== 'INACTIVE') {
+      where.isDeleted = false;
     }
 
     const [properties, total] = await Promise.all([
@@ -374,7 +507,7 @@ export class AdminService {
   }
 
   async createProperty(data: any) {
-    const slug = data.name
+    const slug = (data.slug || data.name)
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9\s-]/g, '')
@@ -388,18 +521,61 @@ export class AdminService {
         type: data.type || 'HOTEL',
         status: data.status || 'DRAFT',
         description: data.description,
+        shortDesc: data.shortDesc || undefined,
         address: data.address,
         city: data.city || 'VIJAYAWADA',
         state: data.state || 'Andhra Pradesh',
         pincode: data.pincode,
+        latitude: data.latitude ? new Prisma.Decimal(data.latitude) : undefined,
+        longitude: data.longitude ? new Prisma.Decimal(data.longitude) : undefined,
         basePrice: new Prisma.Decimal(data.basePrice || 0),
         amenities: data.amenities || [],
         images: data.images || [],
-        mapLocation: data.mapLocation || undefined,
+        videos: data.videos || undefined,
+        highlights: data.highlights || undefined,
+        featureFlags: data.houseDetails ? data.houseDetails : undefined,
       },
     });
 
-    logger.info({ propertyId: property.id }, 'Property created by admin');
+    // Auto-create a default Room for HOME type so pricing/inventory works
+    if (data.type === 'HOME') {
+      const hd = data.houseDetails || {};
+      await prisma.room.create({
+        data: {
+          propertyId: property.id,
+          name: hd.houseType || 'Entire Home',
+          type: hd.listingType || 'entire_home',
+          description: data.description?.slice(0, 200),
+          capacity: Number(hd.totalGuests) || 4,
+          pricePerNight: new Prisma.Decimal(data.basePrice || 0),
+          weekendPrice: hd.weekendPrice ? new Prisma.Decimal(hd.weekendPrice) : undefined,
+          amenities: data.amenities || [],
+          totalRooms: Number(hd.totalUnits) || 1,
+          availableRooms: Number(hd.totalUnits) || 1,
+        },
+      });
+    }
+
+    // Create cancellation policy if provided
+    if (data.cancellationPolicy) {
+      const policyMap: Record<string, { freeBeforeHours: number; refundPercentBefore: number; refundPercentAfter: number }> = {
+        FREE_CANCELLATION: { freeBeforeHours: 24, refundPercentBefore: 100, refundPercentAfter: 0 },
+        MODERATE: { freeBeforeHours: 48, refundPercentBefore: 100, refundPercentAfter: 50 },
+        STRICT: { freeBeforeHours: 72, refundPercentBefore: 100, refundPercentAfter: 0 },
+        NON_REFUNDABLE: { freeBeforeHours: 0, refundPercentBefore: 0, refundPercentAfter: 0 },
+      };
+      const policy = policyMap[data.cancellationPolicy] || policyMap['FREE_CANCELLATION'];
+      await prisma.cancellationPolicy.create({
+        data: {
+          propertyId: property.id,
+          freeBeforeHours: policy.freeBeforeHours,
+          refundPercentBefore: new Prisma.Decimal(policy.refundPercentBefore),
+          refundPercentAfter: new Prisma.Decimal(policy.refundPercentAfter),
+        },
+      });
+    }
+
+    logger.info({ propertyId: property.id, type: data.type }, 'Property created by admin');
 
     return {
       id: property.id,
@@ -407,6 +583,114 @@ export class AdminService {
       slug: property.slug,
       status: property.status,
     };
+  }
+
+  async getPropertyById(propertyId: string) {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId, isDeleted: false },
+      include: {
+        vendor: {
+          select: { id: true, businessName: true, user: { select: { name: true, email: true, phone: true } } }
+        },
+        rooms: {
+          where: { isDeleted: false }
+        },
+        cancellationPolicy: true,
+        _count: { select: { bookings: true, reviews: true } }
+      }
+    });
+
+    if (!property) {
+      const error: any = new Error('Property not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return {
+      ...property,
+      basePrice: property.basePrice.toNumber(),
+      rating: property.rating.toNumber()
+    };
+  }
+
+  async updateProperty(propertyId: string, data: any) {
+    const property = await prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) {
+      const error: any = new Error('Property not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.shortDesc !== undefined) updateData.shortDesc = data.shortDesc;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.city !== undefined) updateData.city = data.city;
+    if (data.state !== undefined) updateData.state = data.state;
+    if (data.pincode !== undefined) updateData.pincode = data.pincode;
+    if (data.latitude !== undefined) updateData.latitude = data.latitude ? new Prisma.Decimal(data.latitude) : null;
+    if (data.longitude !== undefined) updateData.longitude = data.longitude ? new Prisma.Decimal(data.longitude) : null;
+    if (data.basePrice !== undefined) updateData.basePrice = new Prisma.Decimal(data.basePrice);
+    if (data.amenities !== undefined) updateData.amenities = data.amenities;
+    if (data.images !== undefined) updateData.images = data.images;
+    if (data.videos !== undefined) updateData.videos = data.videos;
+    if (data.highlights !== undefined) updateData.highlights = data.highlights;
+    if (data.isFeatured !== undefined) updateData.isFeatured = data.isFeatured;
+    if (data.isVerified !== undefined) updateData.isVerified = data.isVerified;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.featureFlags !== undefined) updateData.featureFlags = data.featureFlags;
+    if (data.houseDetails !== undefined) updateData.featureFlags = data.houseDetails;
+
+    const updated = await prisma.property.update({
+      where: { id: propertyId },
+      data: updateData
+    });
+
+    // Upsert cancellation policy if provided
+    if (data.cancellationPolicy) {
+      const policyMap: Record<string, { freeBeforeHours: number; refundPercentBefore: number; refundPercentAfter: number }> = {
+        FREE_CANCELLATION: { freeBeforeHours: 24, refundPercentBefore: 100, refundPercentAfter: 0 },
+        MODERATE: { freeBeforeHours: 48, refundPercentBefore: 100, refundPercentAfter: 50 },
+        STRICT: { freeBeforeHours: 72, refundPercentBefore: 100, refundPercentAfter: 0 },
+        NON_REFUNDABLE: { freeBeforeHours: 0, refundPercentBefore: 0, refundPercentAfter: 0 },
+      };
+      const policy = policyMap[data.cancellationPolicy] || policyMap['FREE_CANCELLATION'];
+      await prisma.cancellationPolicy.upsert({
+        where: { propertyId },
+        create: {
+          propertyId,
+          freeBeforeHours: policy.freeBeforeHours,
+          refundPercentBefore: new Prisma.Decimal(policy.refundPercentBefore),
+          refundPercentAfter: new Prisma.Decimal(policy.refundPercentAfter),
+        },
+        update: {
+          freeBeforeHours: policy.freeBeforeHours,
+          refundPercentBefore: new Prisma.Decimal(policy.refundPercentBefore),
+          refundPercentAfter: new Prisma.Decimal(policy.refundPercentAfter),
+        },
+      });
+    }
+
+    logger.info({ propertyId }, 'Property updated by admin');
+    return updated;
+  }
+
+  async softDeleteProperty(propertyId: string) {
+    const property = await prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) {
+      const error: any = new Error('Property not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    await prisma.property.update({
+      where: { id: propertyId },
+      data: { isDeleted: true, deletedAt: new Date(), status: 'INACTIVE' }
+    });
+
+    logger.info({ propertyId }, 'Property soft deleted by admin');
+    return { id: propertyId, isDeleted: true };
   }
 
   async updateVendorStatus(vendorId: string, status: string, reason?: string) {
@@ -422,7 +706,7 @@ export class AdminService {
     if (status === 'APPROVED') {
       updateData.isApproved = true;
       updateData.approvedAt = new Date();
-    } else if (status === 'REJECTED') {
+    } else if (status === 'REJECTED' || status === 'SUSPENDED') {
       updateData.isApproved = false;
     }
 
@@ -440,12 +724,91 @@ export class AdminService {
     };
   }
 
+  async updateVendorCommission(vendorId: string, commissionRate: number) {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+
+    if (!vendor) {
+      const error = new Error('Vendor not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updated = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        commissionRate: new Prisma.Decimal(commissionRate),
+      },
+    });
+
+    logger.info({ vendorId, commissionRate }, 'Vendor commission updated');
+
+    return {
+      id: updated.id,
+      commissionRate: updated.commissionRate,
+    };
+  }
+
+  async updateVendor(vendorId: string, data: any) {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: { user: true },
+    });
+
+    if (!vendor) {
+      const error = new Error('Vendor not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updateVendorData: any = {};
+    if (data.businessName !== undefined) updateVendorData.businessName = data.businessName;
+    if (data.businessAddress !== undefined) updateVendorData.businessAddress = data.businessAddress;
+    if (data.gstNumber !== undefined) updateVendorData.gstNumber = data.gstNumber;
+    if (data.panNumber !== undefined) updateVendorData.panNumber = data.panNumber;
+    if (data.aadhaarNumber !== undefined) updateVendorData.aadhaarNumber = data.aadhaarNumber;
+    if (data.passportPhoto !== undefined) updateVendorData.passportPhoto = data.passportPhoto;
+    if (data.companyLogo !== undefined) updateVendorData.companyLogo = data.companyLogo;
+    if (data.commissionRate !== undefined) updateVendorData.commissionRate = new Prisma.Decimal(data.commissionRate);
+    if (data.bankAccount !== undefined) updateVendorData.bankAccount = data.bankAccount;
+
+    const updateUserPayload: any = {};
+    if (data.name !== undefined) updateUserPayload.name = data.name;
+    if (data.email !== undefined) updateUserPayload.email = data.email;
+    if (data.phone !== undefined) updateUserPayload.phone = data.phone;
+
+    const result = await prisma.$transaction(async (tx) => {
+      if (Object.keys(updateUserPayload).length > 0) {
+        await tx.user.update({
+          where: { id: vendor.userId },
+          data: updateUserPayload,
+        });
+      }
+
+      let updatedVendor = vendor;
+      if (Object.keys(updateVendorData).length > 0) {
+        updatedVendor = await tx.vendor.update({
+          where: { id: vendorId },
+          data: updateVendorData,
+          include: { user: true },
+        });
+      }
+      return updatedVendor;
+    });
+
+    logger.info({ vendorId }, 'Vendor details completely updated by admin');
+
+    return result;
+  }
+
   async getAllBookings(filters: {
     page?: number;
     limit?: number;
     status?: string;
     startDate?: Date;
     endDate?: Date;
+    vendorId?: string;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 10;
@@ -461,6 +824,10 @@ export class AdminService {
       where.checkInDate = {};
       if (filters.startDate) where.checkInDate.gte = filters.startDate;
       if (filters.endDate) where.checkInDate.lte = filters.endDate;
+    }
+
+    if (filters.vendorId) {
+      where.property = { vendorId: filters.vendorId };
     }
 
     const [bookings, total] = await Promise.all([
@@ -502,6 +869,88 @@ export class AdminService {
     };
   }
 
+  // Booking detail, status override, and logs
+  async getBookingById(bookingId: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true } },
+        property: { select: { id: true, name: true, type: true, city: true, address: true } },
+        room: { select: { id: true, name: true, type: true } },
+        payment: true,
+      },
+    });
+
+    if (!booking) {
+      const error: any = new Error("Booking not found");
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    // Formatting bigints and decimals
+    return {
+      ...booking,
+      totalAmount: booking.totalAmount.toString(),
+      baseAmount: booking.baseAmount.toString(),
+      taxAmount: booking.taxAmount.toString(),
+      discountAmount: booking.discountAmount.toString(),
+      payment: (booking as any).payment ? {
+        ...(booking as any).payment,
+        amount: (booking as any).payment.amount.toString(),
+      } : null,
+    };
+  }
+
+  async updateBookingStatus(bookingId: string, status: string) {
+    const validStatuses = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'];
+    if (!validStatuses.includes(status)) {
+      const error: any = new Error("Invalid booking status");
+      error.code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) {
+      const error: any = new Error("Booking not found");
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const data: any = { status };
+    if (status === 'CANCELLED') {
+      data.cancelledAt = new Date();
+      data.cancelledBy = 'ADMIN';
+      data.cancellationReason = 'Cancelled by Admin';
+    } else if (status === 'CHECKED_IN') {
+      data.actualCheckIn = new Date();
+    } else if (status === 'CHECKED_OUT') {
+      data.actualCheckOut = new Date();
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id: bookingId },
+      data,
+    });
+    return updated;
+  }
+
+  async getPaymentDetails(bookingId: string) {
+    const payment = await prisma.payment.findUnique({
+      where: { bookingId },
+    });
+
+    if (!payment) {
+      const error: any = new Error("Payment not found for this booking");
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return {
+      ...payment,
+      amount: payment.amount.toString(),
+    };
+  }
+
   async getAllVendors(filters: {
     page?: number;
     limit?: number;
@@ -513,13 +962,13 @@ export class AdminService {
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    
+
     if (filters.status === 'PENDING') {
       where.isApproved = false;
     } else if (filters.status === 'APPROVED') {
       where.isApproved = true;
     }
-    
+
     if (filters.search) {
       where.OR = [
         { businessName: { contains: filters.search, mode: 'insensitive' } },
@@ -565,6 +1014,66 @@ export class AdminService {
     };
   }
 
+  async getVendorById(vendorId: string) {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true, avatarUrl: true } },
+        properties: { select: { id: true, name: true, type: true, status: true, city: true } },
+        payouts: { select: { id: true, amount: true, status: true, createdAt: true }, orderBy: { createdAt: 'desc' }, take: 20 },
+        _count: { select: { properties: true, payouts: true } },
+      },
+    });
+
+    if (!vendor) {
+      const error: any = new Error('Vendor not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const totalEarnings = await prisma.payout.aggregate({
+      where: { vendorId, status: 'PAID' },
+      _sum: { amount: true },
+    });
+
+    return {
+      ...vendor,
+      commissionRate: vendor.commissionRate.toString(),
+      totalEarnings: totalEarnings._sum.amount ? totalEarnings._sum.amount.toString() : '0',
+    };
+  }
+
+  async softDeleteVendor(vendorId: string) {
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) {
+      const error: any = new Error('Vendor not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    // Rather than true physical deletion, we mark user context as soft-deleted + vendor disapproved.
+    // If the schema requires an explicit isDeleted flag, ensure you add one to Prisma schema later.
+    // However typically vendor suspension acts as soft-deletion effectively if we also softly delete their owner `user`.
+
+    await prisma.$transaction(async (tx) => {
+      await tx.vendor.update({
+        where: { id: vendorId },
+        data: { isApproved: false }
+      });
+
+      if (vendor.userId) {
+        await tx.user.update({
+          where: { id: vendor.userId },
+          data: { isDeleted: true, deletedAt: new Date(), isActive: false }
+        });
+      }
+    });
+
+    logger.info({ vendorId }, 'Vendor soft-deleted successfully');
+
+    return { id: vendorId, isDeleted: true };
+  }
+
   async getAllPayouts(filters: {
     page?: number;
     limit?: number;
@@ -607,6 +1116,123 @@ export class AdminService {
         processedAt: p.processedAt,
         transactionId: p.transactionId,
         createdAt: p.createdAt,
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAllPayments(filters: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.status) where.status = filters.status;
+    if (filters.search) {
+      where.OR = [
+        { id: { contains: filters.search, mode: 'insensitive' } },
+        { razorpayPaymentId: { contains: filters.search, mode: 'insensitive' } },
+        { razorpayOrderId: { contains: filters.search, mode: 'insensitive' } },
+        { booking: { bookingNumber: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          booking: {
+            select: {
+              id: true,
+              bookingNumber: true,
+              property: { select: { name: true } },
+              user: { select: { name: true, email: true } },
+            },
+          },
+          refunds: true,
+        },
+      }),
+      prisma.payment.count({ where }),
+    ]);
+
+    return {
+      payments: payments.map((p: any) => ({
+        id: p.id,
+        amount: p.amount.toNumber(),
+        currency: p.currency,
+        status: p.status,
+        method: p.method,
+        razorpayPaymentId: p.razorpayPaymentId,
+        razorpayOrderId: p.razorpayOrderId,
+        bookingId: p.booking?.id,
+        bookingNumber: p.booking?.bookingNumber,
+        propertyName: p.booking?.property?.name,
+        user: p.booking?.user,
+        refunds: p.refunds.map((r: any) => ({ ...r, amount: r.amount.toNumber() })),
+        createdAt: p.createdAt,
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAllRefunds(filters: {
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [refunds, total] = await Promise.all([
+      prisma.refund.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          payment: {
+            include: {
+              booking: {
+                select: {
+                  bookingNumber: true,
+                  property: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.refund.count(),
+    ]);
+
+    return {
+      refunds: refunds.map((r: any) => ({
+        id: r.id,
+        paymentId: r.paymentId,
+        amount: r.amount.toNumber(),
+        reason: r.reason,
+        status: r.status,
+        razorpayRefundId: r.razorpayRefundId,
+        bookingNumber: r.payment?.booking?.bookingNumber,
+        propertyName: r.payment?.booking?.property?.name,
+        createdAt: r.createdAt,
       })),
       meta: {
         page,
@@ -701,6 +1327,56 @@ export class AdminService {
     };
   }
 
+  async refundPayment(paymentId: string, amount?: number, reason?: string) {
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { booking: true },
+    });
+
+    if (!payment) {
+      const error = new Error('Payment not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const refundAmount = amount ?? payment.amount.toNumber();
+
+    await prisma.$transaction([
+      prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'REFUNDED',
+          refundedAt: new Date(),
+        },
+      }),
+      ...(payment.booking ? [
+        prisma.booking.update({
+          where: { id: payment.booking.id },
+          data: {
+            status: 'REFUNDED',
+            cancellationReason: reason,
+            cancelledAt: new Date(),
+          },
+        })
+      ] : []),
+      prisma.refund.create({
+        data: {
+          paymentId: paymentId,
+          amount: new Prisma.Decimal(refundAmount),
+          reason,
+          status: 'processed',
+        },
+      }),
+    ]);
+
+    logger.info({ paymentId, refundAmount }, 'Payment refunded by admin');
+
+    return {
+      paymentId,
+      message: 'Refund processed successfully',
+    };
+  }
+
   async markPayoutPaid(payoutId: string, transactionId: string, notes?: string) {
     const payout = await prisma.payout.findUnique({ where: { id: payoutId } });
 
@@ -729,30 +1405,252 @@ export class AdminService {
     };
   }
 
-  async overrideRoomInventory(roomId: string, availableRooms: number) {
-    const room = await prisma.room.findUnique({ where: { id: roomId } });
+  async calculateCommission(bookingId: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { property: { include: { vendor: true } } },
+    });
 
-    if (!room) {
-      const error = new Error('Room not found');
-      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+    if (!booking || !booking.property.vendor) return;
+
+    const vendor = booking.property.vendor;
+    const commissionRate = vendor.commissionRate;
+    const bookingAmount = booking.totalAmount;
+    const commissionAmount = bookingAmount.mul(commissionRate).div(100);
+    const vendorEarning = bookingAmount.sub(commissionAmount);
+
+    await prisma.commissionLedger.upsert({
+      where: { bookingId },
+      update: {
+        commissionRate,
+        commissionAmount,
+        vendorEarning,
+        bookingAmount,
+      },
+      create: {
+        bookingId,
+        vendorId: vendor.id,
+        bookingAmount,
+        commissionRate,
+        commissionAmount,
+        vendorEarning,
+      },
+    });
+
+    logger.info({ bookingId, vendorId: vendor.id }, 'Commission calculated');
+  }
+
+  async getVendorEarnings() {
+    const vendors = await prisma.vendor.findMany({
+      where: { isDeleted: false },
+      include: {
+        commissionLedger: {
+          where: { payoutId: null },
+        },
+      },
+    });
+
+    return vendors.map((v: any) => {
+      const unpaidEarnings = v.commissionLedger.reduce(
+        (acc: Prisma.Decimal, entry: any) => acc.add(entry.vendorEarning),
+        new Prisma.Decimal(0)
+      );
+
+      return {
+        id: v.id,
+        businessName: v.businessName,
+        unpaidEarnings: unpaidEarnings.toNumber(),
+        pendingEntriesCount: v.commissionLedger.length,
+      };
+    });
+  }
+
+  async createPayout(vendorId: string, amount?: number) {
+    const unpaidEntries = await prisma.commissionLedger.findMany({
+      where: { vendorId, payoutId: null },
+    });
+
+    if (unpaidEntries.length === 0) {
+      const error = new Error('No unpaid earnings for this vendor');
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
       throw error;
     }
 
-    const nextAvailable = Math.min(availableRooms, room.totalRooms);
+    const totalEarning = unpaidEntries.reduce(
+      (acc, entry) => acc.add(entry.vendorEarning),
+      new Prisma.Decimal(0)
+    );
+
+    const payoutAmount = amount ? new Prisma.Decimal(amount) : totalEarning;
+
+    const payout = await prisma.payout.create({
+      data: {
+        vendorId,
+        amount: payoutAmount,
+        status: 'pending',
+        bookingIds: unpaidEntries.map((e) => e.bookingId),
+        periodStart: unpaidEntries[unpaidEntries.length - 1].createdAt,
+        periodEnd: new Date(),
+      },
+    });
+
+    await prisma.commissionLedger.updateMany({
+      where: { id: { in: unpaidEntries.map((e) => e.id) } },
+      data: { payoutId: payout.id },
+    });
+
+    logger.info({ vendorId, payoutId: payout.id }, 'Payout created');
+
+    return payout;
+  }
+
+  async updateRoom(roomId: string, data: { pricePerNight?: number; weekendPrice?: number; totalRooms?: number; availableRooms?: number, isActive?: boolean }) {
+    const room = await prisma.room.findUnique({ where: { id: roomId } });
+
+    if (!room) {
+      const error: any = new Error('Room not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updateData: any = {};
+    if (data.pricePerNight !== undefined) updateData.pricePerNight = new Prisma.Decimal(data.pricePerNight);
+    if (data.weekendPrice !== undefined) updateData.weekendPrice = new Prisma.Decimal(data.weekendPrice);
+    if (data.totalRooms !== undefined) updateData.totalRooms = data.totalRooms;
+
+    // Safely constrain available rooms to not exceed total rooms
+    if (data.availableRooms !== undefined) {
+      updateData.availableRooms = Math.min(data.availableRooms, data.totalRooms ?? room.totalRooms);
+    }
+
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     const updated = await prisma.room.update({
       where: { id: roomId },
-      data: { availableRooms: nextAvailable },
+      data: updateData,
     });
 
-    logger.info({ roomId, availableRooms: nextAvailable }, 'Room inventory overridden by admin');
+    logger.info({ roomId }, 'Room details updated securely by admin');
 
     return {
       id: updated.id,
+      pricePerNight: updated.pricePerNight.toNumber(),
+      weekendPrice: updated.weekendPrice ? updated.weekendPrice.toNumber() : null,
       totalRooms: updated.totalRooms,
       availableRooms: updated.availableRooms,
-      message: 'Inventory updated',
+      isActive: updated.isActive,
+      message: 'Room details updated',
     };
+  }
+
+  async blockRoomDates(roomId: string, checkInDate: Date, checkOutDate: Date, quantity: number) {
+    const room = await prisma.room.findUnique({ where: { id: roomId } });
+
+    if (!room) {
+      const error: any = new Error('Room not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const lock = await prisma.inventoryLock.create({
+      data: {
+        roomId,
+        quantity,
+        checkInDate,
+        checkOutDate,
+        lockUntil: new Date('9999-12-31T23:59:59.000Z'), // Permanent lock until manually lifted
+      },
+    });
+
+    logger.info({ roomId, lockId: lock.id }, 'Room dates forcibly blocked by admin');
+
+    return {
+      lockId: lock.id,
+      roomId: lock.roomId,
+      message: 'Room dates permanently blocked for specified duration',
+    };
+  }
+
+  async getRoomInventory(roomId: string, startDate: Date, endDate: Date) {
+    const [days, locks] = await Promise.all([
+      prisma.inventoryDay.findMany({
+        where: {
+          roomId,
+          date: { gte: startDate, lte: endDate },
+        },
+        orderBy: { date: 'asc' },
+      }),
+      prisma.inventoryLock.findMany({
+        where: {
+          roomId,
+          OR: [
+            { checkInDate: { lte: endDate }, checkOutDate: { gte: startDate } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return {
+      days: days.map(d => ({
+        date: d.date,
+        totalRooms: d.totalRooms,
+        availableRooms: d.availableRooms
+      })),
+      locks: locks.map(l => ({
+        id: l.id,
+        quantity: l.quantity,
+        checkInDate: l.checkInDate,
+        checkOutDate: l.checkOutDate,
+        lockUntil: l.lockUntil,
+        isExpired: l.lockUntil < new Date() && l.lockUntil.getFullYear() < 9000
+      }))
+    };
+  }
+
+  async overrideRoomInventory(roomId: string, date: Date, availableRooms: number) {
+    const room = await prisma.room.findUnique({ where: { id: roomId } });
+    if (!room) {
+      const error: any = new Error('Room not found');
+      error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const result = await prisma.inventoryDay.upsert({
+      where: { roomId_date: { roomId, date } },
+      update: { availableRooms },
+      create: {
+        roomId,
+        date,
+        totalRooms: room.totalRooms,
+        availableRooms
+      }
+    });
+
+    logger.info({ roomId, date, availableRooms }, 'Inventory manually overridden by admin');
+    return result;
+  }
+
+  async releaseRoomLocks(roomId: string, lockId?: string) {
+    const where: any = { roomId };
+    if (lockId) where.id = lockId;
+
+    const result = await prisma.inventoryLock.deleteMany({ where });
+    logger.info({ roomId, lockId }, 'Inventory locks manually released by admin');
+    return { count: result.count };
+  }
+
+  async cleanupInventoryLocks() {
+    const result = await prisma.inventoryLock.deleteMany({
+      where: {
+        lockUntil: { lt: new Date() },
+        // Don't delete permanent admin blocks (year 9999)
+        NOT: { lockUntil: { gte: new Date('9990-01-01') } }
+      }
+    });
+
+    logger.info({ count: result.count }, 'Cleanup of expired inventory locks completed');
+    return { count: result.count };
   }
 
   async getAnalytics(range: '7d' | '30d' | '3m') {
@@ -857,6 +1755,62 @@ export class AdminService {
       revenueByMonth,
       topProperties,
     };
+  }
+
+  // ─── Export Data ───
+
+  async exportData(entity: 'users' | 'vendors' | 'properties' | 'bookings' | 'payouts' | 'payments' | 'refunds') {
+    switch (entity) {
+      case 'users': {
+        const users = await prisma.user.findMany({ select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, isDeleted: true, createdAt: true, lastLoginAt: true } });
+        return users.map(u => ({ ...u, createdAt: u.createdAt.toISOString(), lastLoginAt: u.lastLoginAt?.toISOString() || '' }));
+      }
+      case 'vendors': {
+        const vendors = await prisma.vendor.findMany({ select: { id: true, businessName: true, user: { select: { email: true } }, isApproved: true, commissionRate: true, createdAt: true } });
+        return vendors.map(v => ({ id: v.id, businessName: v.businessName, email: v.user.email, isApproved: v.isApproved, commissionRate: v.commissionRate.toString(), createdAt: v.createdAt.toISOString() }));
+      }
+      case 'properties': {
+        const props = await prisma.property.findMany({ select: { id: true, name: true, type: true, city: true, status: true, reviewCount: true, rating: true, createdAt: true, vendor: { select: { businessName: true } } } });
+        return props.map(p => ({ id: p.id, name: p.name, type: p.type, city: p.city, status: p.status, rating: p.rating?.toString() || '', reviewCount: p.reviewCount, vendor: p.vendor?.businessName || '', createdAt: p.createdAt.toISOString() }));
+      }
+      case 'bookings': {
+        const b = await prisma.booking.findMany({ select: { id: true, bookingNumber: true, status: true, totalAmount: true, checkInDate: true, checkOutDate: true, createdAt: true, property: { select: { name: true } }, user: { select: { email: true } } } });
+        return b.map(x => ({ id: x.id, reference: x.bookingNumber, status: x.status, property: x.property.name, userEmail: x.user.email, amount: x.totalAmount.toString(), checkIn: x.checkInDate.toISOString(), checkOut: x.checkOutDate.toISOString(), createdAt: x.createdAt.toISOString() }));
+      }
+      case 'payouts': {
+        const p = await prisma.payout.findMany({ select: { id: true, status: true, amount: true, periodStart: true, periodEnd: true, processedAt: true, transactionId: true, vendor: { select: { businessName: true } } } });
+        return p.map(x => ({ id: x.id, vendor: x.vendor.businessName, status: x.status, amount: x.amount.toString(), periodStart: x.periodStart.toISOString(), periodEnd: x.periodEnd.toISOString(), processedAt: x.processedAt?.toISOString() || '', transactionId: x.transactionId || '' }));
+      }
+      case 'payments': {
+        const p = await prisma.payment.findMany({ include: { booking: { include: { property: { select: { name: true } } } } } });
+        return p.map(x => ({
+          id: x.id,
+          bookingNumber: x.booking?.bookingNumber || '',
+          property: x.booking?.property?.name || '',
+          amount: x.amount.toString(),
+          status: x.status,
+          method: x.method || '',
+          razorpayOrderId: x.razorpayOrderId || '',
+          razorpayPaymentId: x.razorpayPaymentId || '',
+          createdAt: x.createdAt.toISOString()
+        }));
+      }
+      case 'refunds': {
+        const r = await prisma.refund.findMany({ include: { payment: { include: { booking: true } } } });
+        return r.map(x => ({
+          id: x.id,
+          paymentId: x.paymentId,
+          bookingNumber: x.payment?.booking?.bookingNumber || '',
+          amount: x.amount.toString(),
+          reason: x.reason || '',
+          status: x.status,
+          razorpayRefundId: x.razorpayRefundId || '',
+          createdAt: x.createdAt.toISOString()
+        }));
+      }
+      default:
+        throw new Error('Invalid export entity');
+    }
   }
 }
 

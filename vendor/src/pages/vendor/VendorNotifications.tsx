@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bell, Check, CheckCheck, Trash2, Calendar, CreditCard, Star, AlertCircle, Filter } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bell, Check, CheckCheck, Calendar, CreditCard, Star, AlertCircle, Filter } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { notificationsService } from "@/lib/notifications";
 import { useToast } from "@/hooks/use-toast";
@@ -38,8 +37,9 @@ const VendorNotifications = () => {
     try {
       const params: Record<string, string> = {};
       if (filter === "unread") params.isRead = "false";
+      if (filter === "read") params.isRead = "true";
       const response = await notificationsService.getNotifications(params);
-      setNotifications(response || []);
+      setNotifications(response?.data || []);
       const meta = response?.meta || {};
       setUnreadCount(meta?.unreadCount || 0);
     } catch (error) {
@@ -74,8 +74,9 @@ const VendorNotifications = () => {
 
   const getNotificationIcon = (type: string) => {
     if (type?.includes("BOOKING")) return <Calendar className="w-5 h-5 text-blue-500" />;
-    if (type?.includes("PAYMENT")) return <CreditCard className="w-5 h-5 text-green-500" />;
+    if (type?.includes("PAYMENT") || type?.includes("PAYOUT")) return <CreditCard className="w-5 h-5 text-green-500" />;
     if (type?.includes("REVIEW")) return <Star className="w-5 h-5 text-amber-500" />;
+    if (type?.includes("ADMIN")) return <AlertCircle className="w-5 h-5 text-red-500" />;
     return <Bell className="w-5 h-5 text-gray-500" />;
   };
 

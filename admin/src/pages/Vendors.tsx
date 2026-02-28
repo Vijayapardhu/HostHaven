@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Ban, CheckCircle, Eye, LayoutGrid, List } from 'lucide-react'
+import { Ban, CheckCircle, Eye, LayoutGrid, List, Download } from 'lucide-react'
 import { vendorsService, type Vendor } from '../lib/vendors'
 import { FiltersBar } from '../components/ui/FiltersBar'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -11,6 +11,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PageLoader } from '../components/ui/PageLoader'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { downloadCsvExport } from '../lib/export'
 
 type VendorStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 
@@ -107,6 +108,15 @@ export default function Vendors() {
     }
   }
 
+  const handleExport = async () => {
+    try {
+      await downloadCsvExport('vendors')
+      toast.success('Export started successfully')
+    } catch (err) {
+      toast.error('Failed to export vendors data')
+    }
+  }
+
   const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
@@ -116,15 +126,22 @@ export default function Vendors() {
         description="Track vendor onboarding, status, and payouts."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+              title="Export Vendors to CSV"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
             <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-1">
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                  viewMode === 'grid'
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ${viewMode === 'grid'
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                  }`}
                 title="Grid view"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
@@ -133,11 +150,10 @@ export default function Vendors() {
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ${
-                  viewMode === 'list'
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ${viewMode === 'list'
                     ? 'bg-slate-900 text-white'
                     : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                  }`}
                 title="List view"
               >
                 <List className="h-3.5 w-3.5" />

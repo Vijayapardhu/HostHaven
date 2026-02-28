@@ -178,6 +178,9 @@ model Vendor {
   aadhaarNumber   String?
   bankAccount     Json?
   
+  passportPhoto   String?
+  companyLogo     String?
+  
   isApproved      Boolean  @default(false)
   approvedBy      String?
   approvedAt      DateTime?
@@ -637,6 +640,8 @@ model Payout {
   processedAt     DateTime?
   transactionId   String?
   
+  commissionEntries CommissionLedger[]
+  
   createdAt       DateTime @default(now())
   
   @@index([vendorId])
@@ -656,6 +661,9 @@ model CommissionLedger {
   commissionRate   Decimal  @db.Decimal(5, 2)
   commissionAmount Decimal  @db.Decimal(10, 2)
   vendorEarning    Decimal  @db.Decimal(10, 2)
+
+  payoutId         String?
+  payout           Payout?  @relation(fields: [payoutId], references: [id])
 
   createdAt        DateTime @default(now())
 

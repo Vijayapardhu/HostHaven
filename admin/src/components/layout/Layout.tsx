@@ -22,8 +22,10 @@ import {
   Bell,
   Truck,
   MapPin,
+  Download,
 } from "lucide-react";
 import { useState } from "react";
+import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -53,6 +55,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { canInstall, install } = usePWAInstall();
 
   const handleLogout = () => {
     logout();
@@ -112,6 +115,19 @@ export default function Layout() {
               );
             })}
           </nav>
+          {/* Install + Footer */}
+          {canInstall && (
+            <div className="px-3 py-3 border-t">
+              <button
+                onClick={install}
+                className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors group"
+              >
+                <Download className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
+                Install App
+                <span className="ml-auto text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-semibold">NEW</span>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -142,6 +158,15 @@ export default function Layout() {
                 </span>
               </div>
             </div>
+            {canInstall && (
+              <button
+                onClick={install}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Install App</span>
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"

@@ -59,11 +59,42 @@ export const AuthController = {
         );
       }
 
-      const statusCode = 
+      const statusCode =
         error.code === ERROR_CODES.ACCOUNT_LOCKED ? 423 :
-        error.code === ERROR_CODES.ACCOUNT_DISABLED ? 403 :
-        error.code === ERROR_CODES.OAUTH_ONLY_ACCOUNT ? 400 : 401;
-      
+          error.code === ERROR_CODES.ACCOUNT_DISABLED ? 403 :
+            error.code === ERROR_CODES.OAUTH_ONLY_ACCOUNT ? 400 : 401;
+
+      return sendError(reply, error.code || ERROR_CODES.INVALID_CREDENTIALS, error.message, statusCode);
+    }
+  },
+
+  async vendorLogin(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = loginSchema.parse(request.body);
+      const result = await authService.loginVendorWithEmail({
+        email: data.email,
+        password: data.password,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] || '',
+      });
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Vendor login failed');
+
+      if (error instanceof Prisma.PrismaClientInitializationError) {
+        return sendError(
+          reply,
+          ERROR_CODES.DATABASE_ERROR,
+          'Database unavailable. Please check database connectivity and try again.',
+          503
+        );
+      }
+
+      const statusCode =
+        error.code === ERROR_CODES.ACCOUNT_LOCKED ? 423 :
+          error.code === ERROR_CODES.ACCOUNT_DISABLED ? 403 :
+            error.code === ERROR_CODES.OAUTH_ONLY_ACCOUNT ? 400 : 401;
+
       return sendError(reply, error.code || ERROR_CODES.INVALID_CREDENTIALS, error.message, statusCode);
     }
   },
@@ -82,7 +113,7 @@ export const AuthController = {
   async googleCallback(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { code, state } = googleCallbackSchema.parse(request.query);
-      
+
       // Verify state
       const stateData = await cacheService.get(cacheService.keys.stateToken(state));
       if (!stateData) {
@@ -114,7 +145,7 @@ export const AuthController = {
   async googleLogin(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { idToken } = googleIdTokenSchema.parse(request.body);
-      
+
       const result = await authService.loginWithGoogleIdToken(
         idToken,
         request.ip,
@@ -124,7 +155,7 @@ export const AuthController = {
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Google login failed');
-      const statusCode = 
+      const statusCode =
         error.code === ERROR_CODES.ACCOUNT_DISABLED ? 403 : 401;
       return sendError(reply, error.code || ERROR_CODES.GOOGLE_AUTH_FAILED, error.message, statusCode);
     }
@@ -139,7 +170,7 @@ export const AuthController = {
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Link Google failed');
-      const statusCode = 
+      const statusCode =
         error.code === ERROR_CODES.GOOGLE_ACCOUNT_LINKED ? 409 : 400;
       return sendError(reply, error.code || ERROR_CODES.INTERNAL_ERROR, error.message, statusCode);
     }
@@ -152,7 +183,7 @@ export const AuthController = {
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Unlink Google failed');
-      const statusCode = 
+      const statusCode =
         error.code === ERROR_CODES.CANNOT_UNLINK_ONLY_AUTH ? 400 : 500;
       return sendError(reply, error.code || ERROR_CODES.INTERNAL_ERROR, error.message, statusCode);
     }
@@ -192,6 +223,17 @@ export const AuthController = {
     }
   },
 
+  async vendorForgotPassword(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { email } = forgotPasswordSchema.parse(request.body);
+      const result = await authService.forgotVendorPassword(email);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Vendor forgot password failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to process request', 500);
+    }
+  },
+
   async resetPassword(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = resetPasswordSchema.parse(request.body);
@@ -199,6 +241,18 @@ export const AuthController = {
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Reset password failed');
+      const statusCode = error.code === ERROR_CODES.INVALID_TOKEN ? 400 : 500;
+      return sendError(reply, error.code || ERROR_CODES.INTERNAL_ERROR, error.message, statusCode);
+    }
+  },
+
+  async vendorResetPassword(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = resetPasswordSchema.parse(request.body);
+      const result = await authService.resetVendorPassword(data.token, data.password);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Vendor reset password failed');
       const statusCode = error.code === ERROR_CODES.INVALID_TOKEN ? 400 : 500;
       return sendError(reply, error.code || ERROR_CODES.INTERNAL_ERROR, error.message, statusCode);
     }

@@ -15,14 +15,14 @@ export interface DecodedToken extends TokenPayload {
 
 export const generateAccessToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.jwt.accessSecret, {
-    expiresIn: config.jwt.accessExpires,
+    expiresIn: config.jwt.accessExpires as any,
     algorithm: 'HS512',
   });
 };
 
 export const generateRefreshToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.jwt.refreshSecret, {
-    expiresIn: config.jwt.refreshExpires,
+    expiresIn: config.jwt.refreshExpires as any,
     algorithm: 'HS512',
   });
 };

@@ -34,6 +34,8 @@ const PropertyDetails = PageLoader(
   lazy(() => import("./pages/PropertyDetails")),
 );
 const AddProperty = PageLoader(lazy(() => import("./pages/AddProperty")));
+const AddHotel = PageLoader(lazy(() => import("./pages/AddHotel")));
+const AddHouse = PageLoader(lazy(() => import("./pages/AddHouse")));
 const PropertyApproval = PageLoader(
   lazy(() => import("./pages/PropertyApproval")),
 );
@@ -46,6 +48,10 @@ const VendorApproval = PageLoader(lazy(() => import("./pages/VendorApproval")));
 const Users = PageLoader(lazy(() => import("./pages/Users")));
 const UserDetails = PageLoader(lazy(() => import("./pages/UserDetails")));
 const Payments = PageLoader(lazy(() => import("./pages/Payments")));
+const VendorEarnings = PageLoader(lazy(() => import("./pages/VendorEarnings")));
+const RoomInventoryControl = PageLoader(
+  lazy(() => import("./pages/RoomInventoryControl")),
+);
 const Services = PageLoader(lazy(() => import("./pages/Services")));
 const ServiceDetails = PageLoader(lazy(() => import("./pages/ServiceDetails")));
 const AddService = PageLoader(lazy(() => import("./pages/AddService")));
@@ -66,6 +72,7 @@ const ServiceBookingDetails = PageLoader(
   lazy(() => import("./pages/ServiceBookingDetails")),
 );
 const Success = PageLoader(lazy(() => import("./pages/Success")));
+const SystemControl = PageLoader(lazy(() => import("./pages/SystemControl")));
 
 const routes = [
   {
@@ -108,6 +115,14 @@ const routes = [
         element: <AddProperty />,
       },
       {
+        path: "/properties/add-hotel",
+        element: <AddHotel />,
+      },
+      {
+        path: "/properties/add-house",
+        element: <AddHouse />,
+      },
+      {
         path: "/properties/:id/edit",
         element: <AddProperty />,
       },
@@ -140,6 +155,14 @@ const routes = [
         element: <Payments />,
       },
       {
+        path: "/finance/earnings",
+        element: <VendorEarnings />,
+      },
+      {
+        path: "/rooms/:roomId/inventory",
+        element: <RoomInventoryControl />,
+      },
+      {
         path: "/services",
         element: <Services />,
       },
@@ -170,6 +193,10 @@ const routes = [
       {
         path: "/settings",
         element: <Settings />,
+      },
+      {
+        path: "/system",
+        element: <SystemControl />,
       },
       {
         path: "/support",

@@ -22,9 +22,7 @@ export class SupportService {
         status: 'OPEN',
       },
     });
-
     logger.info({ supportTicketId: ticket.id }, 'Support ticket created');
-
     return ticket;
   }
 
@@ -35,9 +33,7 @@ export class SupportService {
 
     const [tickets, total] = await Promise.all([
       prisma.supportTicket.findMany({
-        where,
-        skip,
-        take: filters.limit,
+        where, skip, take: filters.limit,
         orderBy: { createdAt: 'desc' },
       }),
       prisma.supportTicket.count({ where }),
@@ -45,12 +41,7 @@ export class SupportService {
 
     return {
       tickets,
-      meta: {
-        page: filters.page,
-        limit: filters.limit,
-        total,
-        totalPages: Math.ceil(total / filters.limit),
-      },
+      meta: { page: filters.page, limit: filters.limit, total, totalPages: Math.ceil(total / filters.limit) },
     };
   }
 
@@ -61,9 +52,7 @@ export class SupportService {
 
     const [tickets, total] = await Promise.all([
       prisma.supportTicket.findMany({
-        where,
-        skip,
-        take: filters.limit,
+        where, skip, take: filters.limit,
         orderBy: { createdAt: 'desc' },
         include: {
           user: { select: { id: true, name: true, email: true, phone: true } },
@@ -74,35 +63,86 @@ export class SupportService {
 
     return {
       tickets,
-      meta: {
-        page: filters.page,
-        limit: filters.limit,
-        total,
-        totalPages: Math.ceil(total / filters.limit),
-      },
+      meta: { page: filters.page, limit: filters.limit, total, totalPages: Math.ceil(total / filters.limit) },
     };
   }
 
-  async updateTicket(id: string, data: { status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'; adminNotes?: string }) {
-    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
+  async getTicketById(id: string) {
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { id, isDeleted: false },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true } },
+      },
+    });
+    if (!ticket) {
+      const error = new Error('Support ticket not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    return ticket;
+  }
 
+  async updateTicket(id: string, data: { status?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'; adminNotes?: string }) {
+    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
     if (!existing) {
       const error = new Error('Support ticket not found');
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
 
+    const updateData: any = {};
+    if (data.status) {
+      updateData.status = data.status;
+      updateData.resolvedAt = data.status === 'RESOLVED' ? new Date() : null;
+    }
+    if (data.adminNotes !== undefined) {
+      // Append note with timestamp to existing notes
+      const timestamp = new Date().toISOString();
+      const newEntry = `[${timestamp}] ${data.adminNotes}`;
+      updateData.adminNotes = existing.adminNotes
+        ? `${existing.adminNotes}\n---\n${newEntry}`
+        : newEntry;
+    }
+
+    const ticket = await prisma.supportTicket.update({ where: { id }, data: updateData });
+    logger.info({ supportTicketId: id, status: data.status }, 'Support ticket updated');
+    return ticket;
+  }
+
+  async addNote(id: string, content: string, addedBy: string) {
+    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
+    if (!existing) {
+      const error = new Error('Support ticket not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const timestamp = new Date().toISOString();
+    const newEntry = `[${timestamp}] (${addedBy}) ${content}`;
+    const adminNotes = existing.adminNotes
+      ? `${existing.adminNotes}\n---\n${newEntry}`
+      : newEntry;
+
     const ticket = await prisma.supportTicket.update({
       where: { id },
-      data: {
-        status: data.status,
-        adminNotes: data.adminNotes,
-        resolvedAt: data.status === 'RESOLVED' ? new Date() : null,
-      },
+      data: { adminNotes },
     });
+    logger.info({ supportTicketId: id }, 'Note added to support ticket');
+    return ticket;
+  }
 
-    logger.info({ supportTicketId: id, status: data.status }, 'Support ticket updated');
-
+  async reopenTicket(id: string) {
+    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
+    if (!existing) {
+      const error = new Error('Support ticket not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    const ticket = await prisma.supportTicket.update({
+      where: { id },
+      data: { status: 'OPEN', resolvedAt: null },
+    });
+    logger.info({ supportTicketId: id }, 'Support ticket reopened');
     return ticket;
   }
 }

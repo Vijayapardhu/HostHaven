@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, CalendarDays, CreditCard, MapPin, Phone, Mail } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Phone, Mail } from 'lucide-react'
 import { bookingsService, type Booking } from '../lib/bookings'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
@@ -20,6 +20,8 @@ export default function BookingDetails() {
   const [error, setError] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [confirmRefund, setConfirmRefund] = useState(false)
+  const [paymentDetails, setPaymentDetails] = useState<any>(null)
+  const [isChangingStatus, setIsChangingStatus] = useState(false)
 
   const fetchBooking = async () => {
     if (!id) return
@@ -28,6 +30,13 @@ export default function BookingDetails() {
     try {
       const data = await bookingsService.getBookingById(id)
       setBooking(data)
+      try {
+        const payment = await bookingsService.getPaymentDetails(id)
+        setPaymentDetails(payment)
+      } catch (e) {
+        // Payment might not exist
+        console.warn('No payment found', e)
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to load booking details.')
     } finally {
@@ -57,16 +66,18 @@ export default function BookingDetails() {
     return 'danger' as const
   }, [booking])
 
-  const handleCancel = async () => {
+  const handleStatusChange = async (newStatus: BookingStatus) => {
     if (!booking) return
+    setIsChangingStatus(true)
     try {
-      await bookingsService.cancelBooking(booking.id)
-      setBooking({ ...booking, status: 'cancelled' })
-      toast.success('Booking cancelled successfully.')
+      await bookingsService.updateBookingStatus(booking.id, newStatus.toUpperCase())
+      setBooking({ ...booking, status: newStatus })
+      toast.success(`Booking status successfully updated to ${newStatus}.`)
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Unable to cancel booking.')
+      toast.error(err?.response?.data?.message || 'Unable to update booking status.')
     } finally {
-      setConfirmCancel(false)
+      setIsChangingStatus(false)
+      setConfirmCancel(false) // in case the change was a cancellation
     }
   }
 
@@ -223,9 +234,20 @@ export default function BookingDetails() {
                   <button
                     type="button"
                     onClick={() => setConfirmCancel(true)}
-                    className="w-full rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                    disabled={isChangingStatus}
+                    className="w-full rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100 disabled:opacity-50"
                   >
                     Cancel booking
+                  </button>
+                ) : null}
+                {booking.status === 'checked_in' || booking.status === 'confirmed' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleStatusChange('checked_out')}
+                    disabled={isChangingStatus}
+                    className="w-full rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    Mark as completed
                   </button>
                 ) : null}
                 {booking.paymentStatus === 'completed' && booking.status !== 'cancelled' ? (
@@ -234,19 +256,69 @@ export default function BookingDetails() {
                     onClick={() => setConfirmRefund(true)}
                     className="w-full rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-600 hover:bg-amber-50"
                   >
-                    Process refund
+                    Issue refund
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => navigate(`/properties/${booking.propertyId}`)}
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  View property
-                </button>
+
+                <div className="pt-4 border-t border-slate-100 mt-2">
+                  <p className="text-xs font-semibold text-slate-500 mb-2">Override Status</p>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                    value={booking.status}
+                    onChange={(e) => handleStatusChange(e.target.value as BookingStatus)}
+                    disabled={isChangingStatus}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="checked_in">Checked In</option>
+                    <option value="checked_out">Checked Out</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/properties/${booking.propertyId}`)}
+                    className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    View property
+                  </button>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {paymentDetails && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Razorpay Logs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 text-xs">
+                  <div className="flex flex-col gap-1 break-all">
+                    <span className="font-semibold text-slate-500">Order ID:</span>
+                    <span className="text-slate-800 font-mono bg-slate-50 p-1 rounded">{paymentDetails.razorpayOrderId || '—'}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 break-all">
+                    <span className="font-semibold text-slate-500">Payment ID:</span>
+                    <span className="text-slate-800 font-mono bg-slate-50 p-1 rounded">{paymentDetails.razorpayPaymentId || '—'}</span>
+                  </div>
+                  {(paymentDetails.errorCode || paymentDetails.errorDesc) && (
+                    <div className="mt-2 p-2 bg-rose-50 rounded-lg text-rose-700 border border-rose-100">
+                      <p className="font-semibold">Error: {paymentDetails.errorCode}</p>
+                      <p className="mt-1">{paymentDetails.errorDesc}</p>
+                    </div>
+                  )}
+                  {paymentDetails.refundId && (
+                    <div className="mt-2 text-slate-600">
+                      Refund ID: <span className="font-semibold">{paymentDetails.refundId}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -257,7 +329,7 @@ export default function BookingDetails() {
         description="The booking will be cancelled and the guest will be notified."
         confirmText="Cancel booking"
         variant="danger"
-        onConfirm={handleCancel}
+        onConfirm={() => handleStatusChange('cancelled')}
       />
 
       <ConfirmDialog

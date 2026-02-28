@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Ban, CheckCircle, Eye, UserX } from 'lucide-react'
+import { Ban, CheckCircle, Eye, UserX, Download } from 'lucide-react'
 import { usersService, type User } from '../lib/users'
 import { FiltersBar } from '../components/ui/FiltersBar'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -12,6 +12,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
 import { PageLoader } from '../components/ui/PageLoader'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { downloadCsvExport } from '../lib/export'
 
 type UserStatus = 'active' | 'suspended'
 
@@ -83,6 +84,15 @@ export default function Users() {
     }
   }
 
+  const handleExport = async () => {
+    try {
+      await downloadCsvExport('users')
+      toast.success('Export started successfully')
+    } catch (err) {
+      toast.error('Failed to export users data')
+    }
+  }
+
   const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all', [searchTerm, statusFilter])
 
   return (
@@ -90,6 +100,14 @@ export default function Users() {
       <PageHeader
         title="Users"
         description="Manage platform users, verification, and access status."
+        actions={
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </button>
+        }
       />
 
       <FiltersBar>

@@ -264,11 +264,11 @@ const normalizeList = (payload: any) => {
     data: Array.isArray(data) ? data.map(mapTemple) : [],
     pagination: meta
       ? {
-          total: meta.total ?? 0,
-          page: meta.page ?? 1,
-          limit: meta.limit ?? 10,
-          totalPages: meta.totalPages ?? meta.pages ?? 1,
-        }
+        total: meta.total ?? 0,
+        page: meta.page ?? 1,
+        limit: meta.limit ?? 10,
+        totalPages: meta.totalPages ?? meta.pages ?? 1,
+      }
       : { total: 0, page: 1, limit: 10, totalPages: 1 },
   };
 };
@@ -314,5 +314,39 @@ export const templesService = {
   deactivateTemple: async (id: string) => {
     const response = await api.patch(`/v1/temples/${id}/deactivate`);
     return response.data?.data ?? response.data;
+  },
+
+  updateTimings: async (id: string, timings: {
+    darshanTimings?: any[];
+    morningAarti?: string;
+    afternoonAarti?: string;
+    eveningAarti?: string;
+    specialSevas?: string;
+    festivalSpecificTimings?: string;
+  }) => {
+    const response = await api.put(`/v1/temples/${id}`, timings);
+    return mapTemple(response.data.data ?? response.data);
+  },
+
+  updateFestivalInfo: async (id: string, data: {
+    majorFestivals?: string;
+    festivalDates?: string;
+    annualBrahmotsavam?: string;
+    rathotsavamDetails?: string;
+    specialPoojas?: string;
+    specialDecorationDays?: string;
+    crowdExpectationLevel?: string;
+  }) => {
+    const response = await api.put(`/v1/temples/${id}`, data);
+    return mapTemple(response.data.data ?? response.data);
+  },
+
+  updateMedia: async (id: string, data: {
+    images?: any[];
+    videos?: any[];
+    virtualTourUrl?: string;
+  }) => {
+    const response = await api.put(`/v1/temples/${id}`, data);
+    return mapTemple(response.data.data ?? response.data);
   },
 };

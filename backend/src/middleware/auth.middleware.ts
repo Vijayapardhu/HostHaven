@@ -5,14 +5,14 @@ import { ERROR_CODES } from "../constants/error-codes";
 import { logger } from "../utils/logger.util";
 import prisma from "../config/database";
 
+import { AuthUser } from "../types";
+
 declare module "fastify" {
   interface FastifyRequest {
-    user?: {
-      id: string;
-      email: string;
-      role: string;
-      vendorId?: string;
-    };
+    user?: AuthUser;
+  }
+  interface FastifyInstance {
+    authenticate: any;
   }
 }
 
@@ -47,7 +47,7 @@ export const authMiddleware = async (
     request.user = {
       id: decoded.userId,
       email: decoded.email,
-      role: decoded.role,
+      role: decoded.role as AuthUser["role"],
     };
 
     if (decoded.role === "VENDOR") {
@@ -55,7 +55,7 @@ export const authMiddleware = async (
         where: { userId: decoded.userId },
         select: { id: true },
       });
-      if (vendor) {
+      if (vendor && request.user) {
         request.user.vendorId = vendor.id;
       }
     }
@@ -85,7 +85,7 @@ export const optionalAuthMiddleware = async (
         request.user = {
           id: decoded.userId,
           email: decoded.email,
-          role: decoded.role,
+          role: decoded.role as AuthUser["role"],
         };
 
         if (decoded.role === "VENDOR") {
@@ -93,7 +93,7 @@ export const optionalAuthMiddleware = async (
             where: { userId: decoded.userId },
             select: { id: true },
           });
-          if (vendor) {
+          if (vendor && request.user) {
             request.user.vendorId = vendor.id;
           }
         }

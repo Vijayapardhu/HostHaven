@@ -40,6 +40,7 @@ export default function TempleDetails() {
   const [confirmAction, setConfirmAction] = useState<
     "activate" | "deactivate" | null
   >(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const fetchTemple = async () => {
     if (!id) return;
@@ -79,6 +80,21 @@ export default function TempleDetails() {
       );
     } finally {
       setConfirmAction(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!temple) return;
+    try {
+      await templesService.deleteTemple(temple.id);
+      toast.success("Temple deleted successfully.");
+      navigate("/temples");
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || "Unable to delete temple.",
+      );
+    } finally {
+      setConfirmDelete(false);
     }
   };
 
@@ -254,122 +270,122 @@ export default function TempleDetails() {
             temple.morningAarti ||
             temple.afternoonAarti ||
             temple.eveningAarti) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Darshan Timings & Aarti</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-sm text-slate-700">
-                  {temple.morningAarti && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Morning Aarti:</span>{" "}
-                      {temple.morningAarti}
-                    </div>
-                  )}
-                  {temple.afternoonAarti && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Afternoon Aarti:</span>{" "}
-                      {temple.afternoonAarti}
-                    </div>
-                  )}
-                  {temple.eveningAarti && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Evening Aarti:</span>{" "}
-                      {temple.eveningAarti}
-                    </div>
-                  )}
-                  {temple.specialSevas && (
-                    <div className="mt-4 pt-4 border-t">
-                      <p className="font-medium text-slate-900 mb-2">
-                        Special Sevas:
-                      </p>
-                      <p className="text-slate-600">{temple.specialSevas}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Darshan Timings & Aarti</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm text-slate-700">
+                    {temple.morningAarti && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Morning Aarti:</span>{" "}
+                        {temple.morningAarti}
+                      </div>
+                    )}
+                    {temple.afternoonAarti && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Afternoon Aarti:</span>{" "}
+                        {temple.afternoonAarti}
+                      </div>
+                    )}
+                    {temple.eveningAarti && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Evening Aarti:</span>{" "}
+                        {temple.eveningAarti}
+                      </div>
+                    )}
+                    {temple.specialSevas && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="font-medium text-slate-900 mb-2">
+                          Special Sevas:
+                        </p>
+                        <p className="text-slate-600">{temple.specialSevas}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {(temple.generalEntryFee ||
             temple.specialDarshanFee ||
             temple.vipDarshanFee) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Fees</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-sm text-slate-700">
-                  {temple.generalEntryFee && (
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">General Entry:</span>{" "}
-                      {temple.generalEntryFee}
-                    </div>
-                  )}
-                  {temple.specialDarshanFee && (
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Special Darshan:</span>{" "}
-                      {temple.specialDarshanFee}
-                    </div>
-                  )}
-                  {temple.vipDarshanFee && (
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">VIP Darshan:</span>{" "}
-                      {temple.vipDarshanFee}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Fees</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm text-slate-700">
+                    {temple.generalEntryFee && (
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">General Entry:</span>{" "}
+                        {temple.generalEntryFee}
+                      </div>
+                    )}
+                    {temple.specialDarshanFee && (
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Special Darshan:</span>{" "}
+                        {temple.specialDarshanFee}
+                      </div>
+                    )}
+                    {temple.vipDarshanFee && (
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">VIP Darshan:</span>{" "}
+                        {temple.vipDarshanFee}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {(temple.historicalSignificance ||
             temple.mythologicalSignificance ||
             temple.associatedLegends) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Historical & Mythological Significance</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {temple.historicalSignificance && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Historical Significance
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.historicalSignificance}
-                    </p>
-                  </div>
-                )}
-                {temple.mythologicalSignificance && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Mythological Significance
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.mythologicalSignificance}
-                    </p>
-                  </div>
-                )}
-                {temple.associatedLegends && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Associated Legends
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.associatedLegends}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Historical & Mythological Significance</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {temple.historicalSignificance && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Historical Significance
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.historicalSignificance}
+                      </p>
+                    </div>
+                  )}
+                  {temple.mythologicalSignificance && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Mythological Significance
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.mythologicalSignificance}
+                      </p>
+                    </div>
+                  )}
+                  {temple.associatedLegends && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Associated Legends
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.associatedLegends}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
           {temple.majorFestivals && (
             <Card>
@@ -410,215 +426,215 @@ export default function TempleDetails() {
             temple.peakCrowdDays ||
             temple.avoidDays ||
             temple.weatherConditions) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Visitor Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-sm text-slate-700">
-                  {temple.bestMonths && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Best Months:</span>{" "}
-                      {temple.bestMonths}
-                    </div>
-                  )}
-                  {temple.bestTimeOfDay && (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">
-                        Best Time of Day:
-                      </span>{" "}
-                      {temple.bestTimeOfDay}
-                    </div>
-                  )}
-                  {temple.idealVisitDuration && (
-                    <div className="flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">
-                        Ideal Visit Duration:
-                      </span>{" "}
-                      {temple.idealVisitDuration}
-                    </div>
-                  )}
-                  {temple.peakCrowdDays && (
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Peak Crowd Days:</span>{" "}
-                      {temple.peakCrowdDays}
-                    </div>
-                  )}
-                  {temple.avoidDays && (
-                    <div className="flex items-center gap-2">
-                      <Info className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Days to Avoid:</span>{" "}
-                      {temple.avoidDays}
-                    </div>
-                  )}
-                  {temple.weatherConditions && (
-                    <div className="flex items-center gap-2">
-                      <Info className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">
-                        Weather Conditions:
-                      </span>{" "}
-                      {temple.weatherConditions}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Visitor Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm text-slate-700">
+                    {temple.bestMonths && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Best Months:</span>{" "}
+                        {temple.bestMonths}
+                      </div>
+                    )}
+                    {temple.bestTimeOfDay && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">
+                          Best Time of Day:
+                        </span>{" "}
+                        {temple.bestTimeOfDay}
+                      </div>
+                    )}
+                    {temple.idealVisitDuration && (
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">
+                          Ideal Visit Duration:
+                        </span>{" "}
+                        {temple.idealVisitDuration}
+                      </div>
+                    )}
+                    {temple.peakCrowdDays && (
+                      <div className="flex items-center gap-2">
+                        <Star className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Peak Crowd Days:</span>{" "}
+                        {temple.peakCrowdDays}
+                      </div>
+                    )}
+                    {temple.avoidDays && (
+                      <div className="flex items-center gap-2">
+                        <Info className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Days to Avoid:</span>{" "}
+                        {temple.avoidDays}
+                      </div>
+                    )}
+                    {temple.weatherConditions && (
+                      <div className="flex items-center gap-2">
+                        <Info className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">
+                          Weather Conditions:
+                        </span>{" "}
+                        {temple.weatherConditions}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {(temple.dressCodeMen ||
             temple.dressCodeWomen ||
             temple.thingsToCarry ||
             temple.thingsNotAllowed) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Visitor Guidelines</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {temple.dressCodeMen && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Dress Code (Men):
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.dressCodeMen}
-                    </p>
-                  </div>
-                )}
-                {temple.dressCodeWomen && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Dress Code (Women):
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.dressCodeWomen}
-                    </p>
-                  </div>
-                )}
-                {temple.thingsToCarry && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Things to Carry:
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.thingsToCarry}
-                    </p>
-                  </div>
-                )}
-                {temple.thingsNotAllowed && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Things Not Allowed:
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.thingsNotAllowed}
-                    </p>
-                  </div>
-                )}
-                {temple.mobileRestrictions && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Mobile Restrictions:
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.mobileRestrictions}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Visitor Guidelines</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {temple.dressCodeMen && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Dress Code (Men):
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.dressCodeMen}
+                      </p>
+                    </div>
+                  )}
+                  {temple.dressCodeWomen && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Dress Code (Women):
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.dressCodeWomen}
+                      </p>
+                    </div>
+                  )}
+                  {temple.thingsToCarry && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Things to Carry:
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.thingsToCarry}
+                      </p>
+                    </div>
+                  )}
+                  {temple.thingsNotAllowed && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Things Not Allowed:
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.thingsNotAllowed}
+                      </p>
+                    </div>
+                  )}
+                  {temple.mobileRestrictions && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Mobile Restrictions:
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.mobileRestrictions}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
           {(temple.nearbyTemples ||
             temple.nearbyRestaurants ||
             temple.nearbyHotels ||
             temple.nearbyBeachesOrHills) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Nearby Places</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {temple.nearbyTemples && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Nearby Temples:
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.nearbyTemples}
-                    </p>
-                  </div>
-                )}
-                {temple.nearbyRestaurants && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Nearby Restaurants:
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.nearbyRestaurants}
-                    </p>
-                  </div>
-                )}
-                {temple.nearbyHotels && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Nearby Hotels:
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.nearbyHotels}
-                    </p>
-                  </div>
-                )}
-                {temple.nearbyBeachesOrHills && (
-                  <div>
-                    <p className="font-medium text-slate-900 mb-1">
-                      Nearby Beaches/Hills:
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {temple.nearbyBeachesOrHills}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Nearby Places</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {temple.nearbyTemples && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Nearby Temples:
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.nearbyTemples}
+                      </p>
+                    </div>
+                  )}
+                  {temple.nearbyRestaurants && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Nearby Restaurants:
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.nearbyRestaurants}
+                      </p>
+                    </div>
+                  )}
+                  {temple.nearbyHotels && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Nearby Hotels:
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.nearbyHotels}
+                      </p>
+                    </div>
+                  )}
+                  {temple.nearbyBeachesOrHills && (
+                    <div>
+                      <p className="font-medium text-slate-900 mb-1">
+                        Nearby Beaches/Hills:
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {temple.nearbyBeachesOrHills}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
           {(temple.distanceRailwayStation ||
             temple.distanceBusStand ||
             temple.distanceAirport) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Distance from Transport</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-sm text-slate-700">
-                  {temple.distanceRailwayStation && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Railway Station:</span>{" "}
-                      {temple.distanceRailwayStation}
-                    </div>
-                  )}
-                  {temple.distanceBusStand && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Bus Stand:</span>{" "}
-                      {temple.distanceBusStand}
-                    </div>
-                  )}
-                  {temple.distanceAirport && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium">Airport:</span>{" "}
-                      {temple.distanceAirport}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Distance from Transport</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm text-slate-700">
+                    {temple.distanceRailwayStation && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Railway Station:</span>{" "}
+                        {temple.distanceRailwayStation}
+                      </div>
+                    )}
+                    {temple.distanceBusStand && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Bus Stand:</span>{" "}
+                        {temple.distanceBusStand}
+                      </div>
+                    )}
+                    {temple.distanceAirport && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-slate-400" />
+                        <span className="font-medium">Airport:</span>{" "}
+                        {temple.distanceAirport}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
         </div>
 
         <div className="space-y-6">
@@ -817,6 +833,13 @@ export default function TempleDetails() {
                     Activate Temple
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-100"
+                >
+                  Delete Temple
+                </button>
               </div>
             </CardContent>
           </Card>
@@ -860,6 +883,16 @@ export default function TempleDetails() {
         }
         variant={confirmAction === "activate" ? "default" : "danger"}
         onConfirm={confirmStatusChange}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this temple?"
+        description="This action is permanent and cannot be undone. The temple will be removed from all listings."
+        confirmText="Delete temple"
+        variant="danger"
+        onConfirm={handleDelete}
       />
     </div>
   );
