@@ -4,19 +4,19 @@ import { config } from '../config';
 const createRedisClient = () => {
   return new Redis(config.redis.url, {
     maxRetriesPerRequest: 3,
-    retryDelayOnFailover: 100,
+    retryStrategy: (times: number) => Math.min(times * 100, 3000),
     lazyConnect: true,
   });
 };
 
 const createNoopRedis = () => {
   return {
-    get: async () => null,
-    set: async () => 'OK',
-    setex: async () => 'OK',
-    del: async () => 0,
-    keys: async () => [],
-    exists: async () => 0,
+    get: async (_key: string) => null,
+    set: async (_key: string, _value: string, ..._args: any[]) => 'OK',
+    setex: async (_key: string, _seconds: number, _value: string) => 'OK',
+    del: async (..._keys: any[]) => 0,
+    keys: async (_pattern: string) => [] as string[],
+    exists: async (..._keys: any[]) => 0,
     quit: async () => undefined,
   };
 };
@@ -28,7 +28,7 @@ declare global {
 
 export const redis = config.redis.enabled
   ? globalThis.redis ?? createRedisClient()
-  : createNoopRedis();
+  : createNoopRedis() as any;
 
 if (config.app.nodeEnv === 'development') {
   globalThis.redis = redis;

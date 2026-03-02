@@ -19,16 +19,6 @@ export interface Property {
   vendorId?: string
   rating?: number
   reviewCount?: number
-  isFeatured?: boolean
-  isVerified?: boolean
-  rooms?: any[]
-  cancellationPolicy?: {
-    id: string
-    freeBeforeHours: number
-    refundPercentBefore: number
-    refundPercentAfter: number
-  } | null
-  houseDetails?: any
   createdAt: string
   updatedAt: string
 }
@@ -81,11 +71,6 @@ const mapProperty = (property: any): Property => ({
   vendorId: property.vendor?.id ?? property.vendorId,
   rating: property.rating,
   reviewCount: property.reviewCount,
-  isFeatured: property.isFeatured,
-  isVerified: property.isVerified,
-  rooms: property.rooms ?? [],
-  cancellationPolicy: property.cancellationPolicy ?? null,
-  houseDetails: property.featureFlags ?? null,
   createdAt: property.createdAt,
   updatedAt: property.updatedAt ?? property.createdAt,
 })
@@ -97,11 +82,11 @@ const normalizeList = (payload: any) => {
     data: Array.isArray(data) ? data.map(mapProperty) : [],
     pagination: meta
       ? {
-        total: meta.total ?? 0,
-        page: meta.page ?? 1,
-        limit: meta.limit ?? 10,
-        totalPages: meta.totalPages ?? meta.pages ?? 1,
-      }
+          total: meta.total ?? 0,
+          page: meta.page ?? 1,
+          limit: meta.limit ?? 10,
+          totalPages: meta.totalPages ?? meta.pages ?? 1,
+        }
       : { total: 0, page: 1, limit: 10, totalPages: 1 },
   }
 }
@@ -114,7 +99,6 @@ export const propertiesService = {
     type?: string
     status?: string
     city?: string
-    vendorId?: string
   }) => {
     const response = await api.get('/v1/admin/properties', {
       params: {
@@ -124,14 +108,13 @@ export const propertiesService = {
         status: mapStatusToApi(params?.status),
         type: mapTypeToApi(params?.type),
         city: params?.city,
-        vendorId: params?.vendorId,
       },
     })
     return normalizeList(response.data)
   },
 
   getPropertyById: async (id: string) => {
-    const response = await api.get(`/v1/admin/properties/${id}`)
+    const response = await api.get(`/v1/properties/${id}`)
     const payload = response.data?.data ?? response.data
     return mapProperty(payload)
   },
@@ -160,26 +143,18 @@ export const propertiesService = {
   },
 
   updateProperty: async (propertyId: string, data: Partial<Property>) => {
-    // If status needs to change standalone (rare now that we can update all)
-    if (data.status && Object.keys(data).length === 1) {
+    if (data.status) {
       const response = await api.put(`/v1/admin/properties/${propertyId}/status`, {
         status: mapStatusToApi(data.status),
       })
       return response.data?.data ?? response.data
     }
-
-    // Convert status to API format if provided
-    const payload = { ...data }
-    if (payload.status) {
-      (payload as any).status = mapStatusToApi(payload.status)
-    }
-
-    const response = await api.put(`/v1/admin/properties/${propertyId}`, payload)
+    const response = await api.put(`/v1/properties/${propertyId}`, data)
     return response.data?.data ?? response.data
   },
 
   deleteProperty: async (propertyId: string) => {
-    const response = await api.delete(`/v1/admin/properties/${propertyId}`)
+    const response = await api.delete(`/v1/properties/${propertyId}`)
     return response.data?.data ?? response.data
   },
 
@@ -190,26 +165,6 @@ export const propertiesService = {
 
   createProperty: async (data: Partial<Property>) => {
     const response = await api.post('/v1/admin/properties', data)
-    return response.data?.data ?? response.data
-  },
-
-  updateRoom: async (roomId: string, data: { pricePerNight?: number; weekendPrice?: number; totalRooms?: number; availableRooms?: number, isActive?: boolean }) => {
-    const response = await api.put(`/v1/admin/rooms/${roomId}`, data)
-    return response.data?.data ?? response.data
-  },
-
-  blockRoomDates: async (roomId: string, data: { checkInDate: string; checkOutDate: string; quantity?: number; notes?: string }) => {
-    const response = await api.post(`/v1/admin/rooms/${roomId}/block`, data)
-    return response.data?.data ?? response.data
-  },
-
-  setCancellationPolicy: async (propertyId: string, policy: 'FREE_CANCELLATION' | 'MODERATE' | 'STRICT' | 'NON_REFUNDABLE') => {
-    const response = await api.put(`/v1/admin/properties/${propertyId}`, { cancellationPolicy: policy })
-    return response.data?.data ?? response.data
-  },
-
-  publishProperty: async (propertyId: string, publish: boolean) => {
-    const response = await api.put(`/v1/admin/properties/${propertyId}/status`, { status: publish ? 'ACTIVE' : 'INACTIVE' })
     return response.data?.data ?? response.data
   },
 }

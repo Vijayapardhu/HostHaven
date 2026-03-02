@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-  useCallback,
-} from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 import { authService } from "@/lib/auth";
 import { vendorService } from "@/lib/vendor";
 import {
@@ -26,13 +19,10 @@ interface VendorProfile {
   id: string;
   businessName: string;
   businessAddress?: string;
-  phone?: string;
   gstNumber?: string;
   panNumber?: string;
   aadhaarNumber?: string;
   bankAccount?: any;
-  passportPhoto?: string;
-  companyLogo?: string;
   isApproved: boolean;
   approvedAt?: string;
   commissionRate: number;
@@ -91,10 +81,7 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const response = await vendorService.login(email, password);
-    setTokens({
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-    });
+    setTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
     setVendor(response.vendor);
   };
 

@@ -1,6 +1,7 @@
 import prisma from '../../config/database';
 import { logger } from '../../utils/logger.util';
 import { generateBookingNumber } from '../../utils/crypto.util';
+import { hashPassword } from '../../utils/hash.util';
 import inventoryService from '../inventory/inventory.service';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
@@ -220,20 +221,29 @@ export class BookingsService {
       });
 
       if (property.vendorId) {
-        await notificationsService.create({
-          userId: property.vendorId,
-          type: `BOOKING_${action}`,
-          title: vendorTitle,
-          message: vendorMessage,
-          data: { bookingId: booking.id, bookingNumber: booking.bookingNumber, propertyId: property.id },
+        // Resolve vendor's userId for notifications (vendorId is Vendor.id, not User.id)
+        const vendor = await prisma.vendor.findUnique({
+          where: { id: property.vendorId },
+          select: { userId: true },
         });
+        const vendorUserId = vendor?.userId;
 
-        await webPushService.sendNotification(property.vendorId, {
-          title: vendorTitle,
-          body: vendorMessage,
-          tag: `booking-${booking.id}`,
-          data: { bookingId: booking.id, bookingNumber: booking.bookingNumber, propertyId: property.id },
-        });
+        if (vendorUserId) {
+          await notificationsService.create({
+            userId: vendorUserId,
+            type: `BOOKING_${action}`,
+            title: vendorTitle,
+            message: vendorMessage,
+            data: { bookingId: booking.id, bookingNumber: booking.bookingNumber, propertyId: property.id },
+          });
+
+          await webPushService.sendNotification(vendorUserId, {
+            title: vendorTitle,
+            body: vendorMessage,
+            tag: `booking-${booking.id}`,
+            data: { bookingId: booking.id, bookingNumber: booking.bookingNumber, propertyId: property.id },
+          });
+        }
       }
     } catch (error) {
       logger.error({ error }, 'Failed to send booking notifications');
@@ -248,11 +258,7 @@ export class BookingsService {
         ...(userId ? { userId } : {}),
       },
       include: {
-        property: {
-          include: {
-            images: true,
-          },
-        },
+        property: true,
         room: true,
         payment: true,
         user: {
@@ -588,7 +594,7 @@ export class BookingsService {
     adults: number;
     children?: number;
     totalAmount: number;
-    paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'ONLINE';
+    paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'RAZORPAY';
     isOnline?: boolean;
     vendorId: string;
   }) {
@@ -650,7 +656,7 @@ export class BookingsService {
           name: data.guestName,
           email: data.guestEmail || `${data.guestPhone}@guest.hosthaven`,
           phone: data.guestPhone,
-          password: Math.random().toString(36).slice(-8),
+          passwordHash: await hashPassword(Math.random().toString(36).slice(-8)),
           role: 'USER',
         },
       });

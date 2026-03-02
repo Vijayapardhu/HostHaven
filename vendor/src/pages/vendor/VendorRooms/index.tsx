@@ -57,11 +57,7 @@ const VendorRoomsIndex = () => {
 	};
 
 	const fetchRooms = async (propertyId?: string) => {
-		if (!propertyId) {
-			setRooms([]);
-			return;
-		}
-		const response = await roomsService.getRooms(propertyId);
+		const response = await roomsService.getRooms(propertyId || undefined);
 		const roomList = Array.isArray(response) ? response : response?.rooms || [];
 		setRooms(roomList);
 	};
@@ -102,13 +98,13 @@ const VendorRoomsIndex = () => {
 		});
 	}, [rooms, search]);
 
-	const handleDeleteRoom = async (propertyId: string, id: string) => {
+	const handleDeleteRoom = async (id: string) => {
 		if (!window.confirm("Delete this room?")) {
 			return;
 		}
 
 		try {
-			await roomsService.deleteRoom(propertyId, id);
+			await roomsService.deleteRoom(id);
 			toast({ title: "Room deleted" });
 			await fetchRooms(selectedPropertyId || undefined);
 		} catch (error: any) {
@@ -203,7 +199,7 @@ const VendorRoomsIndex = () => {
 										<Edit className="w-4 h-4" />
 										Edit
 									</Button>
-									<Button variant="destructive" className="gap-2" onClick={() => handleDeleteRoom(selectedPropertyId, room.id)}>
+									<Button variant="destructive" className="gap-2" onClick={() => handleDeleteRoom(room.id)}>
 										<Trash2 className="w-4 h-4" />
 									</Button>
 								</div>

@@ -56,8 +56,6 @@ export const updateVendorSchema = z.object({
   gstNumber: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/).optional(),
   panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).optional(),
   aadhaarNumber: z.string().regex(/^\d{12}$/).optional(),
-  passportPhoto: z.string().url().optional(),
-  companyLogo: z.string().url().optional(),
   bankAccount: z.object({
     bankName: z.string().min(2).max(100),
     accountNumber: z.string().min(9).max(18),

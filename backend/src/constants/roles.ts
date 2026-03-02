@@ -49,7 +49,7 @@ export const hasPermission = (
   role: UserRole,
   permission: string
 ): boolean => {
-  const permissions = ROLE_PERMISSIONS[role] || [];
+  const permissions: readonly string[] = ROLE_PERMISSIONS[role] || [];
   return (
     permissions.includes('read:all') ||
     permissions.includes('create:all') ||

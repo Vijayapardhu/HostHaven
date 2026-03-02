@@ -14,6 +14,7 @@ import {
   X,
   Bell,
   ChevronRight,
+  User,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
@@ -21,24 +22,22 @@ import {
   BarChart3,
   Headphones,
   FileText,
-  Package,
-  Download,
+  Home,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import logo from "@/assets/logo.png";
 import { useVendor } from "@/contexts/VendorContext";
 import { useToast } from "@/hooks/use-toast";
-import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 const sidebarLinks = [
   { path: "/vendor/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/vendor/pos", label: "Room Inventory (POS)", icon: ShoppingCart },
   { path: "/vendor/pos/history", label: "Sales & Invoices", icon: FileText },
-  { path: "/vendor/hotel", label: "My Hotel", icon: Building2 },
+  { path: "/vendor/properties", label: "My Hotels", icon: Building2 },
   { path: "/vendor/rooms", label: "Room Management", icon: BedDouble },
   { path: "/vendor/bookings", label: "Bookings", icon: CalendarDays },
   { path: "/vendor/calendar", label: "Availability Calendar", icon: Calendar },
-  { path: "/vendor/inventory", label: "Inventory Management", icon: Package },
   { path: "/vendor/reports", label: "Reports & Analytics", icon: BarChart3 },
   { path: "/vendor/support", label: "Support", icon: Headphones },
   { path: "/vendor/notifications", label: "Notifications", icon: Bell },
@@ -53,7 +52,6 @@ const VendorLayout = () => {
   const { vendor, logout } = useVendor();
   const { toast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { canInstall, install } = usePWAInstall();
 
   const handleLogout = () => {
     logout();
@@ -77,17 +75,9 @@ const VendorLayout = () => {
             <Menu className="w-6 h-6 text-slate-700" />
           </button>
           <Link to="/vendor/dashboard" className="flex items-center gap-2">
-            <img
-              src={logo}
-              alt="HostHaven"
-              className="h-8 transition-transform hover:scale-105"
-            />
+            <img src={logo} alt="HostHaven" className="h-8 transition-transform hover:scale-105" />
           </Link>
-          <Link
-            to="/vendor/notifications"
-            className="relative p-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95"
-            aria-label="Notifications"
-          >
+          <Link to="/vendor/notifications" className="relative p-2 rounded-xl hover:bg-slate-100 transition-all active:scale-95" aria-label="Notifications">
             <Bell className="w-6 h-6 text-slate-700" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
           </Link>
@@ -114,11 +104,7 @@ const VendorLayout = () => {
               className="lg:hidden fixed top-0 left-0 bottom-0 w-[280px] bg-white z-50 shadow-2xl"
             >
               <div className="flex items-center justify-between p-4 border-b border-slate-200">
-                <Link
-                  to="/vendor/dashboard"
-                  className="flex items-center gap-2"
-                  onClick={() => setSidebarOpen(false)}
-                >
+                <Link to="/vendor/dashboard" className="flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
                   <img src={logo} alt="HostHaven" className="h-10" />
                 </Link>
                 <button
@@ -129,7 +115,7 @@ const VendorLayout = () => {
                   <X className="w-5 h-5 text-slate-700" />
                 </button>
               </div>
-
+              
               {/* Mobile Vendor Info */}
               <div className="p-4 border-b border-slate-200/60">
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/10">
@@ -139,12 +125,8 @@ const VendorLayout = () => {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate text-slate-900">
-                      {vendor?.businessName}
-                    </p>
-                    <p className="text-xs text-slate-600 truncate">
-                      {vendor?.user?.email}
-                    </p>
+                    <p className="font-semibold text-sm truncate text-slate-900">{vendor?.businessName}</p>
+                    <p className="text-xs text-slate-600 truncate">{vendor?.user?.email}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
@@ -170,32 +152,21 @@ const VendorLayout = () => {
                       key={link.path}
                       to={link.path}
                       onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
-                        ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/30"
-                        : "hover:bg-slate-100 text-slate-700 hover:text-slate-900"
-                        }`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                        isActive
+                          ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/30"
+                          : "hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                      }`}
                     >
-                      <link.icon
-                        className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? "text-white" : ""}`}
-                      />
+                      <link.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? "text-white" : ""}`} />
                       <span className="font-medium text-sm">{link.label}</span>
                       {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
                     </Link>
                   );
                 })}
               </nav>
-
-              <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-slate-200 bg-white space-y-1">
-                {canInstall && (
-                  <button
-                    onClick={install}
-                    className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-orange-600 hover:bg-orange-50 transition-all duration-200 group"
-                  >
-                    <Download className="w-5 h-5 transition-transform group-hover:-translate-y-0.5" />
-                    <span className="font-medium text-sm">Install App</span>
-                    <span className="ml-auto text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-semibold">NEW</span>
-                  </button>
-                )}
+              
+              <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-slate-200 bg-white">
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-red-600 hover:bg-red-50 transition-all duration-200 group"
@@ -212,15 +183,8 @@ const VendorLayout = () => {
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-[280px] bg-white border-r border-slate-200 flex-col z-40 shadow-sm">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <Link
-            to="/vendor/dashboard"
-            className="flex items-center gap-3 group"
-          >
-            <img
-              src={logo}
-              alt="HostHaven"
-              className="h-12 transition-transform group-hover:scale-105"
-            />
+          <Link to="/vendor/dashboard" className="flex items-center gap-3 group">
+            <img src={logo} alt="HostHaven" className="h-12 transition-transform group-hover:scale-105" />
           </Link>
         </div>
 
@@ -233,12 +197,8 @@ const VendorLayout = () => {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm truncate text-slate-900">
-                {vendor?.businessName}
-              </p>
-              <p className="text-xs text-slate-600 truncate">
-                {vendor?.user?.email}
-              </p>
+              <p className="font-semibold text-sm truncate text-slate-900">{vendor?.businessName}</p>
+              <p className="text-xs text-slate-600 truncate">{vendor?.user?.email}</p>
             </div>
           </div>
           <div className="mt-3 flex items-center gap-2">
@@ -263,32 +223,23 @@ const VendorLayout = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
-                  ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/30"
-                  : "hover:bg-slate-100 text-slate-700 hover:text-slate-900"
-                  }`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+                  isActive
+                    ? "bg-gradient-to-r from-primary to-primary/90 text-white shadow-lg shadow-primary/30"
+                    : "hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                }`}
               >
-                <link.icon
-                  className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? "text-white" : ""}`}
-                />
+                <link.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? "text-white" : ""}`} />
                 <span className="font-medium text-sm">{link.label}</span>
-                {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
+                {isActive && (
+                  <ChevronRight className="w-4 h-4 ml-auto" />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-3 border-t border-slate-200 space-y-1">
-          {canInstall && (
-            <button
-              onClick={install}
-              className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-orange-600 hover:bg-orange-50 transition-all duration-200 group"
-            >
-              <Download className="w-5 h-5 transition-transform group-hover:-translate-y-0.5" />
-              <span className="font-medium text-sm">Install App</span>
-              <span className="ml-auto text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full font-semibold">NEW</span>
-            </button>
-          )}
+        <div className="p-3 border-t border-slate-200">
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-red-600 hover:bg-red-50 transition-all duration-200 group"

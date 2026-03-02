@@ -303,4 +303,31 @@ export const AuthController = {
       return sendError(reply, error.code || ERROR_CODES.USER_NOT_FOUND, error.message, 404);
     }
   },
+
+  async changePassword(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user.id;
+      const { currentPassword, newPassword } = request.body as { currentPassword: string; newPassword: string };
+
+      if (!currentPassword || !newPassword) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Current and new password are required', 400);
+      }
+
+      if (newPassword.length < 6) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'New password must be at least 6 characters', 400);
+      }
+
+      const result = await authService.changePassword(userId, currentPassword, newPassword);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Change password failed');
+      if (error.code === ERROR_CODES.UNAUTHORIZED) {
+        return sendError(reply, error.code, error.message, 401);
+      }
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to change password', 500);
+    }
+  },
 };

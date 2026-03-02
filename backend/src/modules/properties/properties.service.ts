@@ -215,7 +215,7 @@ export class PropertiesService {
         description: data.description,
         shortDesc: data.shortDesc,
         address: data.address,
-        city: data.city,
+        city: data.city as any,
         state: data.state,
         pincode: data.pincode,
         latitude: data.latitude ? new Prisma.Decimal(data.latitude) : null,
@@ -396,8 +396,8 @@ export class PropertiesService {
         status: 'ACTIVE',
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
-          { city: { contains: query, mode: 'insensitive' } },
           { state: { contains: query, mode: 'insensitive' } },
+          { address: { contains: query, mode: 'insensitive' } },
         ],
       },
       take: limit,

@@ -510,6 +510,24 @@ export class ReviewsService {
     return this.sanitizeReview(updated);
   }
 
+  async adminUpdateReviewContent(id: string, data: { title?: string; comment?: string }) {
+    const review = await prisma.review.findFirst({ where: { id, isDeleted: false } });
+    if (!review) {
+      const error = new Error('Review not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    const updated = await prisma.review.update({
+      where: { id },
+      data: {
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.comment !== undefined && { comment: data.comment }),
+      },
+    });
+    logger.info({ reviewId: id }, 'Review content updated by admin');
+    return this.sanitizeReview(updated);
+  }
+
   async adminDeleteReview(id: string) {
     const review = await prisma.review.findFirst({ where: { id, isDeleted: false } });
     if (!review) {

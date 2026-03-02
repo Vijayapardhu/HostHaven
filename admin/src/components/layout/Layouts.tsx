@@ -198,6 +198,13 @@ const navigationConfig: NavItem[] = [
     section: "system",
     permission: "settings:full",
   },
+  {
+    name: "Homepage Editor",
+    href: "/homepage-editor",
+    icon: Home,
+    section: "system",
+    permission: "settings:full",
+  },
 ];
 
 function filterNavigation(

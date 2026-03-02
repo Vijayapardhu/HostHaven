@@ -17,8 +17,7 @@ interface Review {
   isPublic: boolean;
   createdAt: string;
   property: { id: string; name: string };
-  user: { name: string; avatarUrl?: string };
-  vendorResponse?: string;
+  user: { name: string };
 }
 
 const VendorReviews = () => {
@@ -26,9 +25,6 @@ const VendorReviews = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [ratingFilter, setRatingFilter] = useState("all");
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchReviews();
@@ -46,7 +42,7 @@ const VendorReviews = () => {
             if (revs && Array.isArray(revs)) {
               allReviews.push(...revs.map((r: any) => ({ ...r, property: { id: prop.id, name: prop.name } })));
             }
-          } catch { }
+          } catch {}
         }
         setReviews(allReviews);
       }
@@ -54,23 +50,6 @@ const VendorReviews = () => {
       console.error("Failed to fetch reviews:", error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleRespond = async (reviewId: string) => {
-    if (!replyText.trim()) return;
-
-    setIsSubmitting(true);
-    try {
-      await reviewsService.respondToReview(reviewId, replyText);
-      // Update local state instead of refetching all
-      setReviews(reviews.map(r => r.id === reviewId ? { ...r, vendorResponse: replyText } : r));
-      setReplyingTo(null);
-      setReplyText("");
-    } catch (error) {
-      console.error("Failed to respond to review:", error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -166,50 +145,18 @@ const VendorReviews = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold">{review.user?.name || "Anonymous Guest"}</p>
+                        <p className="font-semibold">{review.user.name}</p>
                         <div className="flex gap-1">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <Star key={star} className={`w-4 h-4 ${star <= review.rating ? "text-amber-500 fill-amber-500" : "text-gray-300"}`} />
                           ))}
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{review.property?.name}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{review.property.name}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</p>
                   </div>
                   <p className="mt-3 text-sm">{review.comment}</p>
-
-                  {review.vendorResponse ? (
-                    <div className="mt-4 bg-muted/50 rounded-lg p-3 border border-border/50">
-                      <div className="flex items-center gap-2 mb-1">
-                        <MessageCircle className="w-4 h-4 text-primary" />
-                        <span className="font-semibold text-sm">Your Response</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{review.vendorResponse}</p>
-                    </div>
-                  ) : (
-                    <div className="mt-4 pt-4 border-t">
-                      {replyingTo === review.id ? (
-                        <div className="space-y-3">
-                          <Input
-                            placeholder="Write your response..."
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            disabled={isSubmitting}
-                          />
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText(""); }}>Cancel</Button>
-                            <Button size="sm" onClick={() => handleRespond(review.id)} disabled={isSubmitting || !replyText.trim()}>Submit Response</Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <Button variant="outline" size="sm" onClick={() => setReplyingTo(review.id)}>
-                          <MessageCircle className="w-4 h-4 mr-2" />
-                          Reply to Review
-                        </Button>
-                      )}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </motion.div>

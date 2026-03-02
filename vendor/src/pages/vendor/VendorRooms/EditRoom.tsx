@@ -93,7 +93,7 @@ const EditRoom = () => {
 
     setSubmitting(true);
     try {
-      await roomsService.updateRoom(values.propertyId, id, {
+      await roomsService.updateRoom(id, {
         name: values.name,
         type: values.type,
         description: values.description,

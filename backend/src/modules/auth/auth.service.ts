@@ -677,6 +677,36 @@ export class AuthService {
     return { message: 'Logged out from all devices' };
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user || !user.passwordHash) {
+      const error = new Error('User not found or no password set');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const isValid = await verifyPassword(user.passwordHash, currentPassword);
+    if (!isValid) {
+      const error = new Error('Current password is incorrect');
+      (error as any).code = ERROR_CODES.UNAUTHORIZED;
+      throw error;
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
+
+    logger.info({ userId }, 'Password changed successfully');
+
+    return { message: 'Password changed successfully' };
+  }
+
   // ==========================================
   // GET CURRENT USER
   // ==========================================

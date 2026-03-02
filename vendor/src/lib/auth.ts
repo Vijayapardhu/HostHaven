@@ -12,17 +12,14 @@ export const authService = {
   },
 
   forgotPassword: async (email: string) => {
-    const response = await api.post("/v1/vendor/forgot-password", { email });
-    return response.data;
-  },
-
-  changePassword: async (currentPassword: string, newPassword: string) => {
-    const response = await api.put("/v1/vendor/password", { currentPassword, newPassword });
+    const response = await api.post("/v1/auth/forgot-password", { email });
     return response.data;
   },
 
   logout: async () => {
-    const response = await api.post("/v1/vendor/logout");
-    return response.data;
+    // No server-side logout endpoint; clear tokens client-side
+    localStorage.removeItem("vendor_token");
+    localStorage.removeItem("vendor_refresh_token");
+    return { success: true };
   },
 };

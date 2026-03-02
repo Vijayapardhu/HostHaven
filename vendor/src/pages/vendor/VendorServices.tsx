@@ -315,7 +315,7 @@ const VendorServices = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
-          [1, 2, 3].map((i) => (
+          {[1, 2, 3].map((i) => (
             <Card key={i} className="border-0 shadow-lg">
               <div className="h-40 bg-muted animate-pulse"></div>
               <CardContent className="p-4">
@@ -323,7 +323,7 @@ const VendorServices = () => {
                 <div className="h-4 bg-muted rounded w-1/2"></div>
               </CardContent>
             </Card>
-          ))
+          ))}
         ) : filteredServices.length > 0 ? (
           filteredServices.map((service, index) => (
             <motion.div key={service.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>

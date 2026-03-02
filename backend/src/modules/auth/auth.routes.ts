@@ -25,6 +25,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
   fastify.get('/me', { preHandler: [fastify.authenticate] }, AuthController.me);
   fastify.post('/logout', { preHandler: [fastify.authenticate] }, AuthController.logout);
   fastify.post('/logout-all', { preHandler: [fastify.authenticate] }, AuthController.logoutAll);
+  fastify.post('/change-password', { preHandler: [fastify.authenticate] }, AuthController.changePassword);
   fastify.post('/link-google', { preHandler: [fastify.authenticate] }, AuthController.linkGoogle);
   fastify.delete('/unlink-google', { preHandler: [fastify.authenticate] }, AuthController.unlinkGoogle);
 }

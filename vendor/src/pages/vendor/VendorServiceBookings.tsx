@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import api from "@/lib/api";
 
 interface ServiceBooking {
   id: string;
@@ -58,9 +59,19 @@ const VendorServiceBookings = () => {
   const fetchBookings = async () => {
     setIsLoading(true);
     try {
-      setBookings([]);
+      const params: Record<string, string> = {
+        page: currentPage.toString(),
+      };
+      if (statusFilter !== "all") {
+        params.status = statusFilter;
+      }
+      const response = await api.get("/v1/services/bookings/my", { params });
+      const data = response.data?.data ?? response.data;
+      setBookings(Array.isArray(data) ? data : data?.bookings ?? []);
+      setTotalPages(data?.meta?.totalPages ?? 1);
     } catch (error) {
       console.error("Failed to fetch service bookings:", error);
+      setBookings([]);
     } finally {
       setIsLoading(false);
     }

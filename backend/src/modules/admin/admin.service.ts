@@ -4,6 +4,50 @@ import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
 import type { PlatformSettingsInput } from './admin-settings.schema';
 
+const DEFAULT_HOMEPAGE_CONFIG = {
+  sections: {
+    banner: { isVisible: true, order: 0 },
+    hero: { isVisible: true, order: 1 },
+    features: { isVisible: true, order: 2 },
+    destinations: { isVisible: true, order: 3 },
+    recommendations: { isVisible: true, order: 4 },
+    temples: { isVisible: true, order: 5 },
+    services: { isVisible: true, order: 6 },
+    becomePartner: { isVisible: true, order: 7 },
+  },
+  bannerSlides: [
+    { id: '1', title: 'Planning a Weekend\nGetaway?', subtitle: 'Discover Premium Hotels', tags: '· Luxury · Comfort · Service', ctaText: 'Explore Hotels', ctaLink: '/hotels', imageUrl: '', isActive: true },
+    { id: '2', title: 'Looking for a\nCozy Stay?', subtitle: 'Find Perfect Homes', tags: '· Spacious · Homely · Affordable', ctaText: 'Browse Homes', ctaLink: '/homes', imageUrl: '', isActive: true },
+    { id: '3', title: 'Planning a Weekend\nDeviation?', subtitle: 'Discover Sacred Temples', tags: '· Yaganti · Mahanandi · Ahobilam', ctaText: 'Know the route', ctaLink: '/deviation-temples', imageUrl: '', isActive: true },
+  ],
+  destinations: [
+    { id: '1', name: 'Nandyala', imageUrl: '', link: '/hotels?destination=nandyala', isActive: true },
+    { id: '2', name: 'Vijayawada', imageUrl: '', link: '/hotels?destination=vijayawada', isActive: true },
+    { id: '3', name: 'Vetapalem', imageUrl: '', link: '/hotels?destination=vetapalem', isActive: true },
+  ],
+  featureCards: [
+    { id: '1', icon: 'clock', title: '24 Hour Check-In', description: 'Instant access to your stay, anytime', badge: 'Fast Resolution', isActive: true },
+    { id: '2', icon: 'settings', title: 'Customizable Rooms', description: 'Tailor your stay to your needs', badge: '', link: '/contact', isActive: true },
+    { id: '3', icon: 'refresh', title: 'Instant Refund', description: 'Fast and hassle-free refunds', badge: '59 Second Response', isActive: true },
+  ],
+  serviceCards: [
+    { id: '1', icon: 'car', title: 'Car Rental', description: 'Explore Andhra Pradesh with our reliable car rental service', link: '/services#car-rental', isActive: true },
+    { id: '2', icon: 'bike', title: 'Bike Rental', description: 'Two-wheelers for quick and easy local travel', link: '/services#bike-rental', isActive: true },
+    { id: '3', icon: 'wrench', title: 'Car Services', description: 'Professional car maintenance and repair services', link: '/services#car-services', isActive: true },
+  ],
+  temples: [
+    { id: '1', name: 'Kanaka Durga Temple', location: 'Vijayawada', imageUrl: '', link: '/temples/kanaka-durga', isActive: true },
+    { id: '2', name: 'Mahanandi Temple', location: 'Nandyala', imageUrl: '', link: '/temples/mahanandi', isActive: true },
+    { id: '3', name: 'Sri Venkateswara Temple', location: 'Tirupati', imageUrl: '', link: '/temples/tirumala', isActive: true },
+  ],
+  partnerSection: {
+    title: 'Are you a property owner?',
+    subtitle: 'List your property on HostHaven and start earning today',
+    ctaText: 'Become a Partner',
+    ctaLink: '/vendor/signup',
+  },
+};
+
 export class AdminService {
   async getPlatformSettings() {
     const settings = await prisma.platformSetting.findFirst();
@@ -69,6 +113,29 @@ export class AdminService {
       minPayoutAmount: updated.minPayoutAmount.toNumber(),
     };
   }
+
+  async getHomepageConfig() {
+    const settings = await prisma.platformSetting.findFirst({
+      select: { homepageConfig: true },
+    });
+    return settings?.homepageConfig ?? DEFAULT_HOMEPAGE_CONFIG;
+  }
+
+  async updateHomepageConfig(config: Record<string, unknown>) {
+    const existing = await prisma.platformSetting.findFirst();
+    if (!existing) {
+      const error = new Error('Platform settings not initialized. Save general settings first.');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    const updated = await prisma.platformSetting.update({
+      where: { id: existing.id },
+      data: { homepageConfig: config as Prisma.InputJsonValue },
+    });
+    logger.info({ settingsId: updated.id }, 'Homepage config updated');
+    return updated.homepageConfig;
+  }
+
   async getDashboard() {
     const [
       totalUsers,

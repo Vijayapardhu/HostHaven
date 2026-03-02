@@ -185,11 +185,13 @@ const HomeDetails = () => {
       });
 
       if (result.success) {
-        if (result.response?.razorpay_order_id && result.response?.razorpay_payment_id && result.response?.razorpay_signature) {
+        const resp = result.response as any;
+        if (resp?.razorpay_order_id && resp?.razorpay_payment_id && resp?.razorpay_signature) {
+          const resp = result.response as any;
           await api.payments.verify({
-            razorpay_order_id: result.response.razorpay_order_id,
-            razorpay_payment_id: result.response.razorpay_payment_id,
-            razorpay_signature: result.response.razorpay_signature,
+            razorpay_order_id: resp.razorpay_order_id,
+            razorpay_payment_id: resp.razorpay_payment_id,
+            razorpay_signature: resp.razorpay_signature,
           });
         }
         toast({

@@ -106,6 +106,30 @@ export const AdminController = {
     }
   },
 
+  async getHomepageConfig(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const config = await adminService.getHomepageConfig();
+      return sendSuccess(reply, config);
+    } catch (error: any) {
+      logger.error({ error }, "Get homepage config failed");
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to fetch homepage config", 500);
+    }
+  },
+
+  async updateHomepageConfig(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const config = request.body as Record<string, unknown>;
+      const result = await adminService.updateHomepageConfig(config);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, "Update homepage config failed");
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to update homepage config", 500);
+    }
+  },
+
   async getAllUsers(request: FastifyRequest, reply: FastifyReply) {
     try {
       const query = request.query as any;
@@ -928,6 +952,21 @@ export const AdminController = {
         return sendError(reply, error.code, error.message, 404);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to verify review", 500);
+    }
+  },
+
+  async adminUpdateReviewContent(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = request.params as { id: string };
+      const data = request.body as { title?: string; comment?: string };
+      const result = await reviewsService.adminUpdateReviewContent(id, data);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, "Admin update review content failed");
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to update review", 500);
     }
   },
 

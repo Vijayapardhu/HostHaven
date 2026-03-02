@@ -5,63 +5,35 @@ export interface User {
   phone: string
   name?: string
   email?: string
-  status: 'active' | 'suspended' | 'deleted'
-  isVerified?: boolean
+  status: 'active' | 'suspended'
   createdAt: string
   updatedAt: string
   bookingsCount?: number
   reviewsCount?: number
 }
 
-export interface UserDetail extends User {
-  avatarUrl?: string
-  role?: string
-  emailVerifiedAt?: string
-  isDeleted?: boolean
-  deletedAt?: string
-  lastLoginAt?: string
-  lastLoginIp?: string
-  totalSpent?: number
-  _count?: { bookings: number; reviews: number; serviceBookings: number; wishlistItems: number }
-  bookings?: Array<{
-    id: string; checkInDate: string; checkOutDate: string; status: string
-    totalAmount: number; createdAt: string
-    property: { id: string; name: string; type: string }
-  }>
-  reviews?: Array<{
-    id: string; rating: number; comment: string; createdAt: string
-    property: { id: string; name: string }
-  }>
-  serviceBookings?: Array<{
-    id: string; status: string; serviceDate: string; totalAmount: number
-    service: { id: string; name: string }
-  }>
-}
-
-export interface UserSession {
-  id: string; userAgent?: string; ipAddress?: string; deviceType?: string
-  location?: string; isActive: boolean; expiresAt: string; createdAt: string
-}
-
 export interface PaginatedResponse<T> {
   data: T[]
-  pagination: { total: number; page: number; limit: number; pages: number }
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    pages: number
+  }
 }
 
 const mapUser = (user: any): User => {
   const isActive = Boolean(user.isActive ?? true)
-  const isDeleted = Boolean(user.isDeleted ?? false)
   return {
     id: user.id,
     phone: user.phone ?? '',
     name: user.name ?? undefined,
     email: user.email ?? undefined,
-    status: isDeleted ? 'deleted' : isActive ? 'active' : 'suspended',
-    isVerified: user.isVerified,
+    status: isActive ? 'active' : 'suspended',
     createdAt: user.createdAt,
     updatedAt: user.updatedAt ?? user.createdAt,
-    bookingsCount: user.bookingsCount ?? user._count?.bookings,
-    reviewsCount: user.reviewsCount ?? user._count?.reviews,
+    bookingsCount: user.bookingsCount,
+    reviewsCount: user.reviewsCount,
   }
 }
 
@@ -71,22 +43,29 @@ const normalizeList = (payload: any): PaginatedResponse<User> => {
   return {
     data: Array.isArray(data) ? data.map(mapUser) : [],
     pagination: {
-      total: meta?.total ?? 0, page: meta?.page ?? 1,
-      limit: meta?.limit ?? 10, pages: meta?.totalPages ?? meta?.pages ?? 1,
+      total: meta?.total ?? 0,
+      page: meta?.page ?? 1,
+      limit: meta?.limit ?? 10,
+      pages: meta?.totalPages ?? meta?.pages ?? 1,
     },
   }
 }
 
 export const usersService = {
-  getUsers: async (params?: { page?: number; limit?: number; search?: string; status?: string }) => {
+  getUsers: async (params?: {
+    page?: number
+    limit?: number
+    search?: string
+    status?: string
+  }) => {
     const response = await api.get('/v1/admin/users', { params })
     return normalizeList(response.data)
   },
 
-  getUserById: async (id: string): Promise<UserDetail> => {
+  getUserById: async (id: string) => {
     const response = await api.get(`/v1/admin/users/${id}`)
-    const raw = response.data?.data ?? response.data
-    return { ...mapUser(raw), ...raw } as UserDetail
+    const payload = response.data?.data ?? response.data
+    return mapUser(payload)
   },
 
   suspendUser: async (id: string) => {
@@ -114,8 +93,9 @@ export const usersService = {
     return response.data?.data ?? response.data
   },
 
-  getSessions: async (id: string): Promise<UserSession[]> => {
+  getSessions: async (id: string) => {
     const response = await api.get(`/v1/admin/users/${id}/sessions`)
-    return response.data?.data ?? response.data ?? []
+    const payload = response.data?.data ?? response.data
+    return Array.isArray(payload) ? payload : payload?.sessions ?? []
   },
 }

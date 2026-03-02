@@ -73,8 +73,8 @@ const VendorRoomDetail = () => {
 
   const fetchRoom = async () => {
     try {
-      const response = await api.vendor.getRooms("");
-      const foundRoom = response.find((r: Room) => r.id === id);
+      const response = await api.get<any>(`/rooms/${id}`);
+      const foundRoom = response.data ?? response;
       if (foundRoom) {
         setRoom(foundRoom);
         setFormData({

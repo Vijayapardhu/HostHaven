@@ -5,34 +5,34 @@ import { ServiceBookingsController } from "../service-bookings/service-bookings.
 
 export default async function servicesRoutes(fastify: FastifyInstance) {
   const auth = (fastify as any).authenticate;
-  fastify.addHook("preHandler", auth);
 
-  // Public routes
+  // Public routes (no auth required)
   fastify.get("/", ServicesController.getAll);
+  fastify.get("/:id", ServicesController.getById);
 
-  // Service bookings - Public
-  fastify.post("/bookings", ServiceBookingsController.create);
-  fastify.get("/bookings/my", ServiceBookingsController.getMyBookings);
+  // Authenticated routes
+  fastify.post("/bookings", { preHandler: [auth] }, ServiceBookingsController.create);
+  fastify.get("/bookings/my", { preHandler: [auth] }, ServiceBookingsController.getMyBookings);
 
   // Service bookings - Admin only
   fastify.get(
     "/bookings/admin",
-    { preHandler: [requireRole("ADMIN")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServiceBookingsController.getAllForAdmin,
   );
   fastify.get(
     "/bookings/admin/:id",
-    { preHandler: [requireRole("ADMIN")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServiceBookingsController.getByIdForAdmin,
   );
   fastify.put(
     "/bookings/admin/:id/status",
-    { preHandler: [requireRole("ADMIN")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServiceBookingsController.updateStatus,
   );
   fastify.post(
     "/bookings/admin/:id/refund",
-    { preHandler: [requireRole("ADMIN")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServiceBookingsController.refund,
   );
 
@@ -47,7 +47,6 @@ export default async function servicesRoutes(fastify: FastifyInstance) {
     { preHandler: [auth, requireRole("ADMIN")] },
     ServicesController.create,
   );
-  fastify.get("/:id", ServicesController.getById);
   fastify.put(
     "/:id",
     { preHandler: [auth, requireRole("ADMIN")] },

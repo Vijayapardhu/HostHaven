@@ -59,10 +59,10 @@ const mapBooking = (booking: any): Booking => ({
   propertyId: booking.property?.id ?? booking.propertyId,
   property: booking.property
     ? {
-      id: booking.property.id,
-      name: booking.property.name,
-      type: booking.property.type?.toLowerCase() ?? 'hotel',
-    }
+        id: booking.property.id,
+        name: booking.property.name,
+        type: booking.property.type?.toLowerCase() ?? 'hotel',
+      }
     : undefined,
   roomTypeId: booking.roomTypeId ?? booking.room?.id,
   checkInDate: booking.checkInDate,
@@ -87,11 +87,11 @@ const normalizeList = (payload: any) => {
     data: Array.isArray(data) ? data.map(mapBooking) : [],
     pagination: meta
       ? {
-        total: meta.total ?? 0,
-        page: meta.page ?? 1,
-        limit: meta.limit ?? 10,
-        totalPages: meta.totalPages ?? meta.pages ?? 1,
-      }
+          total: meta.total ?? 0,
+          page: meta.page ?? 1,
+          limit: meta.limit ?? 10,
+          totalPages: meta.totalPages ?? meta.pages ?? 1,
+        }
       : { total: 0, page: 1, limit: 10, totalPages: 1 },
   }
 }
@@ -104,14 +104,12 @@ export const bookingsService = {
     status?: string
     userId?: string
     propertyId?: string
-    vendorId?: string
   }) => {
     const response = await api.get('/v1/admin/bookings', {
       params: {
         page: params?.page,
         limit: params?.limit,
         status: mapStatusToApi(params?.status),
-        vendorId: params?.vendorId,
       },
     })
     const normalized = normalizeList(response.data)
@@ -137,16 +135,21 @@ export const bookingsService = {
   getBookingById: async (id: string) => {
     const response = await api.get(`/v1/admin/bookings/${id}`)
     const payload = response.data?.data ?? response.data
-    return mapBooking({ ...payload, payment: undefined }) // We map payment separately if needed or just use raw hook
+    return mapBooking(payload)
   },
 
-  updateBookingStatus: async (bookingId: string, status: string) => {
-    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, { status })
+  cancelBooking: async (bookingId: string, reason?: string) => {
+    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, {
+      status: 'CANCELLED',
+      reason,
+    })
     return response.data?.data ?? response.data
   },
 
-  getPaymentDetails: async (bookingId: string) => {
-    const response = await api.get(`/v1/admin/bookings/${bookingId}/payment`)
+  confirmBooking: async (bookingId: string) => {
+    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, {
+      status: 'CONFIRMED',
+    })
     return response.data?.data ?? response.data
   },
 
@@ -158,7 +161,43 @@ export const bookingsService = {
     return response.data?.data ?? response.data
   },
 
+  checkIn: async (bookingId: string) => {
+    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, {
+      status: 'CHECKED_IN',
+    })
+    return response.data?.data ?? response.data
+  },
+
+  checkOut: async (bookingId: string) => {
+    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, {
+      status: 'CHECKED_OUT',
+    })
+    return response.data?.data ?? response.data
+  },
+
   exportBookings: async (params?: Record<string, any>) => {
-    throw new Error('Export bookings endpoint is not available on the backend')
+    const response = await api.get('/v1/admin/export/bookings', {
+      responseType: 'blob',
+      params,
+    })
+    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `bookings_export_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  },
+
+  getPaymentDetails: async (bookingId: string) => {
+    const response = await api.get(`/v1/admin/bookings/${bookingId}/payment`)
+    return response.data?.data ?? response.data
+  },
+
+  updateBookingStatus: async (bookingId: string, status: string) => {
+    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, { status })
+    return response.data?.data ?? response.data
   },
 }

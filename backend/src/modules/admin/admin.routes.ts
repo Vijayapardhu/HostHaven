@@ -12,6 +12,8 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   fastify.get('/analytics', AdminController.getAnalytics);
   fastify.get('/settings', AdminController.getSettings);
   fastify.put('/settings', AdminController.updateSettings);
+  fastify.get('/settings/homepage', AdminController.getHomepageConfig);
+  fastify.put('/settings/homepage', AdminController.updateHomepageConfig);
 
   fastify.get('/users', AdminController.getAllUsers);
   fastify.get('/users/:id', AdminController.getUserById);
@@ -64,6 +66,7 @@ export default async function adminRoutes(fastify: FastifyInstance) {
 
   // Review moderation
   fastify.get('/reviews', AdminController.adminGetAllReviews);
+  fastify.put('/reviews/:id', AdminController.adminUpdateReviewContent);
   fastify.put('/reviews/:id/hide', AdminController.adminHideReview);
   fastify.put('/reviews/:id/unhide', AdminController.adminUnhideReview);
   fastify.put('/reviews/:id/verify', AdminController.adminVerifyReview);

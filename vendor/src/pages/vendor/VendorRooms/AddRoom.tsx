@@ -38,7 +38,8 @@ const AddRoom = () => {
 
     setSubmitting(true);
     try {
-      await roomsService.createRoom(values.propertyId, {
+      await roomsService.createRoom({
+        propertyId: values.propertyId,
         name: values.name,
         type: values.type,
         description: values.description,

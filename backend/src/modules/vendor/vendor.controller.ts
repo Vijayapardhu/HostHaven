@@ -70,20 +70,6 @@ export const VendorController = {
     }
   },
 
-  async getAnalytics(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const vendorId = (request as any).user.vendorId;
-      const analytics = await vendorService.getAnalytics(vendorId);
-      return sendSuccess(reply, analytics);
-    } catch (error: any) {
-      logger.error({ error }, 'Get vendor analytics failed');
-      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
-        return sendError(reply, error.code, error.message, 404);
-      }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch analytics', 500);
-    }
-  },
-
   async getProfile(request: FastifyRequest, reply: FastifyReply) {
     try {
       const vendorId = (request as any).user.vendorId;
@@ -120,60 +106,97 @@ export const VendorController = {
     }
   },
 
-  async getHotel(request: FastifyRequest, reply: FastifyReply) {
+  async getEarningsSummary(request: FastifyRequest, reply: FastifyReply) {
     try {
       const vendorId = (request as any).user.vendorId;
-      const hotel = await vendorService.getHotel(vendorId);
-      return sendSuccess(reply, hotel);
+
+      const summary = await vendorService.getEarningsSummary(vendorId);
+
+      return sendSuccess(reply, summary);
     } catch (error: any) {
-      logger.error({ error }, 'Get vendor hotel failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch hotel', 500);
+      logger.error({ error }, 'Get vendor earnings summary failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch earnings summary', 500);
     }
   },
 
-  async updateHotel(request: FastifyRequest, reply: FastifyReply) {
+  async getPayoutHistory(request: FastifyRequest, reply: FastifyReply) {
     try {
       const vendorId = (request as any).user.vendorId;
-      const data = request.body as any; // We can parse using a Zod schema if available
-      const hotel = await vendorService.updateHotel(vendorId, data);
-      return sendSuccess(reply, hotel);
+      const query = request.query as { page?: string; limit?: string; status?: string };
+
+      const result = await vendorService.getPayoutHistory(vendorId, {
+        page: query.page ? parseInt(query.page) : undefined,
+        limit: query.limit ? parseInt(query.limit) : undefined,
+        status: query.status,
+      });
+
+      return sendSuccess(reply, result.payouts, 200, result.meta);
     } catch (error: any) {
-      logger.error({ error }, 'Update vendor hotel failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update hotel', 500);
+      logger.error({ error }, 'Get vendor payout history failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch payout history', 500);
     }
   },
 
-  async uploadHotelImage(request: FastifyRequest, reply: FastifyReply) {
+  async blockInventoryDate(request: FastifyRequest, reply: FastifyReply) {
     try {
       const vendorId = (request as any).user.vendorId;
-      const data = await request.file();
-      if (!data) {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'No file uploaded', 400);
+      const body = request.body as { roomTypeId: string; date: string; reason?: string };
+
+      const result = await vendorService.blockInventoryDate(vendorId, body);
+
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Vendor block inventory date failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
       }
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to block date', 500);
+    }
+  },
 
-      const fileUpload = {
-        filename: data.filename,
-        data: await data.toBuffer(),
-        mimetype: data.mimetype,
+  async unblockInventoryDate(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const vendorId = (request as any).user.vendorId;
+      const body = request.body as { roomTypeId: string; date: string };
+
+      const result = await vendorService.unblockInventoryDate(vendorId, body);
+
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Vendor unblock inventory date failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to unblock date', 500);
+    }
+  },
+
+  async blockInventoryDates(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const vendorId = (request as any).user.vendorId;
+      const body = request.body as {
+        roomId?: string;
+        propertyId?: string;
+        startDate: string;
+        endDate: string;
+        reason?: string;
       };
 
-      const result = await vendorService.uploadHotelImage(vendorId, fileUpload);
-      return sendSuccess(reply, result, 201);
-    } catch (error: any) {
-      logger.error({ error }, 'Upload hotel image failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to upload image', 500);
-    }
-  },
+      const result = await vendorService.blockInventoryDates(vendorId, body);
 
-  async deleteHotelImage(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const vendorId = (request as any).user.vendorId;
-      const { imgId } = request.params as any;
-      await vendorService.deleteHotelImage(vendorId, imgId);
-      return sendSuccess(reply, { success: true });
+      return sendSuccess(reply, result);
     } catch (error: any) {
-      logger.error({ error }, 'Delete hotel image failed');
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to delete image', 500);
+      logger.error({ error }, 'Vendor block inventory dates failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to block dates', 500);
     }
   },
 };
@@ -233,86 +256,6 @@ export const AdminVendorController = {
         return sendError(reply, ERROR_CODES.VALIDATION_ERROR, error.message || 'Invalid input data', 400);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to create onboarding vendor', 500);
-    }
-  },
-};
-
-export const VendorRoomsController = {
-  async getRoomsByProperty(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const vendorId = (request as any).user.vendorId;
-      const { propertyId } = request.params as any;
-
-      const rooms = await vendorService.getRoomsByProperty(vendorId, propertyId);
-      return sendSuccess(reply, rooms);
-    } catch (error: any) {
-      logger.error({ error }, 'Get vendor property rooms failed');
-      if (error.code === ERROR_CODES.UNAUTHORIZED || error.message === 'Unauthorized') {
-        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Unauthorized', 403);
-      }
-      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
-        return sendError(reply, error.code, error.message, 404);
-      }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch rooms', 500);
-    }
-  },
-
-  async createRoom(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const vendorId = (request as any).user.vendorId;
-      const { propertyId } = request.params as any;
-      const data = request.body as any;
-
-      const room = await vendorService.createRoom(vendorId, propertyId, data);
-      return sendSuccess(reply, room, 201);
-    } catch (error: any) {
-      logger.error({ error }, 'Create vendor property room failed');
-      if (error.code === ERROR_CODES.UNAUTHORIZED || error.message === 'Unauthorized') {
-        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Unauthorized', 403);
-      }
-      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
-        return sendError(reply, error.code, error.message, 404);
-      }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to create room', 500);
-    }
-  },
-
-  async updateRoom(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const vendorId = (request as any).user.vendorId;
-      const { propertyId, roomId } = request.params as any;
-      const data = request.body as any;
-
-      const room = await vendorService.updateRoom(vendorId, propertyId, roomId, data);
-      return sendSuccess(reply, room);
-    } catch (error: any) {
-      logger.error({ error }, 'Update vendor property room failed');
-      if (error.code === ERROR_CODES.UNAUTHORIZED || error.message === 'Unauthorized') {
-        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Unauthorized', 403);
-      }
-      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
-        return sendError(reply, error.code, error.message, 404);
-      }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update room', 500);
-    }
-  },
-
-  async deleteRoom(request: FastifyRequest, reply: FastifyReply) {
-    try {
-      const vendorId = (request as any).user.vendorId;
-      const { propertyId, roomId } = request.params as any;
-
-      await vendorService.deleteRoom(vendorId, propertyId, roomId);
-      return sendSuccess(reply, { success: true });
-    } catch (error: any) {
-      logger.error({ error }, 'Delete vendor property room failed');
-      if (error.code === ERROR_CODES.UNAUTHORIZED || error.message === 'Unauthorized') {
-        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Unauthorized', 403);
-      }
-      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
-        return sendError(reply, error.code, error.message, 404);
-      }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to delete room', 500);
     }
   },
 };

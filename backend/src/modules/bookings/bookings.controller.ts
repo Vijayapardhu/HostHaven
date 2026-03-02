@@ -129,7 +129,7 @@ export const BookingsController = {
       const query = bookingFilterSchema.parse(request.query);
       const user = (request as any).user;
 
-      const result = await bookingsService.getVendorBookings(user.id, {
+      const result = await bookingsService.getVendorBookings(user.vendorId, {
         page: query.page,
         limit: query.limit,
         status: query.status,
@@ -158,7 +158,7 @@ export const BookingsController = {
         adults: number;
         children?: number;
         totalAmount: number;
-        paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'ONLINE';
+        paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'RAZORPAY';
         isOnline?: boolean;
       };
 
@@ -166,7 +166,7 @@ export const BookingsController = {
         ...data,
         checkInDate: new Date(data.checkInDate),
         checkOutDate: new Date(data.checkOutDate),
-        vendorId: user.id,
+        vendorId: user.vendorId,
       });
 
       return sendSuccess(reply, result, 201);
@@ -184,7 +184,7 @@ export const BookingsController = {
       const { id } = bookingIdSchema.parse(request.params);
       const user = (request as any).user;
 
-      const result = await bookingsService.checkIn(id, user.id);
+      const result = await bookingsService.checkIn(id, user.vendorId);
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Check in failed');
@@ -200,7 +200,7 @@ export const BookingsController = {
       const { id } = bookingIdSchema.parse(request.params);
       const user = (request as any).user;
 
-      const result = await bookingsService.checkOut(id, user.id);
+      const result = await bookingsService.checkOut(id, user.vendorId);
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Check out failed');

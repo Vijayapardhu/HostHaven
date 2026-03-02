@@ -2,7 +2,7 @@ import api from "@/lib/api";
 
 export const supportService = {
   getMyTickets: async (params?: Record<string, string>) => {
-    const response = await api.get("/v1/vendor/support/tickets", { params });
+    const response = await api.get("/v1/support/tickets/my", { params });
     return response.data;
   },
 
@@ -12,7 +12,7 @@ export const supportService = {
     bookingReference?: string;
     attachmentUrl?: string;
   }) => {
-    const response = await api.post("/v1/vendor/support/tickets", data);
+    const response = await api.post("/v1/support/tickets", data);
     return response.data;
   },
 };

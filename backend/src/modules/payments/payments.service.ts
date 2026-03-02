@@ -5,6 +5,7 @@ import { config } from '../../config';
 import { logger } from '../../utils/logger.util';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { sendEmail } from '../../services/email.service';
+import { Prisma } from '@prisma/client';
 
 const razorpay = new Razorpay({
   key_id: config.razorpay.keyId,
@@ -249,7 +250,7 @@ export class PaymentsService {
           prisma.refund.create({
             data: {
               paymentId: payment.id,
-              amount: new (prisma as any).Decimal(refundAmount),
+              amount: new Prisma.Decimal(refundAmount),
               status: event === 'refund.processed' ? 'processed' : 'initiated',
               razorpayRefundId: paymentEntity.id,
             },

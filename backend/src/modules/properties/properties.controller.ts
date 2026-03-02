@@ -75,7 +75,7 @@ export const PropertiesController = {
 
       const property = await propertiesService.create({
         ...data,
-        vendorId: user.role === 'VENDOR' ? user.id : undefined,
+        vendorId: user.role === 'VENDOR' ? user.vendorId : undefined,
       });
 
       return sendSuccess(reply, property, 201);

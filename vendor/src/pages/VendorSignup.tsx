@@ -30,7 +30,7 @@ const VendorSignup = () => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await api.post("/vendor/register", {
+            await api.post("/v1/vendor/register", {
                 name: formData.name,
                 email: formData.email,
                 password: formData.password,

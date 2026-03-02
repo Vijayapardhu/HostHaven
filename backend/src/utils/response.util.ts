@@ -13,6 +13,7 @@ export interface ApiResponse<T> {
     limit: number;
     total: number;
     totalPages: number;
+    [key: string]: any;
   };
   timestamp: string;
   requestId?: string;

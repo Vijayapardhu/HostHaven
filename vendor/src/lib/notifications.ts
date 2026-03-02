@@ -7,12 +7,12 @@ export const notificationsService = {
   },
 
   markRead: async (id: string) => {
-    const response = await api.patch(`/v1/vendor/notifications/${id}/read`);
+    const response = await api.put(`/v1/vendor/notifications/${id}/read`);
     return response.data;
   },
 
   markAllRead: async () => {
-    const response = await api.patch("/v1/vendor/notifications/read-all");
+    const response = await api.put("/v1/vendor/notifications/read-all");
     return response.data;
   },
 };

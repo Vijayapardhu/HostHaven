@@ -10,8 +10,19 @@ interface ApiResponse<T> {
   };
 }
 
+interface RazorpayResponse {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
 class ApiService {
   private baseUrl: string;
+  push!: {
+    getVapidKey: () => Promise<{ publicKey: string }>;
+    subscribe: (subscription: any) => Promise<{ message: string }>;
+    unsubscribe: (endpoint: string) => Promise<{ message: string }>;
+  };
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -75,11 +86,15 @@ class ApiService {
     return this.handleResponse<T>(response);
   }
 
-  async delete<T>(endpoint: string, includeAuth: boolean = true): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+  async delete<T>(endpoint: string, includeAuth: boolean = true, body?: unknown): Promise<T> {
+    const options: RequestInit = {
       method: 'DELETE',
       headers: this.getHeaders(includeAuth),
-    });
+    };
+    if (body !== undefined) {
+      options.body = JSON.stringify(body);
+    }
+    const response = await fetch(`${this.baseUrl}${endpoint}`, options);
 
     return this.handleResponse<T>(response);
   }
@@ -132,7 +147,7 @@ class ApiService {
       this.post<{ message: string }>('/auth/reset-password', { token, password }),
 
     linkGoogle: (idToken: string) =>
-      this.post<{ message: string }>('/auth/link-google', { idToken }),
+      this.post<{ message: string }>('/auth/link-google', { idToken }, true),
 
     unlinkGoogle: () =>
       this.delete<{ message: string }>('/auth/unlink-google'),
@@ -246,7 +261,7 @@ class ApiService {
       this.get<{ items: any[] }>('/wishlist'),
 
     add: (itemType: string, itemId: string) =>
-      this.post<{ item: any }>('/wishlist', { itemType, itemId }),
+      this.post<{ item: any }>('/wishlist', { itemType, itemId }, true),
 
     remove: (id: string) =>
       this.delete<{ success: boolean }>(`/wishlist/${id}`),
@@ -311,7 +326,7 @@ class ApiService {
       this.get<any>(`/properties/${id}`),
 
     createProperty: (data: any) =>
-      this.post<any>('/properties', data),
+      this.post<any>('/properties', data, true),
 
     updateProperty: (id: string, data: any) =>
       this.put<any>(`/properties/${id}`, data),
@@ -323,7 +338,7 @@ class ApiService {
       this.get<any>(`/rooms/property/${propertyId}`),
 
     createRoom: (data: any) =>
-      this.post<any>('/rooms', data),
+      this.post<any>('/rooms', data, true),
 
     updateRoom: (id: string, data: any) =>
       this.put<any>(`/rooms/${id}`, data),
@@ -339,8 +354,12 @@ class ApiService {
     getBookingById: (id: string) =>
       this.get<any>(`/bookings/${id}`),
 
-    updateBookingStatus: (id: string, status: string) =>
-      this.put<any>(`/bookings/${id}/status`, { status }),
+    updateBookingStatus: (id: string, status: string) => {
+      if (status === 'CHECKED_IN') return this.put<any>(`/bookings/vendor/${id}/check-in`);
+      if (status === 'CHECKED_OUT') return this.put<any>(`/bookings/vendor/${id}/check-out`);
+      if (status === 'CANCELLED') return this.put<any>(`/bookings/${id}/cancel`, { reason: 'Cancelled by vendor' });
+      return this.put<any>(`/bookings/${id}/cancel`, { reason: status });
+    },
 
     quickBooking: (data: {
       propertyId: string;
@@ -355,7 +374,7 @@ class ApiService {
       totalAmount: number;
       paymentMethod: 'CASH' | 'CARD' | 'UPI' | 'ONLINE';
       isOnline?: boolean;
-    }) => this.post<any>('/bookings/vendor/quick-booking', data),
+    }) => this.post<any>('/bookings/vendor/quick-booking', data, true),
 
     checkIn: (id: string) =>
       this.put<any>(`/bookings/vendor/${id}/check-in`),
@@ -386,10 +405,10 @@ class ApiService {
       this.get<any>(`/reviews/property/${propertyId}`),
 
     getTempleDetails: (propertyId: string) =>
-      this.get<any>(`/temples/property/${propertyId}`),
+      this.get<any>(`/temples/${propertyId}`),
 
     updateTempleDetails: (propertyId: string, data: any) =>
-      this.put<any>(`/temples/property/${propertyId}`, data),
+      this.put<any>(`/temples/${propertyId}`, data),
 
     uploadImage: async (file: File, folder: string = 'hosthaven') => {
       const formData = new FormData();
@@ -469,10 +488,10 @@ api.push = {
     api.get<{ publicKey: string }>('/push/vapid-key', false),
 
   subscribe: (subscription: any) =>
-    api.post<{ message: string }>('/push/subscribe', subscription),
+    api.post<{ message: string }>('/push/subscribe', subscription, true),
 
   unsubscribe: (endpoint: string) =>
-    api.delete<{ message: string }>('/push/unsubscribe', { endpoint }),
+    api.delete<{ message: string }>('/push/unsubscribe', true, { endpoint }),
 };
 
 export default api;

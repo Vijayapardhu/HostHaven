@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { VendorController, AdminVendorController, VendorRoomsController } from './vendor.controller';
+import { VendorController, AdminVendorController } from './vendor.controller';
 import { requireRole } from '../../middleware/auth.middleware';
 import { PropertiesController } from '../properties/properties.controller';
 import { NotificationsController } from '../notifications/notifications.controller';
@@ -18,12 +18,6 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
   );
 
   fastify.get(
-    '/analytics',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorController.getAnalytics
-  );
-
-  fastify.get(
     '/profile',
     { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
     VendorController.getProfile
@@ -35,58 +29,42 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
     VendorController.updateProfile
   );
 
+  // Vendor earnings
+  fastify.get(
+    '/earnings/summary',
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    VendorController.getEarningsSummary
+  );
+
+  fastify.get(
+    '/earnings/payouts',
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    VendorController.getPayoutHistory
+  );
+
+  // Vendor inventory management
+  fastify.post(
+    '/inventory/block-date',
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    VendorController.blockInventoryDate
+  );
+
+  fastify.post(
+    '/inventory/unblock-date',
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    VendorController.unblockInventoryDate
+  );
+
+  fastify.post(
+    '/inventory/block-dates',
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    VendorController.blockInventoryDates
+  );
+
   fastify.get(
     '/properties',
     { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
     PropertiesController.getVendorProperties
-  );
-
-  fastify.get(
-    '/hotel',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorController.getHotel
-  );
-
-  fastify.put(
-    '/hotel',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorController.updateHotel
-  );
-
-  fastify.post(
-    '/hotel/images',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorController.uploadHotelImage
-  );
-
-  fastify.delete(
-    '/hotel/images/:imgId',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorController.deleteHotelImage
-  );
-
-  fastify.get(
-    '/properties/:propertyId/rooms',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorRoomsController.getRoomsByProperty
-  );
-
-  fastify.post(
-    '/properties/:propertyId/rooms',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorRoomsController.createRoom
-  );
-
-  fastify.put(
-    '/properties/:propertyId/rooms/:roomId',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorRoomsController.updateRoom
-  );
-
-  fastify.delete(
-    '/properties/:propertyId/rooms/:roomId',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    VendorRoomsController.deleteRoom
   );
 
   fastify.get(
@@ -95,13 +73,13 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
     NotificationsController.getUserNotifications
   );
 
-  fastify.patch(
+  fastify.put(
     '/notifications/:id/read',
     { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
     NotificationsController.markAsRead
   );
 
-  fastify.patch(
+  fastify.put(
     '/notifications/read-all',
     { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
     NotificationsController.markAllAsRead

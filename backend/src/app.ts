@@ -22,10 +22,10 @@ import adminRoutes from "./modules/admin/admin.routes";
 import uploadsRoutes from "./modules/uploads/uploads.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
 import servicesRoutes from "./modules/services/services.routes";
-import serviceBookingsRoutes from "./modules/service-bookings/service-bookings.routes";
 import supportRoutes from "./modules/support/support.routes";
 import pushRoutes from "./modules/push/push.routes";
 import inventoryRoutes from "./modules/inventory/inventory.routes";
+import adminService from "./modules/admin/admin.service";
 
 export const buildApp = async () => {
   const fastify = Fastify({
@@ -155,6 +155,16 @@ export const buildApp = async () => {
     timestamp: new Date().toISOString(),
     version: config.app.apiVersion,
   }));
+
+  // Public homepage config endpoint (no auth)
+  fastify.get(`/${config.app.apiVersion}/settings/homepage`, async (request, reply) => {
+    try {
+      const homepageConfig = await adminService.getHomepageConfig();
+      return { success: true, data: homepageConfig };
+    } catch (error) {
+      return { success: true, data: null };
+    }
+  });
 
   // API routes
   await fastify.register(authRoutes, {

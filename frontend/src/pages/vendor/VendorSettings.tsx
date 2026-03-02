@@ -117,7 +117,7 @@ const VendorSettings = () => {
       await api.post("/auth/change-password", {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword,
-      });
+      }, true);
       toast({ title: "Password updated successfully" });
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (error: any) {

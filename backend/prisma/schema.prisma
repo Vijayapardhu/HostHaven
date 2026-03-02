@@ -883,6 +883,7 @@ model PlatformSetting {
   payoutFrequency    PayoutFrequency @default(WEEKLY)
   emailTemplates     Json?
   featureFlags       Json?
+  homepageConfig     Json?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 

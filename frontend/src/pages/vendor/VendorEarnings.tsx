@@ -11,22 +11,39 @@ interface Payout {
   amount: number;
   status: string;
   createdAt: string;
+  processedAt?: string;
+}
+
+interface EarningsSummary {
+  totalRevenue: number;
+  pendingCommissions: { amount: number; commissionAmount: number; count: number };
+  paidCommissions: { amount: number; commissionAmount: number; count: number };
+  completedPayouts: { amount: number; count: number };
+  pendingPayouts: { amount: number; count: number };
+  recentPayouts: Payout[];
 }
 
 const VendorEarnings = () => {
   const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchPayouts();
+    fetchEarnings();
   }, []);
 
-  const fetchPayouts = async () => {
+  const fetchEarnings = async () => {
     setIsLoading(true);
     try {
-      setPayouts([]);
+      const [summaryData, payoutsData] = await Promise.all([
+        api.get<EarningsSummary>("/vendor/earnings/summary"),
+        api.get<{ payouts: Payout[] }>("/vendor/earnings/payouts"),
+      ]);
+      setSummary(summaryData);
+      const payoutsList = (payoutsData as any)?.payouts ?? payoutsData;
+      setPayouts(Array.isArray(payoutsList) ? payoutsList : []);
     } catch (error) {
-      console.error("Failed to fetch payouts:", error);
+      console.error("Failed to fetch earnings:", error);
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +68,7 @@ const VendorEarnings = () => {
               </span>
             </div>
             <div className="mt-4">
-              <p className="text-3xl font-bold">₹0</p>
+              <p className="text-3xl font-bold">₹{(summary?.totalRevenue ?? 0).toLocaleString()}</p>
               <p className="text-sm text-muted-foreground">Total Earnings</p>
             </div>
           </CardContent>
@@ -65,7 +82,7 @@ const VendorEarnings = () => {
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-3xl font-bold">₹0</p>
+              <p className="text-3xl font-bold">₹{(summary?.paidCommissions?.amount ?? 0).toLocaleString()}</p>
               <p className="text-sm text-muted-foreground">This Month</p>
             </div>
           </CardContent>
@@ -82,7 +99,7 @@ const VendorEarnings = () => {
               </span>
             </div>
             <div className="mt-4">
-              <p className="text-3xl font-bold">₹0</p>
+              <p className="text-3xl font-bold">₹{(summary?.pendingPayouts?.amount ?? 0).toLocaleString()}</p>
               <p className="text-sm text-muted-foreground">Pending Payouts</p>
             </div>
           </CardContent>
@@ -96,8 +113,8 @@ const VendorEarnings = () => {
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-3xl font-bold">₹0</p>
-              <p className="text-sm text-muted-foreground">Commission (10%)</p>
+              <p className="text-3xl font-bold">₹{(summary?.pendingCommissions?.commissionAmount ?? 0).toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">Commission ({summary?.pendingCommissions?.count ?? 0} bookings)</p>
             </div>
           </CardContent>
         </Card>
