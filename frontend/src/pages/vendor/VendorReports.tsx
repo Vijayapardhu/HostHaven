@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface ReportData {
   totalBookings: number;
@@ -72,7 +72,7 @@ const VendorReports = () => {
         endDate: endDate.toISOString().split("T")[0],
       });
 
-      const bookings = response.bookings || [];
+      const bookings = response.data || [];
       
       const totalRevenue = bookings.reduce((sum: number, b: any) => sum + (b.totalAmount || 0), 0);
       const totalGuests = bookings.reduce((sum: number, b: any) => sum + (b.adults || 0) + (b.children || 0), 0);

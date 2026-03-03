@@ -115,25 +115,52 @@ export class AdminService {
   }
 
   async getHomepageConfig() {
-    const settings = await prisma.platformSetting.findFirst({
-      select: { homepageConfig: true },
-    });
-    return settings?.homepageConfig ?? DEFAULT_HOMEPAGE_CONFIG;
+    try {
+      const settings = await prisma.platformSetting.findFirst({
+        select: { homepageConfig: true },
+      });
+      return settings?.homepageConfig ?? DEFAULT_HOMEPAGE_CONFIG;
+    } catch {
+      return DEFAULT_HOMEPAGE_CONFIG;
+    }
   }
 
   async updateHomepageConfig(config: Record<string, unknown>) {
-    const existing = await prisma.platformSetting.findFirst();
+    let existing = await prisma.platformSetting.findFirst();
     if (!existing) {
-      const error = new Error('Platform settings not initialized. Save general settings first.');
-      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
-      throw error;
+      existing = await prisma.platformSetting.create({
+        data: {
+          platformName: 'HostHaven',
+          commissionRate: new Prisma.Decimal(15),
+          supportEmail: 'support@hosthaven.com',
+          supportPhone: '+91 1800 123 4567',
+          emailNotifications: true,
+          pushNotifications: true,
+          minPayoutAmount: new Prisma.Decimal(1000),
+          payoutFrequency: 'WEEKLY',
+          emailTemplates: [],
+          featureFlags: [],
+          homepageConfig: config as Prisma.InputJsonValue,
+        },
+      });
+      logger.info({ settingsId: existing.id }, 'Homepage config created with new platform settings');
+      return existing.homepageConfig;
     }
-    const updated = await prisma.platformSetting.update({
-      where: { id: existing.id },
-      data: { homepageConfig: config as Prisma.InputJsonValue },
-    });
-    logger.info({ settingsId: updated.id }, 'Homepage config updated');
-    return updated.homepageConfig;
+    try {
+      const updated = await prisma.platformSetting.update({
+        where: { id: existing.id },
+        data: { homepageConfig: config as Prisma.InputJsonValue },
+      });
+      logger.info({ settingsId: updated.id }, 'Homepage config updated');
+      return updated.homepageConfig;
+    } catch (err: any) {
+      if (err.message?.includes('homepageConfig')) {
+        const error = new Error('homepageConfig column not found. Run: npx prisma db push');
+        (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+        throw error;
+      }
+      throw err;
+    }
   }
 
   async getDashboard() {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface VendorUser {
   id: string;

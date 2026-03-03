@@ -3,13 +3,33 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import heritageImage from "@/assets/heritage-welcome.jpg";
 
-const HeritageBanner = () => {
+interface HeritageBannerConfig {
+  title?: string;
+  highlightText?: string;
+  subtitle?: string;
+  ctaText?: string;
+  ctaLink?: string;
+  image?: string;
+}
+
+interface HeritageBannerProps {
+  config?: HeritageBannerConfig;
+}
+
+const HeritageBanner = ({ config }: HeritageBannerProps) => {
+  const title = config?.title || "Experience Traditional";
+  const highlight = config?.highlightText || "Andhra Hospitality";
+  const subtitle = config?.subtitle || "Discover the warmth of our heritage through authentic stays, divine temple visits, and unforgettable cultural experiences.";
+  const ctaText = config?.ctaText || "Explore Stays";
+  const ctaLink = config?.ctaLink || "/hotels";
+  const image = config?.image || heritageImage;
+
   return (
     <section className="py-12">
       <div className="container mx-auto px-4">
         <div className="relative rounded-3xl overflow-hidden">
           <img
-            src={heritageImage}
+            src={image}
             alt="Andhra Heritage Welcome"
             className="w-full h-[300px] md:h-[400px] object-cover"
           />
@@ -18,16 +38,15 @@ const HeritageBanner = () => {
             <div className="container mx-auto px-8 md:px-12">
               <div className="max-w-lg">
                 <h2 className="text-2xl md:text-4xl font-serif font-bold text-cream-light mb-4">
-                  Experience Traditional{" "}
-                  <span className="text-gold-light">Andhra Hospitality</span>
+                  {title}{" "}
+                  <span className="text-gold-light">{highlight}</span>
                 </h2>
                 <p className="text-cream-light/80 mb-6 text-sm md:text-base">
-                  Discover the warmth of our heritage through authentic stays, 
-                  divine temple visits, and unforgettable cultural experiences.
+                  {subtitle}
                 </p>
-                <Link to="/hotels">
+                <Link to={ctaLink}>
                   <Button variant="gold" size="lg">
-                    Explore Stays
+                    {ctaText}
                     <ArrowRight className="w-5 h-5" />
                   </Button>
                 </Link>

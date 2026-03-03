@@ -31,17 +31,17 @@ export const buildApp = async () => {
   const fastify = Fastify({
     logger: isDevelopment
       ? {
-          level: config.logging.level,
-          transport: {
-            target: "pino-pretty",
-            options: {
-              colorize: true,
-              levelFirst: true,
-              translateTime: "SYS:standard",
-              ignore: "pid,hostname",
-            },
+        level: config.logging.level,
+        transport: {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            levelFirst: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
           },
-        }
+        },
+      }
       : { level: config.logging.level },
     requestIdHeader: "x-request-id",
     requestIdLogLabel: "requestId",
@@ -61,15 +61,15 @@ export const buildApp = async () => {
   await fastify.register(helmet, {
     contentSecurityPolicy: isProduction
       ? {
-          directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            scriptSrc: ["'self'"],
-            connectSrc: ["'self'", config.app.frontendUrl],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-          },
-        }
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          scriptSrc: ["'self'"],
+          connectSrc: ["'self'", config.app.frontendUrl],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        },
+      }
       : false,
     crossOriginEmbedderPolicy: false,
   });
@@ -97,6 +97,8 @@ export const buildApp = async () => {
       "Authorization",
       "X-Requested-With",
       "X-Request-Id",
+      "Cache-Control",
+      "Pragma",
     ],
   });
 

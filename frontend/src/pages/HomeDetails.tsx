@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Star, MapPin, Bed, Users, ArrowLeft, Calendar as CalendarIcon, Wifi, CalendarDays, Minus, Plus } from "lucide-react";
+import {
+  Star, MapPin, Bed, Users, ArrowLeft, Calendar as CalendarIcon,
+  Wifi, CalendarDays, Minus, Plus, Maximize, PlayCircle, Eye,
+  ShoppingBag, ShieldCheck, CheckCircle2, ChevronRight, Wind,
+  Coffee, Tv, Snowflake, Info
+} from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createBookingPayment } from "@/lib/razorpay";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Drawer,
@@ -18,12 +23,27 @@ import {
   DrawerFooter,
 } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface PropertyRoom {
   id: string;
   name: string;
-  pricePerNight: number;
+  description?: string;
+  type: string;
   capacity: number;
+  extraBedCapacity: number;
+  sizeSqm?: number;
+  pricePerNight: number;
+  weekendPrice?: number;
+  amenities: string[];
+  images?: Array<{ url: string; alt?: string; isPrimary?: boolean }>;
+}
+
+interface CancellationPolicy {
+  freeBeforeHours: number;
+  refundPercentBefore: number;
+  refundPercentAfter: number;
 }
 
 interface PropertyData {
@@ -32,13 +52,23 @@ interface PropertyData {
   address: string;
   city: string;
   state: string;
+  pincode?: string;
   basePrice: number;
+  currency?: string;
   rating: number;
   reviewCount: number;
+  bookingCount?: number;
+  viewCount?: number;
   description: string;
+  shortDesc?: string;
   images: Array<{ url: string; alt?: string; isPrimary?: boolean }>;
+  videos?: Array<{ url: string; title?: string }>;
+  virtualTourUrl?: string;
   amenities: string[];
+  highlights?: string[];
+  featureFlags?: any;
   rooms?: PropertyRoom[];
+  cancellationPolicy?: CancellationPolicy;
   reviews?: Array<{
     id: string;
     rating: number;
@@ -50,6 +80,16 @@ interface PropertyData {
   longitude?: number;
 }
 
+const getAmenityIcon = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes("wifi") || n.includes("internet")) return <Wifi className="w-5 h-5" />;
+  if (n.includes("ac") || n.includes("air")) return <Snowflake className="w-5 h-5" />;
+  if (n.includes("tv") || n.includes("television")) return <Tv className="w-5 h-5" />;
+  if (n.includes("coffee") || n.includes("tea")) return <Coffee className="w-5 h-5" />;
+  if (n.includes("wind")) return <Wind className="w-5 h-5" />;
+  return <CheckCircle2 className="w-5 h-5" />;
+};
+
 const HomeDetails = () => {
   const { id } = useParams();
   const [home, setHome] = useState<PropertyData | null>(null);
@@ -59,16 +99,19 @@ const HomeDetails = () => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const autoScrollInterval = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Booking state
   const [checkIn, setCheckIn] = useState<Date>();
   const [checkOut, setCheckOut] = useState<Date>();
-  const [guests, setGuests] = useState(2);
+  const [guests, setGuests] = useState(1);
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [isCheckOutOpen, setIsCheckOutOpen] = useState(false);
   const [isGuestsOpen, setIsGuestsOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { toast } = useToast();
+
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   // Calculate nights
   const calculateNights = () => {
@@ -87,25 +130,20 @@ const HomeDetails = () => {
 
   const rooms = useMemo(() => home?.rooms || [], [home]);
 
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
   const updateGuests = (delta: number) => {
     const maxGuests = rooms.length
-      ? Math.max(...rooms.map((room) => room.capacity))
+      ? Math.max(...rooms.map((room) => room.capacity + (room.extraBedCapacity || 0)))
       : 4;
     setGuests((prev) => Math.max(1, Math.min(maxGuests, prev + delta)));
   };
 
   const handleBooking = async () => {
-    // Check if user is logged in
     if (!isAuthenticated) {
       toast({
         title: "Login Required",
         description: "Please login to book this property",
         variant: "destructive",
       });
-      // Redirect to login page after a short delay
       setTimeout(() => {
         navigate("/login", { state: { from: window.location.pathname } });
       }, 1500);
@@ -121,25 +159,18 @@ const HomeDetails = () => {
       return;
     }
 
-    if (!home) {
-      toast({
-        title: "Home Unavailable",
-        description: "Home details are not available right now.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!home) return;
 
     setIsProcessingPayment(true);
     let bookingId: string | undefined;
-    
+
     try {
       const totalAmount = home.basePrice * nights;
       const checkInIso = checkIn.toISOString();
       const checkOutIso = checkOut.toISOString();
       const roomId = rooms[0]?.id;
       let lockAcquired = false;
-      
+
       if (roomId) {
         await api.inventory.lock({
           roomId,
@@ -178,16 +209,12 @@ const HomeDetails = () => {
         checkOut: format(checkOut, "MMM dd, yyyy"),
         guests: guests,
         orderId: order.orderId,
-        notes: {
-          propertyId: home.id,
-          roomId: roomId || "",
-        },
+        notes: { propertyId: home.id, roomId: roomId || "" },
       });
 
       if (result.success) {
         const resp = result.response as any;
         if (resp?.razorpay_order_id && resp?.razorpay_payment_id && resp?.razorpay_signature) {
-          const resp = result.response as any;
           await api.payments.verify({
             razorpay_order_id: resp.razorpay_order_id,
             razorpay_payment_id: resp.razorpay_payment_id,
@@ -196,48 +223,21 @@ const HomeDetails = () => {
         }
         toast({
           title: "Booking Successful! 🎉",
-          description: `Your booking for ${home.name} has been confirmed. Payment ID: ${result.paymentId}`,
+          description: `Your booking for ${home.name} has been confirmed.`,
         });
-        
-        // Reset booking form
-        setCheckIn(undefined);
-        setCheckOut(undefined);
-        setGuests(1);
       } else {
         if (bookingId) {
-          const cancelResult = await api.bookings.cancel(bookingId, "Payment failed");
-          toast({
-            title: "Booking Cancelled",
-            description: cancelResult?.booking?.status
-              ? `Booking status updated to ${cancelResult.booking.status}.`
-              : "Booking was cancelled due to payment failure.",
-          });
+          await api.bookings.cancel(bookingId, "Payment failed");
         }
         if (lockAcquired && roomId) {
           await api.inventory.release({ roomId });
         }
-        toast({
-          title: "Payment Failed",
-          description: result.error || "Unable to process payment. Please try again.",
-          variant: "destructive",
-        });
+        throw new Error(result.error || "Payment failed");
       }
-    } catch (error) {
-      if (rooms[0]?.id) {
-        await api.inventory.release({ roomId: rooms[0].id });
-      }
-      if (typeof bookingId === "string") {
-        const cancelResult = await api.bookings.cancel(bookingId, "Payment failed");
-        toast({
-          title: "Booking Cancelled",
-          description: cancelResult?.booking?.status
-            ? `Booking status updated to ${cancelResult.booking.status}.`
-            : "Booking was cancelled due to payment failure.",
-        });
-      }
+    } catch (error: any) {
       toast({
-        title: "Booking Error",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Payment Error",
+        description: error.message || "Unable to process payment. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -249,7 +249,6 @@ const HomeDetails = () => {
     const fetchHome = async () => {
       if (!id) return;
       setIsLoading(true);
-      setError(null);
       try {
         const data = await api.properties.getById(id);
         setHome(data);
@@ -259,70 +258,40 @@ const HomeDetails = () => {
         setIsLoading(false);
       }
     };
-
     fetchHome();
   }, [id]);
 
-
-  // Auto-scroll functionality
   useEffect(() => {
     if (!homeImages.length) return;
     const startAutoScroll = () => {
-      if (autoScrollInterval.current) {
-        clearInterval(autoScrollInterval.current);
-      }
+      if (autoScrollInterval.current) clearInterval(autoScrollInterval.current);
       autoScrollInterval.current = setInterval(() => {
         setCurrentImageIndex((prev) => (prev + 1) % homeImages.length);
-      }, 3500);
+      }, 4000);
     };
-
     startAutoScroll();
     return () => {
-      if (autoScrollInterval.current) {
-        clearInterval(autoScrollInterval.current);
-      }
+      if (autoScrollInterval.current) clearInterval(autoScrollInterval.current);
     };
   }, [homeImages.length]);
 
-  // Touch handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
+  const handleTouchStart = (e: React.TouchEvent) => setTouchStart(e.targetTouches[0].clientX);
+  const handleTouchMove = (e: React.TouchEvent) => setTouchEnd(e.targetTouches[0].clientX);
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd || homeImages.length === 0) return;
-    
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe) {
-      setCurrentImageIndex((prev) => (prev + 1) % homeImages.length);
-    }
-    if (isRightSwipe) {
-      setCurrentImageIndex((prev) => (prev - 1 + homeImages.length) % homeImages.length);
-    }
-
-    // Reset auto-scroll after manual swipe
-    if (autoScrollInterval.current) {
-      clearInterval(autoScrollInterval.current);
-    }
-    autoScrollInterval.current = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % homeImages.length);
-    }, 3500);
-
-    setTouchStart(0);
-    setTouchEnd(0);
+    if (!touchStart || !touchEnd || !homeImages.length) return;
+    const dist = touchStart - touchEnd;
+    if (dist > 50) setCurrentImageIndex((prev) => (prev + 1) % homeImages.length);
+    if (dist < -50) setCurrentImageIndex((prev) => (prev - 1 + homeImages.length) % homeImages.length);
+    setTouchStart(0); setTouchEnd(0);
   };
 
   if (isLoading) {
     return (
       <Layout>
-        <div className="py-16 text-center text-muted-foreground">Loading home details...</div>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-xl font-medium text-muted-foreground animate-pulse">Loading amazing spaces...</p>
+        </div>
       </Layout>
     );
   }
@@ -330,391 +299,364 @@ const HomeDetails = () => {
   if (error || !home) {
     return (
       <Layout>
-        <div className="py-16 text-center">
-          <p className="text-lg font-semibold">Unable to load home</p>
-          <p className="text-sm text-muted-foreground mt-2">{error || "Home not found"}</p>
+        <div className="py-20 text-center max-w-md mx-auto">
+          <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Info className="w-10 h-10 text-destructive" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Property Not Found</h2>
+          <p className="text-muted-foreground mb-8">{error || "We couldn't find the home you're looking for."}</p>
+          <Button onClick={() => navigate("/homes")} size="lg">Browse Other Homes</Button>
         </div>
       </Layout>
     );
   }
 
+  const currencyStr = home.currency || "INR";
+
   return (
     <Layout>
-      <div className="py-4 md:py-6">
-        <div className="container mx-auto px-4">
-          {/* Back Button */}
-          <Link to="/homes" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 md:mb-6">
-            <ArrowLeft className="w-4 h-4" />
+      <div className="bg-background min-h-screen pb-20 md:pb-10">
+        <div className="container mx-auto px-4 md:px-6 py-6 md:py-8">
+
+          <Link to="/homes" className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 hover:bg-muted text-foreground rounded-full transition-all duration-300 mb-6 font-medium text-sm group">
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             Back to Homes
           </Link>
 
-          {/* Images - Vertical on mobile, Grid on desktop */}
-          <div className="mb-4 md:mb-8">
-            {/* Mobile: Horizontal scroll gallery */}
-            <div className="md:hidden -mx-4 px-4">
-              <div 
-                className="relative rounded-xl overflow-hidden aspect-[4/3] bg-muted"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                {homeImages.map((img, index) => (
-                  <img
-                    key={index}
-                    src={img}
-                    alt={`${home.name} ${index + 1}`}
-                    className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${
-                      index === currentImageIndex
-                        ? "opacity-100 scale-100"
-                        : "opacity-0 scale-105 blur-sm"
-                    }`}
-                  />
+          {/* Hero Section */}
+          <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl mb-12 bg-black group h-[40vh] md:h-[60vh]">
+            <div className="absolute inset-0 transition-opacity duration-1000 ease-in-out">
+              {homeImages.map((img, index) => (
+                <img
+                  key={index}
+                  src={img}
+                  alt={`${home.name} ${index + 1}`}
+                  className={cn(
+                    "absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-in-out",
+                    index === currentImageIndex ? "opacity-100 scale-100" : "opacity-0 scale-105"
+                  )}
+                />
+              ))}
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+
+            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-12 text-white">
+              <div className="flex flex-wrap gap-3 mb-4">
+                {home.rating > 0 && (
+                  <Badge variant="secondary" className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-0 py-1.5 px-3">
+                    <Star className="w-4 h-4 fill-current mr-1 text-yellow-500" />
+                    <span className="font-bold">{home.rating}</span>
+                    <span className="ml-1 opacity-80 font-normal">({home.reviewCount} reviews)</span>
+                  </Badge>
+                )}
+                {home.viewCount && home.viewCount > 100 && (
+                  <Badge variant="secondary" className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-0 py-1.5 px-3">
+                    <Eye className="w-4 h-4 mr-1 text-primary-foreground" />
+                    Highly Viewed
+                  </Badge>
+                )}
+                {home.highlights?.slice(0, 2).map((h, i) => (
+                  <Badge key={i} variant="secondary" className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-0 py-1.5 px-3">
+                    {h}
+                  </Badge>
                 ))}
               </div>
-              <div className="flex justify-center gap-1.5 mt-3">
-                {homeImages.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`h-2 rounded-full transition-all ${
-                      index === currentImageIndex
-                        ? "w-6 bg-primary"
-                        : "w-2 bg-primary/30"
-                    }`}
-                    aria-label={`View image ${index + 1}`}
-                  />
-                ))}
+              <h1 className="text-3xl md:text-5xl lg:text-7xl font-serif font-bold text-white mb-3 text-shadow-sm tracking-tight">
+                {home.name}
+              </h1>
+              <div className="flex items-center gap-2 text-white/90 text-sm md:text-lg">
+                <MapPin className="w-5 h-5 text-primary-foreground" />
+                <span className="font-medium">{home.address}, {home.city}, {home.state} {home.pincode}</span>
               </div>
             </div>
 
-            {/* Desktop: Grid layout */}
-            <div className="hidden md:grid grid-cols-3 gap-4">
-              <div className="col-span-2 rounded-2xl overflow-hidden aspect-[16/10]">
-                <img
-                  src={homeImages[0]}
-                  alt={home.name}
-                  className="w-full h-full object-cover"
+            {home.virtualTourUrl && (
+              <a href={home.virtualTourUrl} target="_blank" rel="noreferrer" className="absolute top-6 right-6 bg-white/20 hover:bg-white/40 backdrop-blur-lg rounded-full px-5 py-2.5 flex items-center gap-2 text-white font-semibold transition-all shadow-xl">
+                <PlayCircle className="w-5 h-5" /> Virtual Tour
+              </a>
+            )}
+
+            {/* Gallery Navigation Controls (Desktop) */}
+            <div className="absolute bottom-12 right-12 hidden md:flex gap-2">
+              {homeImages.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentImageIndex(i)}
+                  className={cn(
+                    "h-2 rounded-full transition-all duration-300",
+                    i === currentImageIndex ? "w-8 bg-primary" : "w-3 bg-white/50 hover:bg-white"
+                  )}
                 />
-              </div>
-              <div className="grid grid-rows-2 gap-4">
-                {homeImages.slice(1, 3).map((img, index) => (
-                  <div key={index} className="rounded-2xl overflow-hidden">
-                    <img
-                      src={img}
-                      alt={`${home.name} ${index + 2}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
+
+            {/* Mobile Touch Area */}
+            <div
+              className="absolute inset-0 md:hidden z-10"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-4 md:space-y-8">
-              {/* Header */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="flex items-center gap-1 bg-primary/10 text-primary rounded-full px-2.5 py-0.5 md:px-3 md:py-1">
-                    <Star className="w-3.5 h-3.5 md:w-4 md:h-4 fill-current" />
-                    <span className="text-sm md:text-base font-medium">{home.rating}</span>
-                  </div>
-                  <span className="text-muted-foreground text-xs md:text-sm">({home.reviewCount} reviews)</span>
-                </div>
-                <h1 className="text-xl md:text-4xl font-serif font-bold text-foreground">
-                  {home.name}
-                </h1>
-                <div className="flex items-center gap-2 text-muted-foreground mt-2 text-sm md:text-base">
-                  <MapPin className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                  {home.address}, {home.city}
-                </div>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
 
-              {/* Property Details */}
-              <div className="flex items-center gap-4 md:gap-6 p-3 md:p-4 bg-card rounded-xl shadow-card">
-                <div className="flex items-center gap-2">
-                  <Bed className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                  <span className="text-sm md:text-base font-medium">{rooms.length} Rooms</span>
+            {/* Main Content Area */}
+            <div className="lg:col-span-8 space-y-10">
+
+              {/* Quick Info Bar */}
+              <div className="flex flex-wrap items-center gap-4 p-5 bg-card rounded-2xl shadow-sm border border-border/50">
+                <div className="flex items-center gap-3 pr-4 border-r border-border/50">
+                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Users className="w-5 h-5" /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Guests</p>
+                    <p className="font-semibold text-foreground">Up to {rooms.length ? Math.max(...rooms.map(r => r.capacity + (r.extraBedCapacity || 0))) : 4}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                  <span className="text-sm md:text-base font-medium">
-                    Up to {rooms.length ? Math.max(...rooms.map((room) => room.capacity)) : 4} Guests
-                  </span>
+                <div className="flex items-center gap-3 pr-4 border-r border-border/50">
+                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Bed className="w-5 h-5" /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Rooms</p>
+                    <p className="font-semibold text-foreground">{rooms.length} Bedrooms</p>
+                  </div>
                 </div>
+                {home.bookingCount && home.bookingCount > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><ShoppingBag className="w-5 h-5" /></div>
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Popular</p>
+                      <p className="font-semibold text-foreground">{home.bookingCount} Bookings</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Description */}
-              <div>
-                <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-2 md:mb-3">About this Home</h2>
-                <p className="text-sm md:text-base text-muted-foreground leading-relaxed">{home.description}</p>
+              <div className="space-y-4">
+                <h2 className="text-2xl font-serif font-bold text-foreground flex items-center gap-2">
+                  About this Property
+                </h2>
+                {home.shortDesc && (
+                  <p className="text-lg font-medium text-foreground/80 leading-relaxed italic border-l-4 border-primary pl-4 py-1">
+                    "{home.shortDesc}"
+                  </p>
+                )}
+                <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none text-muted-foreground leading-loose">
+                  {home.description.split('\n').map((paragraph, idx) => (
+                    <p key={idx} className="mb-4">{paragraph}</p>
+                  ))}
+                </div>
               </div>
 
               {/* Amenities */}
-              <div>
-                <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-3 md:mb-4">Amenities</h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                  {home.amenities.slice(0, 12).map((amenity) => (
-                    <div key={amenity} className="flex items-center gap-2 md:gap-3 bg-card rounded-xl p-3 md:p-4 shadow-card">
-                      <Wifi className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                      <span className="text-xs md:text-sm font-medium">{amenity}</span>
+              <div className="space-y-6">
+                <h2 className="text-2xl font-serif font-bold text-foreground">What this place offers</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {home.amenities.map((amenity, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-4 bg-muted/30 rounded-2xl hover:bg-muted/70 transition-colors border border-border/30">
+                      <div className="text-primary">{getAmenityIcon(amenity)}</div>
+                      <span className="font-medium text-sm sm:text-base text-foreground/90">{amenity}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {home.reviews?.length ? (
-                <div>
-                  <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-3 md:mb-4">Guest Reviews</h2>
-                  <div className="space-y-4">
-                    {home.reviews.slice(0, 4).map((review) => (
-                      <div key={review.id} className="rounded-xl bg-card p-4 shadow-card">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                            <span className="text-sm font-semibold">
-                              {(review.user?.name || "G").charAt(0)}
-                            </span>
+              {/* Rooms Details */}
+              {rooms.length > 0 && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-serif font-bold text-foreground mb-6">Accommodations</h2>
+                  <div className="grid gap-6">
+                    {rooms.map((room) => (
+                      <Card key={room.id} className="overflow-hidden border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex flex-col md:flex-row">
+                          <div className="md:w-1/3 bg-muted isolate">
+                            {room.images?.[0]?.url ? (
+                              <img src={room.images[0].url} alt={room.name} className="w-full h-full object-cover min-h-[200px]" />
+                            ) : (
+                              <div className="w-full h-full min-h-[200px] flex items-center justify-center bg-primary/5">
+                                <Bed className="w-12 h-12 text-primary/20" />
+                              </div>
+                            )}
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{review.user?.name || "Guest"}</p>
-                            <p className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</p>
-                          </div>
-                          <div className="ml-auto flex items-center gap-1 text-primary">
-                            <Star className="h-4 w-4 fill-current" />
-                            <span className="text-sm font-semibold">{review.rating.toFixed(1)}</span>
-                          </div>
+                          <CardContent className="p-6 md:w-2/3 flex flex-col justify-between">
+                            <div>
+                              <div className="flex justify-between items-start mb-2">
+                                <h3 className="text-xl font-bold">{room.name}</h3>
+                                <Badge variant="outline" className="capitalize font-semibold">{room.type}</Badge>
+                              </div>
+                              {room.description && <p className="text-sm text-muted-foreground mb-4">{room.description}</p>}
+
+                              <div className="flex flex-wrap gap-x-6 gap-y-2 mb-4 text-sm font-medium">
+                                <div className="flex items-center gap-1.5"><Users className="w-4 h-4 text-primary" /> Max: {room.capacity + (room.extraBedCapacity || 0)} Guests</div>
+                                {room.sizeSqm && <div className="flex items-center gap-1.5"><Maximize className="w-4 h-4 text-primary" /> {room.sizeSqm} m²</div>}
+                              </div>
+
+                              {room.amenities?.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                  {room.amenities.slice(0, 4).map((am, i) => (
+                                    <span key={i} className="text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground">{am}</span>
+                                  ))}
+                                  {room.amenities.length > 4 && <span className="text-xs text-muted-foreground self-center">+{room.amenities.length - 4} more</span>}
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-border/50 flex items-end justify-between">
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Room Rate</p>
+                                <p className="text-xl font-bold text-primary">{currencyStr} {room.pricePerNight.toLocaleString()} <span className="text-sm text-muted-foreground font-normal">/ night</span></p>
+                              </div>
+                            </div>
+                          </CardContent>
                         </div>
-                        {review.comment ? (
-                          <p className="mt-3 text-sm text-muted-foreground">{review.comment}</p>
-                        ) : null}
-                      </div>
+                      </Card>
                     ))}
                   </div>
                 </div>
-              ) : null}
+              )}
+
+              {/* Policies */}
+              <div className="space-y-6">
+                <h2 className="text-2xl font-serif font-bold text-foreground">Things to know</h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Cancellation Policy */}
+                  <div className="bg-card p-6 rounded-2xl shadow-sm border border-border/50">
+                    <div className="flex items-center gap-3 mb-4">
+                      <ShieldCheck className="w-6 h-6 text-primary" />
+                      <h3 className="text-lg font-bold">Cancellation Policy</h3>
+                    </div>
+                    {home.cancellationPolicy ? (
+                      <ul className="space-y-3 text-sm text-muted-foreground">
+                        <li className="flex gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                          <span>Cancel before {home.cancellationPolicy.freeBeforeHours} hours for a {home.cancellationPolicy.refundPercentBefore}% refund.</span>
+                        </li>
+                        <li className="flex gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
+                          <span>Cancel within {home.cancellationPolicy.freeBeforeHours} hours for a {home.cancellationPolicy.refundPercentAfter}% refund.</span>
+                        </li>
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Free cancellation up to 24 hours before check-in. Non-refundable afterwards.</p>
+                    )}
+                  </div>
+
+                  {/* House Rules */}
+                  <div className="bg-card p-6 rounded-2xl shadow-sm border border-border/50">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Info className="w-6 h-6 text-primary" />
+                      <h3 className="text-lg font-bold">House Rules</h3>
+                    </div>
+                    <ul className="space-y-3 text-sm text-muted-foreground">
+                      <li className="flex gap-2"><ChevronRight className="w-4 h-4 text-primary mt-0.5 shrink-0" /> Check-in: After 2:00 PM</li>
+                      <li className="flex gap-2"><ChevronRight className="w-4 h-4 text-primary mt-0.5 shrink-0" /> Checkout: Before 11:00 AM</li>
+                      <li className="flex gap-2"><ChevronRight className="w-4 h-4 text-primary mt-0.5 shrink-0" /> No smoking or unregistered guests allowed</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
-            {/* Booking Card */}
-            <div className="lg:col-span-1">
-              <div className="bg-card rounded-xl md:rounded-2xl shadow-card p-4 md:p-6 lg:sticky lg:top-24">
-                <div className="text-center mb-4 md:mb-6">
-                  <p className="text-muted-foreground text-xs md:text-sm">Per night</p>
-                  <p className="text-2xl md:text-3xl font-serif font-bold text-foreground">
-                    ₹{home.basePrice.toLocaleString()}
-                  </p>
-                  {nights > 0 && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 bg-primary/10 text-primary rounded-full px-3 py-1">
-                      <CalendarDays className="w-3.5 h-3.5" />
-                      <span className="text-xs font-semibold">{nights} Night{nights > 1 ? 's' : ''}</span>
-                       <span className="text-xs">• ₹{(home.basePrice * nights).toLocaleString()}</span>
+            {/* Sticky Sidebar Widget */}
+            <div className="lg:col-span-4 relative mt-10 lg:mt-0">
+              <div className="sticky top-24">
+                <Card className="border-border/60 shadow-xl overflow-hidden rounded-3xl">
+                  {/* Price Header */}
+                  <div className="bg-muted/30 p-6 border-b border-border/50">
+                    <div className="flex items-end gap-2 mb-2">
+                      <span className="text-4xl font-serif font-black text-primary">{currencyStr} {home.basePrice.toLocaleString()}</span>
+                      <span className="text-muted-foreground font-medium mb-1">/ night</span>
                     </div>
-                  )}
-                </div>
-
-                {home.latitude && home.longitude ? (
-                  <div className="mt-6 rounded-xl overflow-hidden border border-border">
-                    <iframe
-                      title="Home location"
-                      src={`https://www.google.com/maps?q=${home.latitude},${home.longitude}&z=14&output=embed`}
-                      className="w-full h-48"
-                      loading="lazy"
-                    />
-                  </div>
-                ) : null}
-
-                <div className="space-y-3 md:space-y-4">
-                  {/* Mobile: Drawer inputs */}
-                  <div className="md:hidden grid grid-cols-2 gap-2">
-                    <Drawer open={isCheckInOpen} onOpenChange={setIsCheckInOpen}>
-                      <button
-                        onClick={() => setIsCheckInOpen(true)}
-                        className="flex items-center gap-2 p-2.5 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-left"
-                      >
-                        <CalendarDays className="w-4 h-4 text-primary flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] text-muted-foreground font-medium">Check In</p>
-                          <p className={cn(
-                            "text-xs font-medium truncate",
-                            !checkIn && "text-muted-foreground"
-                          )}>
-                            {checkIn ? format(checkIn, "MMM dd") : "Select"}
-                          </p>
-                        </div>
-                      </button>
-                      <DrawerContent className="max-h-[85vh]">
-                        <DrawerHeader className="text-left">
-                          <DrawerTitle className="text-lg font-semibold">Select Check-In Date</DrawerTitle>
-                          <DrawerDescription className="text-sm">Choose your arrival date</DrawerDescription>
-                        </DrawerHeader>
-                        <div className="px-4 pb-6 flex justify-center">
-                          <div className="bg-card rounded-2xl p-4 shadow-sm">
-                            <Calendar
-                              mode="single"
-                              selected={checkIn}
-                              onSelect={(date) => {
-                                setCheckIn(date);
-                                setIsCheckInOpen(false);
-                              }}
-                              disabled={(date) => date < new Date()}
-                              initialFocus
-                            />
-                          </div>
-                        </div>
-                      </DrawerContent>
-                    </Drawer>
-
-                    <Drawer open={isCheckOutOpen} onOpenChange={setIsCheckOutOpen}>
-                      <button
-                        onClick={() => setIsCheckOutOpen(true)}
-                        className="flex items-center gap-2 p-2.5 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-left"
-                      >
-                        <CalendarDays className="w-4 h-4 text-primary flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] text-muted-foreground font-medium">Check Out</p>
-                          <p className={cn(
-                            "text-xs font-medium truncate",
-                            !checkOut && "text-muted-foreground"
-                          )}>
-                            {checkOut ? format(checkOut, "MMM dd") : "Select"}
-                          </p>
-                        </div>
-                      </button>
-                      <DrawerContent className="max-h-[85vh]">
-                        <DrawerHeader className="text-left">
-                          <DrawerTitle className="text-lg font-semibold">Select Check-Out Date</DrawerTitle>
-                          <DrawerDescription className="text-sm">
-                            {checkIn ? `Check-in: ${format(checkIn, "MMM dd, yyyy")}` : "Choose your departure date"}
-                          </DrawerDescription>
-                        </DrawerHeader>
-                        <div className="px-4 pb-6 flex justify-center">
-                          <div className="bg-card rounded-2xl p-4 shadow-sm">
-                            <Calendar
-                              mode="single"
-                              selected={checkOut}
-                              onSelect={(date) => {
-                                setCheckOut(date);
-                                setIsCheckOutOpen(false);
-                              }}
-                              disabled={(date) => date < (checkIn || new Date())}
-                              modifiers={checkIn ? { checkInDate: checkIn } : {}}
-                              modifiersClassNames={{
-                                checkInDate: "bg-primary/20 text-primary font-semibold border-2 border-primary"
-                              }}
-                              initialFocus
-                            />
-                          </div>
-                        </div>
-                      </DrawerContent>
-                    </Drawer>
-                  </div>
-
-                  {/* Desktop: Simple inputs */}
-                  <div className="hidden md:grid grid-cols-2 gap-3">
-                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
-                      <CalendarIcon className="w-4 h-4 text-primary flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-medium">Check In</p>
-                        <input type="date" className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none" />
+                    {home.viewCount && home.viewCount > 50 && (
+                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-500 bg-rose-500/10 px-2.5 py-1 rounded-full mt-2">
+                        <Eye className="w-3.5 h-3.5" /> High Demand Property
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
-                      <CalendarIcon className="w-4 h-4 text-primary flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-medium">Check Out</p>
-                        <input type="date" className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none" />
-                      </div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Guests - Mobile Drawer */}
-                  <div className="md:hidden">
-                    <Drawer open={isGuestsOpen} onOpenChange={setIsGuestsOpen}>
-                      <button
-                        onClick={() => setIsGuestsOpen(true)}
-                        className="w-full flex items-center gap-2 p-2.5 bg-muted rounded-lg hover:bg-muted/80 transition-colors text-left"
-                      >
-                        <Users className="w-4 h-4 text-primary flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] text-muted-foreground font-medium">Guests</p>
-                          <p className="text-xs font-medium">
-                            {guests} Guest{guests > 1 ? "s" : ""}
-                          </p>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+
+                      {/* Dates Selector */}
+                      <div className="grid grid-cols-2 bg-muted/40 p-1 rounded-xl border border-border/50">
+                        <div className="relative p-3">
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Check-in</p>
+                          <input
+                            type="date"
+                            className="w-full bg-transparent border-none p-0 text-sm font-semibold focus:outline-none focus:ring-0 text-foreground cursor-pointer"
+                            min={new Date().toISOString().split("T")[0]}
+                            value={checkIn ? format(checkIn, "yyyy-MM-dd") : ""}
+                            onChange={(e) => setCheckIn(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                          />
                         </div>
-                      </button>
-                      <DrawerContent className="max-h-[85vh]">
-                        <DrawerHeader className="text-left">
-                          <DrawerTitle className="text-lg font-semibold">Select Guests</DrawerTitle>
-                          <DrawerDescription className="text-sm">Number of guests staying</DrawerDescription>
-                        </DrawerHeader>
-                        <div className="px-6 pb-6">
-                          <div className="bg-card rounded-2xl p-8 shadow-sm">
-                            <div className="flex items-center justify-between max-w-xs mx-auto">
-                              <button
-                                onClick={() => updateGuests(-1)}
-                                disabled={guests <= 1}
-                                className="w-14 h-14 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-sm"
-                              >
-                                <Minus className="w-5 h-5" />
+                        <div className="relative p-3 border-l border-border/50">
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Checkout</p>
+                          <input
+                            type="date"
+                            className="w-full bg-transparent border-none p-0 text-sm font-semibold focus:outline-none focus:ring-0 text-foreground cursor-pointer"
+                            min={checkIn ? format(new Date(checkIn.getTime() + 86400000), "yyyy-MM-dd") : new Date().toISOString().split("T")[0]}
+                            value={checkOut ? format(checkOut, "yyyy-MM-dd") : ""}
+                            onChange={(e) => setCheckOut(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Guests Selector */}
+                      <div className="bg-muted/40 p-1 rounded-xl border border-border/50">
+                        <div className="p-3">
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Guests</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-foreground">{guests} Guest{guests > 1 ? 's' : ''}</span>
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => updateGuests(-1)} disabled={guests <= 1} className="w-8 h-8 rounded-full bg-background border flex justify-center items-center hover:bg-muted disabled:opacity-50 transition-colors">
+                                <Minus className="w-4 h-4 text-foreground" />
                               </button>
-                              <div className="text-center">
-                                <span className="text-4xl font-bold text-foreground">{guests}</span>
-                                <p className="text-xs text-muted-foreground mt-1">Guest{guests > 1 ? "s" : ""}</p>
-                              </div>
-                              <button
-                                onClick={() => updateGuests(1)}
-                               disabled={
-                                 guests >=
-                                 (rooms.length ? Math.max(...rooms.map((room) => room.capacity)) : 4)
-                               }
-                                className="w-14 h-14 rounded-full bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-sm"
-                              >
-                                <Plus className="w-5 h-5" />
+                              <button onClick={() => updateGuests(1)} disabled={rooms.length ? guests >= Math.max(...rooms.map(r => r.capacity + (r.extraBedCapacity || 0))) : guests >= 4} className="w-8 h-8 rounded-full bg-background border flex justify-center items-center hover:bg-muted disabled:opacity-50 transition-colors">
+                                <Plus className="w-4 h-4 text-foreground" />
                               </button>
                             </div>
                           </div>
                         </div>
-                        <DrawerFooter className="pt-2">
-                          <Button onClick={() => setIsGuestsOpen(false)} className="w-full" size="lg">
-                            Done
-                          </Button>
-                        </DrawerFooter>
-                      </DrawerContent>
-                    </Drawer>
-                  </div>
-
-                  {/* Guests - Desktop Select */}
-                  <div className="hidden md:block">
-                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
-                      <Users className="w-4 h-4 text-primary flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-medium">Guests</p>
-                        <select className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none appearance-none cursor-pointer">
-                          {Array.from({ length: rooms.length ? Math.max(...rooms.map((room) => room.capacity)) : 4 }, (_, i) => i + 1).map((num) => (
-                            <option key={num} value={num}>{num} Guest{num > 1 ? "s" : ""}</option>
-                          ))}
-                        </select>
                       </div>
-                    </div>
-                  </div>
-                  <Button 
-                    variant="hero" 
-                    className="w-full" 
-                    size="xl"
-                    onClick={handleBooking}
-                    disabled={!checkIn || !checkOut || isProcessingPayment}
-                  >
-                    {isProcessingPayment ? "Processing..." : "Book Now"}
-                  </Button>
-                </div>
 
-                <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-border text-center">
-                  <p className="text-xs md:text-sm text-muted-foreground">
-                    Free cancellation up to 24 hours before check-in
-                  </p>
-                </div>
+                      {/* Summary Pricing (Visible if dates selected) */}
+                      {nights > 0 && (
+                        <div className="pt-4 mt-2 border-t border-border/50 space-y-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{currencyStr} {home.basePrice.toLocaleString()} x {nights} night{nights > 1 ? 's' : ''}</span>
+                            <span className="font-medium text-foreground">{currencyStr} {(home.basePrice * nights).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground underline decoration-dotted">Taxes & fees</span>
+                            <span className="font-medium text-foreground">Calculated at checkout</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-lg pt-3 border-t border-border/50">
+                            <span>Total</span>
+                            <span className="text-primary">{currencyStr} {(home.basePrice * nights).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
+                        size="xl"
+                        onClick={handleBooking}
+                        disabled={!checkIn || !checkOut || isProcessingPayment}
+                        className="w-full h-14 text-lg font-bold rounded-2xl bg-primary hover:bg-primary/90 mt-4 shadow-lg shadow-primary/30 transition-all hover:-translate-y-1"
+                      >
+                        {isProcessingPayment ? (
+                          <span className="flex items-center gap-2">
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Processing...
+                          </span>
+                        ) : "Reserve Now"}
+                      </Button>
+                      <p className="text-center text-xs text-muted-foreground font-medium">You won't be charged yet</p>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
+
           </div>
         </div>
       </div>

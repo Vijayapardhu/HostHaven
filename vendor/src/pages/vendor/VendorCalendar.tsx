@@ -58,7 +58,7 @@ const VendorCalendar = () => {
   const fetchProperties = async () => {
     try {
       const response = await vendorService.getProperties();
-      const props = response.properties || [];
+      const props = response.data || response || [];
       setProperties(props.map((p: any) => ({ id: p.id, name: p.name })));
       if (props.length > 0) {
         setSelectedProperty(props[0].id);

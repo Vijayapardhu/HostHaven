@@ -15,9 +15,7 @@ export const PropertiesController = {
   async getAll(request: FastifyRequest, reply: FastifyReply) {
     try {
       const query = propertyFilterSchema.parse(request.query);
-      
       const amenities = query.amenities ? query.amenities.split(',') : undefined;
-
       const result = await propertiesService.getAll({
         page: query.page,
         limit: query.limit,
@@ -35,14 +33,21 @@ export const PropertiesController = {
         lng: query.lng,
         radius: query.radius,
       });
-
       return sendSuccess(reply, result.properties, 200, result.meta);
     } catch (error: any) {
-      logger.error({ error }, 'Get properties failed');
       if (error.name === 'ZodError') {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid query parameters', 400);
+        // Return 400 for validation errors with details
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, error.message, 400, error.issues || error.errors);
       }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch properties', 500);
+      logger.error({
+        error: error,
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause,
+        code: error.code,
+        name: error.name,
+      }, 'Get properties failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, error.message || 'Failed to fetch properties', 500);
     }
   },
 

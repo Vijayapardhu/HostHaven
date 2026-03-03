@@ -83,7 +83,7 @@ const VendorSupport = () => {
         params.status = statusFilter;
       }
       const response = await supportService.getMyTickets(params);
-      setTickets(response.tickets || []);
+      setTickets(response.data || response || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (error) {
       console.error("Failed to fetch tickets:", error);

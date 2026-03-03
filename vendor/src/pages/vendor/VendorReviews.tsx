@@ -34,9 +34,10 @@ const VendorReviews = () => {
     setIsLoading(true);
     try {
       const properties = await vendorService.getProperties();
-      if (properties.properties && properties.properties.length > 0) {
+      const propList = properties.data || properties || [];
+      if (propList.length > 0) {
         const allReviews: Review[] = [];
-        for (const prop of properties.properties) {
+        for (const prop of propList) {
           try {
             const revs = await reviewsService.getReviewsByProperty(prop.id);
             if (revs && Array.isArray(revs)) {

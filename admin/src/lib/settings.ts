@@ -82,6 +82,12 @@ export interface HomepageConfig {
     ctaText: string
     ctaLink: string
   }
+  promoBanner?: {
+    isVisible: boolean
+    imageUrl: string
+    link: string
+    title: string
+  }
 }
 
 export interface PlatformSettings {

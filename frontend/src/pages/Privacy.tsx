@@ -51,7 +51,7 @@ const Privacy = () => {
                 Privacy Policy
               </h1>
               <p className="text-muted-foreground">
-                Last updated: February 24, 2026
+                Last updated: March 3, 2026
               </p>
             </div>
 
@@ -101,7 +101,7 @@ const Privacy = () => {
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
                   <li>Hotels and accommodation providers to complete your bookings</li>
-                  <li>Payment processors to handle transactions</li>
+                  <li>Payment processors (Razorpay) to handle transactions securely</li>
                   <li>Service providers who assist with our operations</li>
                   <li>Legal authorities when required by law</li>
                 </ul>
@@ -110,7 +110,32 @@ const Privacy = () => {
               <section className="space-y-3">
                 <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  4. Data Security
+                  4. Payment Data & Razorpay
+                </h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  For payment processing, we use Razorpay, a secure PCI-DSS Level 1 certified payment gateway. 
+                  When you make a payment:
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
+                  <li>Your payment details are processed directly by Razorpay</li>
+                  <li>We do not store your complete credit/debit card numbers</li>
+                  <li>Razorpay handles all payment authorization and processing</li>
+                  <li>Transaction data is subject to Razorpay's privacy policy</li>
+                  <li>We receive only payment confirmation status from Razorpay</li>
+                </ul>
+                <p className="text-muted-foreground leading-relaxed mt-4">
+                  By using our payment services, you agree to Razorpay's Terms of Service and Privacy Policy. 
+                  Razorpay's privacy policy can be found at{" "}
+                  <a href="https://razorpay.com/privacy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    razorpay.com/privacy
+                  </a>
+                </p>
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                  5. Data Security
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   We implement appropriate technical and organizational measures to protect your personal information 
@@ -122,7 +147,7 @@ const Privacy = () => {
               <section className="space-y-3">
                 <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  5. Cookies and Tracking
+                  6. Cookies and Tracking
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   We use cookies and similar tracking technologies to enhance your experience, analyze site usage, 
@@ -133,7 +158,7 @@ const Privacy = () => {
               <section className="space-y-3">
                 <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  6. Your Rights
+                  7. Your Rights
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   You have the right to:
@@ -150,7 +175,7 @@ const Privacy = () => {
               <section className="space-y-3">
                 <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  7. Children's Privacy
+                  8. Children's Privacy
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   Our services are not directed to children under 18. We do not knowingly collect personal information 
@@ -161,7 +186,7 @@ const Privacy = () => {
               <section className="space-y-3">
                 <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  8. Changes to This Policy
+                  9. Changes to This Policy
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   We may update this Privacy Policy from time to time. We will notify you of any changes by posting 
@@ -172,7 +197,7 @@ const Privacy = () => {
               <section className="space-y-3">
                 <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  9. Contact Us
+                  10. Contact Us
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   If you have questions about this Privacy Policy or our data practices, please contact us at{" "}

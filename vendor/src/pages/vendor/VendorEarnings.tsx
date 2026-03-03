@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { earningsService } from "@/lib/earnings";
 
 interface Payout {
   id: string;
@@ -47,16 +48,43 @@ const VendorEarnings = () => {
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState("30");
+  const [stats, setStats] = useState({
+    totalEarnings: 0,
+    thisMonth: 0,
+    pendingPayouts: 0,
+    commission: 0,
+  });
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchEarnings();
+  }, []);
 
   useEffect(() => {
     fetchPayouts();
   }, [dateRange]);
 
+  const fetchEarnings = async () => {
+    try {
+      const response = await earningsService.getEarningsSummary();
+      const summary = response?.data ?? response ?? {};
+      setStats({
+        totalEarnings: Number(summary.totalRevenue ?? 0),
+        thisMonth: Number(summary.pendingCommissions?.amount ?? 0),
+        pendingPayouts: Number(summary.pendingPayouts?.amount ?? 0),
+        commission: Number(summary.paidCommissions?.commissionAmount ?? 0),
+      });
+    } catch (error) {
+      console.error("Failed to fetch earnings summary:", error);
+    }
+  };
+
   const fetchPayouts = async () => {
     setIsLoading(true);
     try {
-      setPayouts([]);
+      const response = await earningsService.getPayoutHistory({ days: dateRange });
+      const payoutList = response?.data ?? response ?? [];
+      setPayouts(Array.isArray(payoutList) ? payoutList : []);
     } catch (error) {
       console.error("Failed to fetch payouts:", error);
     } finally {
@@ -81,13 +109,6 @@ const VendorEarnings = () => {
       default:
         return <Badge>{status}</Badge>;
     }
-  };
-
-  const stats = {
-    totalEarnings: 125000,
-    thisMonth: 45000,
-    pendingPayouts: 15000,
-    commission: 12500,
   };
 
   return (

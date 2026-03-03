@@ -51,7 +51,7 @@ const Terms = () => {
                 Terms of Service
               </h1>
               <p className="text-muted-foreground">
-                Last updated: February 24, 2026
+                Last updated: March 3, 2026
               </p>
             </div>
 
@@ -147,7 +147,24 @@ const Terms = () => {
               <section className="space-y-3">
                 <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-primary" />
-                  8. Contact Us
+                  8. Payment Terms
+                </h2>
+                <p className="text-muted-foreground leading-relaxed">
+                  All payments made through HostHaven are processed securely via Razorpay, a PCI-DSS compliant payment gateway. 
+                  By making a payment, you agree to Razorpay's terms of service and privacy policy.
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
+                  <li>All transactions are encrypted and secure</li>
+                  <li>We do not store your complete credit/debit card details</li>
+                  <li>Payment processing is subject to Razorpay's terms</li>
+                  <li>Refunds are processed according to our refund policy</li>
+                </ul>
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="text-2xl font-serif font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                  9. Contact Us
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   If you have any questions about these Terms of Service, please contact us at{" "}

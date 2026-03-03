@@ -4,7 +4,7 @@ export const roomsService = {
   getRooms: async (propertyId?: string) => {
     const url = propertyId ? `/v1/rooms/property/${propertyId}` : "/v1/rooms";
     const response = await api.get(url);
-    return response.data?.rooms ?? response.data;
+    return response.data?.data ?? response.data;
   },
 
   getRoomById: async (id: string) => {

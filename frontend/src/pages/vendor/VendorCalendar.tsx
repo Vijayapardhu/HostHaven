@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface DayAvailability {
   date: string;
@@ -55,7 +55,7 @@ const VendorCalendar = () => {
   const fetchProperties = async () => {
     try {
       const response = await api.vendor.getProperties();
-      const props = response.properties || [];
+      const props = response.data || [];
       setProperties(props.map((p: any) => ({ id: p.id, name: p.name })));
       if (props.length > 0) {
         setSelectedProperty(props[0].id);

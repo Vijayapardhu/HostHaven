@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
+import { api } from "@/lib/api";
 
 export interface WishlistItem {
   id: string;
@@ -8,6 +9,7 @@ export interface WishlistItem {
   image: string;
   price?: number;
   rating?: number;
+  wishlistId?: string; // backend record ID
 }
 
 interface WishlistContextType {
@@ -16,42 +18,83 @@ interface WishlistContextType {
   removeFromWishlist: (id: string) => void;
   isInWishlist: (id: string) => boolean;
   toggleWishlist: (item: WishlistItem) => void;
+  syncWithBackend: () => void;
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
+const isLoggedIn = () => !!localStorage.getItem("accessToken");
+
 export const WishlistProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<WishlistItem[]>([]);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("hosthaven_wishlist");
-    if (stored) {
-      try {
-        setItems(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem("hosthaven_wishlist");
-      }
+  const loadFromBackend = useCallback(async () => {
+    if (!isLoggedIn()) return;
+    try {
+      const data = await api.wishlist.getAll();
+      const backendItems: WishlistItem[] = (Array.isArray(data?.data) ? data.data : []).map((w: any) => ({
+        id: w.itemId,
+        type: w.itemType,
+        name: w.itemName,
+        location: w.itemLocation,
+        image: w.itemImage,
+        price: w.itemPrice ? Number(w.itemPrice) : undefined,
+        rating: w.itemRating ? Number(w.itemRating) : undefined,
+        wishlistId: w.id,
+      }));
+      setItems(backendItems);
+      localStorage.setItem("hosthaven_wishlist", JSON.stringify(backendItems));
+    } catch {
+      // Fallback to localStorage
+      const stored = localStorage.getItem("hosthaven_wishlist");
+      if (stored) try { setItems(JSON.parse(stored)); } catch {}
     }
   }, []);
+
+  useEffect(() => {
+    if (isLoggedIn()) {
+      loadFromBackend();
+    } else {
+      const stored = localStorage.getItem("hosthaven_wishlist");
+      if (stored) try { setItems(JSON.parse(stored)); } catch { localStorage.removeItem("hosthaven_wishlist"); }
+    }
+  }, [loadFromBackend]);
 
   useEffect(() => {
     localStorage.setItem("hosthaven_wishlist", JSON.stringify(items));
   }, [items]);
 
-  const addToWishlist = (item: WishlistItem) => {
-    setItems((prev) => {
-      if (prev.some((i) => i.id === item.id)) return prev;
-      return [...prev, item];
-    });
+  const addToWishlist = async (item: WishlistItem) => {
+    if (items.some((i) => i.id === item.id)) return;
+    const newItem = { ...item };
+    setItems((prev) => [...prev, newItem]);
+    if (isLoggedIn()) {
+      try {
+        const result = await api.wishlist.add({
+          itemType: item.type,
+          itemId: item.id,
+          itemName: item.name,
+          itemImage: item.image,
+          itemLocation: item.location,
+          itemPrice: item.price,
+          itemRating: item.rating,
+        });
+        if (result?.id) {
+          setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, wishlistId: result.id } : i));
+        }
+      } catch {}
+    }
   };
 
-  const removeFromWishlist = (id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const removeFromWishlist = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    if (isLoggedIn() && item?.wishlistId) {
+      try { await api.wishlist.remove(item.wishlistId); } catch {}
+    }
   };
 
-  const isInWishlist = (id: string) => {
-    return items.some((item) => item.id === id);
-  };
+  const isInWishlist = (id: string) => items.some((item) => item.id === id);
 
   const toggleWishlist = (item: WishlistItem) => {
     if (isInWishlist(item.id)) {
@@ -61,9 +104,11 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const syncWithBackend = () => { if (isLoggedIn()) loadFromBackend(); };
+
   return (
     <WishlistContext.Provider
-      value={{ items, addToWishlist, removeFromWishlist, isInWishlist, toggleWishlist }}
+      value={{ items, addToWishlist, removeFromWishlist, isInWishlist, toggleWishlist, syncWithBackend }}
     >
       {children}
     </WishlistContext.Provider>

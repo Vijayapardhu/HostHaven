@@ -280,11 +280,11 @@ export default function Vendors() {
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                     <p className="text-xs text-slate-500">Properties</p>
-                    <p className="text-sm font-semibold text-slate-900">0</p>
+                    <p className="text-sm font-semibold text-slate-900">{vendor.propertiesCount ?? 0}</p>
                   </div>
                   <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                     <p className="text-xs text-slate-500">Bookings</p>
-                    <p className="text-sm font-semibold text-slate-900">0</p>
+                    <p className="text-sm font-semibold text-slate-900">—</p>
                   </div>
                 </div>
 

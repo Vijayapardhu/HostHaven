@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createBookingPayment } from "@/lib/razorpay";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
@@ -67,7 +67,7 @@ const HotelDetails = () => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const autoScrollInterval = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Booking state
   const [checkIn, setCheckIn] = useState<Date>();
   const [checkOut, setCheckOut] = useState<Date>();
@@ -77,6 +77,26 @@ const HotelDetails = () => {
   const [isGuestsOpen, setIsGuestsOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { toast } = useToast();
+
+  // Get user data from auth context
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  // Guest info state
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+
+  // Pre-fill guest info when dialog opens or user logs in
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.name) {
+        setGuestName(user.name);
+      }
+      if (user.phone) {
+        setGuestPhone(user.phone);
+      }
+    }
+  }, [isAuthenticated, user]);
 
   // Calculate nights
   const calculateNights = () => {
@@ -95,8 +115,23 @@ const HotelDetails = () => {
 
   const rooms = useMemo(() => hotel?.rooms || [], [hotel]);
 
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  // Calculate selected room price
+  const selectedRoomPrice = bookingRoom?.pricePerNight || (rooms.length === 0 ? hotel?.basePrice : null);
+
+
+
+  // Reset guest info when dialog closes
+  useEffect(() => {
+    if (!bookingRoom) {
+      if (isAuthenticated && user) {
+        setGuestName(user.name || "");
+        setGuestPhone(user.phone || "");
+      } else {
+        setGuestName("");
+        setGuestPhone("");
+      }
+    }
+  }, [bookingRoom, isAuthenticated, user]);
 
   const updateGuests = (delta: number) => {
     const maxGuests = rooms.length
@@ -140,7 +175,7 @@ const HotelDetails = () => {
 
     setIsProcessingPayment(true);
     let bookingId: string | undefined;
-    
+
     try {
       const roomPrice = room?.pricePerNight || hotel.basePrice;
       const totalAmount = roomPrice * nights;
@@ -166,7 +201,7 @@ const HotelDetails = () => {
         quantity: 1,
       });
       lockAcquired = true;
-      
+
       const bookingResponse = await api.bookings.create({
         propertyId: hotel.id,
         roomId: selectedRoom.id,
@@ -212,12 +247,12 @@ const HotelDetails = () => {
           title: "Booking Successful! 🎉",
           description: `Your booking for ${propertyName} has been confirmed. Payment ID: ${result.paymentId}`,
         });
-        
+
         // Close room selection dialog if open
         if (bookingRoom) {
           setBookingRoom(null);
         }
-        
+
         // Reset booking form
         setCheckIn(undefined);
         setCheckOut(undefined);
@@ -303,7 +338,7 @@ const HotelDetails = () => {
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd || hotelImages.length === 0) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
@@ -376,7 +411,7 @@ const HotelDetails = () => {
           <div className="mb-4 md:mb-8">
             {/* Mobile: Smooth blur carousel */}
             <div className="md:hidden -mx-4 px-4">
-              <div 
+              <div
                 className="relative rounded-xl overflow-hidden aspect-[4/3] bg-muted"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
@@ -387,11 +422,10 @@ const HotelDetails = () => {
                     key={index}
                     src={img}
                     alt={`${hotel.name} ${index + 1}`}
-                    className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${
-                      index === currentImageIndex
-                        ? "opacity-100 scale-100"
-                        : "opacity-0 scale-105 blur-sm"
-                    }`}
+                    className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${index === currentImageIndex
+                      ? "opacity-100 scale-100"
+                      : "opacity-0 scale-105 blur-sm"
+                      }`}
                   />
                 ))}
               </div>
@@ -400,11 +434,10 @@ const HotelDetails = () => {
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
-                    className={`h-2 rounded-full transition-all ${
-                      index === currentImageIndex
-                        ? "w-6 bg-primary"
-                        : "w-2 bg-primary/30"
-                    }`}
+                    className={`h-2 rounded-full transition-all ${index === currentImageIndex
+                      ? "w-6 bg-primary"
+                      : "w-2 bg-primary/30"
+                      }`}
                     aria-label={`View image ${index + 1}`}
                   />
                 ))}
@@ -505,45 +538,82 @@ const HotelDetails = () => {
               ) : null}
 
               {/* Room Types */}
-              <div>
-                <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-3 md:mb-4">Room Types</h2>
-                <div className="space-y-4">
-                  {rooms.map((room) => (
-                    <div key={room.id} className="bg-card rounded-xl p-5 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <h3 className="font-semibold text-foreground">{room.name}</h3>
-                        <p className="text-muted-foreground text-sm">Up to {room.capacity} guests</p>
+              {rooms.length > 0 && (
+                <div id="rooms-section">
+                  <h2 className="text-lg md:text-xl font-serif font-semibold text-foreground mb-3 md:mb-4">Room Types</h2>
+                  <div className="space-y-4">
+                    {rooms.map((room) => (
+                      <div key={room.id} className="bg-card rounded-xl p-5 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-foreground">{room.name}</h3>
+                          <div className="flex items-center gap-3 mt-1">
+                            <p className="text-muted-foreground text-sm">Up to {room.capacity} guests</p>
+                            {room.capacity > 0 && (
+                              <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                                {room.capacity} Guest{room.capacity > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-xl font-semibold text-foreground">
+                              ₹{room.pricePerNight.toLocaleString()}
+                              <span className="text-muted-foreground font-normal text-sm">/night</span>
+                            </p>
+                          </div>
+                          <Button variant="gold" onClick={() => setBookingRoom(room)}>Select</Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <p className="text-xl font-semibold text-foreground">
-                          ₹{room.pricePerNight.toLocaleString()}
-                          <span className="text-muted-foreground font-normal text-sm">/night</span>
-                        </p>
-                        <Button variant="gold" onClick={() => setBookingRoom(room)}>Book Now</Button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Booking Card */}
             <div className="lg:col-span-1">
               <div className="bg-card rounded-xl md:rounded-2xl shadow-card p-4 md:p-6 lg:sticky lg:top-24">
                 <div className="text-center mb-4 md:mb-6">
-                  <p className="text-muted-foreground text-xs md:text-sm">Starting from</p>
+                  <p className="text-muted-foreground text-xs md:text-sm">{bookingRoom ? "Selected Room" : "Starting from"}</p>
                   <p className="text-2xl md:text-3xl font-serif font-bold text-foreground">
-                    ₹{hotel.basePrice.toLocaleString()}
+                    ₹{(selectedRoomPrice || hotel.basePrice).toLocaleString()}
                     <span className="text-muted-foreground font-normal text-sm md:text-base">/night</span>
                   </p>
                   {nights > 0 && (
                     <div className="mt-2 inline-flex items-center gap-1.5 bg-primary/10 text-primary rounded-full px-3 py-1">
                       <CalendarDays className="w-3.5 h-3.5" />
                       <span className="text-xs font-semibold">{nights} Night{nights > 1 ? 's' : ''}</span>
-                       <span className="text-xs">• ₹{(hotel.basePrice * nights).toLocaleString()}</span>
+                      <span className="text-xs">• ₹{((selectedRoomPrice || hotel.basePrice) * nights).toLocaleString()}</span>
                     </div>
                   )}
                 </div>
+
+                {/* Room Selection */}
+                {rooms.length > 0 && (
+                  <div className="mt-4">
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Select Room</label>
+                    <select
+                      value={bookingRoom?.id || ""}
+                      onChange={(e) => {
+                        const room = rooms.find(r => r.id === e.target.value);
+                        if (room) {
+                          setBookingRoom(room);
+                        } else {
+                          setBookingRoom(null);
+                        }
+                      }}
+                      className="w-full h-10 px-3 bg-muted border-0 rounded-lg text-sm focus:outline-none cursor-pointer"
+                    >
+                      <option value="">Select a room</option>
+                      {rooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          {room.name} - ₹{room.pricePerNight}/night (up to {room.capacity} guests)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {hotel.latitude && hotel.longitude ? (
                   <div className="mt-6 rounded-xl overflow-hidden border border-border">
@@ -698,21 +768,37 @@ const HotelDetails = () => {
                       <CalendarIcon className="w-4 h-4 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-muted-foreground font-medium">Check In</p>
-                        <input type="date" className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none" />
+                        <input
+                          type="date"
+                          className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none"
+                          min={new Date().toISOString().split("T")[0]}
+                          value={checkIn ? format(checkIn, "yyyy-MM-dd") : ""}
+                          onChange={(e) => setCheckIn(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                        />
                       </div>
                     </div>
                     <div className="flex items-center gap-2 p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
                       <CalendarIcon className="w-4 h-4 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-muted-foreground font-medium">Check Out</p>
-                        <input type="date" className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none" />
+                        <input
+                          type="date"
+                          className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none"
+                          min={checkIn ? format(new Date(checkIn.getTime() + 86400000), "yyyy-MM-dd") : new Date().toISOString().split("T")[0]}
+                          value={checkOut ? format(checkOut, "yyyy-MM-dd") : ""}
+                          onChange={(e) => setCheckOut(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                        />
                       </div>
                     </div>
                     <div className="flex items-center gap-2 p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
                       <Users className="w-4 h-4 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-muted-foreground font-medium">Guests</p>
-                        <select className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none appearance-none cursor-pointer">
+                        <select
+                          className="w-full bg-transparent border-0 p-0 text-xs font-medium focus:outline-none appearance-none cursor-pointer"
+                          value={guests}
+                          onChange={(e) => setGuests(Number(e.target.value))}
+                        >
                           {[1, 2, 3, 4].map((num) => (
                             <option key={num} value={num}>{num} Guest{num > 1 ? "s" : ""}</option>
                           ))}
@@ -720,26 +806,36 @@ const HotelDetails = () => {
                       </div>
                     </div>
                   </div>
-                  <Button 
-                    variant="hero" 
-                    className="w-full" 
+                  <Button
+                    variant="hero"
+                    className="w-full"
                     size="xl"
-                    onClick={() => handleBooking()}
-                    disabled={!checkIn || !checkOut || isProcessingPayment}
+                    onClick={() => {
+                      if (rooms.length > 0 && !bookingRoom) {
+                        document.getElementById("rooms-section")?.scrollIntoView({ behavior: "smooth" });
+                      } else {
+                        handleBooking(bookingRoom || undefined);
+                      }
+                    }}
+                    disabled={isProcessingPayment}
                   >
-                    {isProcessingPayment ? "Processing..." : "Book Now"}
+                    {rooms.length > 0
+                      ? (bookingRoom
+                        ? `Book Now - ₹${((bookingRoom.pricePerNight || 0) * (nights || 1)).toLocaleString()}`
+                        : "Select Room")
+                      : "Book Now"}
                   </Button>
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-border">
                   <p className="text-sm text-muted-foreground mb-2">Need help with booking?</p>
-                  <a
-                    href={`tel:${"+91 00000 00000"}`}
+                  <Link
+                    to="/contact"
                     className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
                   >
                     <Phone className="w-5 h-5" />
                     <span className="font-medium">Contact support</span>
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -754,27 +850,52 @@ const HotelDetails = () => {
             <DialogTitle className="font-serif">Book {bookingRoom?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <div className="p-4 bg-muted rounded-xl">
-              <p className="text-sm text-muted-foreground">Room Price</p>
-              <p className="text-2xl font-semibold text-foreground">
-                ₹{bookingRoom?.pricePerNight.toLocaleString()}
-                <span className="text-muted-foreground font-normal text-sm">/night</span>
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Up to {bookingRoom?.capacity} guests</p>
+            <div className="p-4 bg-muted rounded-xl flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Room Price</p>
+                <p className="text-2xl font-semibold text-foreground">
+                  ₹{bookingRoom?.pricePerNight.toLocaleString()}
+                  <span className="text-muted-foreground font-normal text-sm">/night</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Up to {bookingRoom?.capacity} guests</p>
+              </div>
+              {nights > 0 && bookingRoom && (
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">Total</p>
+                  <p className="text-2xl font-bold text-primary">₹{(bookingRoom.pricePerNight * nights).toLocaleString()}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">For {nights} night{nights > 1 ? 's' : ''}</p>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Check In</label>
-                <Input type="date" className="h-10 bg-muted border-0 rounded-lg" />
+                <input
+                  type="date"
+                  className="w-full h-10 px-3 bg-muted border-0 rounded-lg text-sm focus:outline-none"
+                  min={new Date().toISOString().split("T")[0]}
+                  value={checkIn ? format(checkIn, "yyyy-MM-dd") : ""}
+                  onChange={(e) => setCheckIn(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Check Out</label>
-                <Input type="date" className="h-10 bg-muted border-0 rounded-lg" />
+                <input
+                  type="date"
+                  className="w-full h-10 px-3 bg-muted border-0 rounded-lg text-sm focus:outline-none"
+                  min={checkIn ? format(new Date(checkIn.getTime() + 86400000), "yyyy-MM-dd") : new Date().toISOString().split("T")[0]}
+                  value={checkOut ? format(checkOut, "yyyy-MM-dd") : ""}
+                  onChange={(e) => setCheckOut(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                />
               </div>
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Number of Guests</label>
-              <select className="w-full h-10 px-3 bg-muted border-0 rounded-lg text-sm">
+              <select
+                className="w-full h-10 px-3 bg-muted border-0 rounded-lg text-sm focus:outline-none"
+                value={guests}
+                onChange={(e) => setGuests(Number(e.target.value))}
+              >
                 {Array.from({ length: bookingRoom?.capacity || 2 }, (_, i) => i + 1).map((num) => (
                   <option key={num} value={num}>{num} Guest{num > 1 ? "s" : ""}</option>
                 ))}
@@ -782,15 +903,27 @@ const HotelDetails = () => {
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Full Name</label>
-              <Input placeholder="Enter your name" className="h-10 bg-muted border-0 rounded-lg" />
+              <Input
+                placeholder="Enter your name"
+                className="h-10 bg-muted border-0 rounded-lg"
+                id="guest-name"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Phone Number</label>
-              <Input placeholder="+91 98765 43210" className="h-10 bg-muted border-0 rounded-lg" />
+              <Input
+                placeholder="+91 98765 43210"
+                className="h-10 bg-muted border-0 rounded-lg"
+                id="guest-phone"
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+              />
             </div>
-            <Button 
-              variant="hero" 
-              className="w-full" 
+            <Button
+              variant="hero"
+              className="w-full"
               size="lg"
               onClick={() => bookingRoom && handleBooking(bookingRoom)}
               disabled={!checkIn || !checkOut || isProcessingPayment}

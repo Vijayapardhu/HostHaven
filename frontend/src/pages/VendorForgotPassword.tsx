@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 const VendorForgotPassword = () => {
   const [email, setEmail] = useState("");

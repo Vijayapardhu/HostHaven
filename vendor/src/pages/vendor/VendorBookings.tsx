@@ -69,7 +69,7 @@ const VendorBookings = () => {
         params.status = statusFilter;
       }
       const response = await bookingsService.getBookings(params);
-      setBookings(response.bookings || []);
+      setBookings(response.data || response || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (error) {
       console.error("Failed to fetch bookings:", error);

@@ -36,7 +36,7 @@ const BlockDates = () => {
     const fetchProperties = async () => {
       try {
         const response = await vendorService.getProperties();
-        const mapped = (response.properties || []).map((property: any) => ({
+        const mapped = (response.data || response || []).map((property: any) => ({
           id: property.id,
           name: property.name,
         }));

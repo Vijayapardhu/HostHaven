@@ -31,6 +31,13 @@ import Privacy from "./pages/Privacy";
 import VendorTerms from "./pages/VendorTerms";
 import VendorForgotPassword from "./pages/VendorForgotPassword";
 import Support from "./pages/Support";
+import Payments from "./pages/Payments";
+import Notifications from "./pages/Notifications";
+import Security from "./pages/Security";
+import Settings from "./pages/Settings";
+import EditProfile from "./pages/EditProfile";
+import ReviewsPage from "./pages/ReviewsPage";
+import Bookings from "./pages/Bookings";
 import NotFound from "./pages/NotFound";
 import ScrollToTop from "./components/ScrollToTop";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
@@ -89,7 +96,13 @@ const App = () => (
               <Route path="/vendor-terms" element={<VendorTerms />} />
               <Route path="/wishlist" element={<Wishlist />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/edit" element={<EditProfile />} />
               <Route path="/profile/support" element={<Support />} />
+              <Route path="/profile/notifications" element={<Notifications />} />
+              <Route path="/profile/security" element={<Security />} />
+              <Route path="/profile/settings" element={<Settings />} />
+              <Route path="/profile/reviews" element={<ReviewsPage />} />
+              <Route path="/bookings" element={<Bookings />} />
 
               {/* Vendor Protected Routes */}
               <Route path="/vendor" element={<VendorProvider><VendorLayout /></VendorProvider>}>

@@ -32,7 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface Invoice {
@@ -90,7 +90,7 @@ const VendorPOSHistory = () => {
         params.paymentMethod = paymentFilter;
       }
       const response = await api.vendor.getBookings(params);
-      const bookings = response.bookings || [];
+      const bookings = response.data || [];
       const invoiceData: Invoice[] = bookings.map((b: any) => ({
         id: b.id,
         invoiceNumber: `INV-${b.bookingNumber}`,
@@ -124,7 +124,7 @@ const VendorPOSHistory = () => {
       });
       
       const summary: Record<string, DailySummary> = {};
-      const bookings = response.bookings || [];
+      const bookings = response.data || [];
       
       bookings.forEach((b: any) => {
         const date = new Date(b.createdAt).toISOString().split("T")[0];

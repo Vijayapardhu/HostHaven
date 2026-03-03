@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface Notification {
@@ -34,7 +34,7 @@ const VendorNotifications = () => {
       const params: Record<string, string> = {};
       if (filter === "unread") params.isRead = "false";
       const response = await api.vendor.getNotifications(params);
-      setNotifications(response || []);
+      setNotifications(response.data || []);
       const meta = response?.meta || {};
       setUnreadCount(meta?.unreadCount || 0);
     } catch (error) {

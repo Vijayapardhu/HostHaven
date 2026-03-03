@@ -1,17 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, Mail, LogOut, Heart, Calendar, Settings, ChevronRight, LifeBuoy } from "lucide-react";
+import { User, Mail, LogOut, Heart, Calendar, Settings, ChevronRight, LifeBuoy, Camera, Shield, Bell, Edit2, Loader2, Phone, MapPin, MessageSquare, Star, Clock } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
+import api from "@/lib/api";
 
 const Profile = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const { items } = useWishlist();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [bookingCount, setBookingCount] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [completedBookings, setCompletedBookings] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      api.bookings.getMy({ limit: "1" })
+        .then((result) => setBookingCount(result?.meta?.total ?? 0))
+        .catch(() => setBookingCount(0));
+      
+      api.bookings.getMy({ status: "COMPLETED", limit: "1" })
+        .then((result) => setCompletedBookings(result?.meta?.total ?? 0))
+        .catch(() => setCompletedBookings(0));
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -42,11 +61,37 @@ const Profile = () => {
     }, 500);
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const avatarUrl = await api.auth.uploadAvatar(file);
+      await api.auth.updateProfile({ avatar: avatarUrl });
+      await refreshUser();
+      toast({ title: "Profile photo updated" });
+    } catch (error) {
+      toast({ title: "Failed to upload image", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const menuItems = [
-    { icon: Heart, label: "My Wishlist", value: `${items.length} items`, path: "/wishlist" },
-    { icon: Calendar, label: "My Bookings", value: "0 bookings", path: "/bookings" },
-    { icon: LifeBuoy, label: "Support", value: "Open a ticket", path: "/profile/support" },
-    { icon: Settings, label: "Settings", value: "", path: "/settings" },
+    { icon: Edit2, label: "Edit Profile", value: "Name, phone, photo", path: "/profile/edit", color: "text-primary" },
+    { icon: MapPin, label: "Saved Addresses", value: "Manage delivery addresses", path: "/profile/edit", color: "text-green-500" },
+    { icon: Heart, label: "My Wishlist", value: `${items.length} temples saved`, path: "/wishlist", color: "text-rose-500" },
+    { icon: Calendar, label: "My Bookings", value: `${bookingCount !== null ? bookingCount : '...'} bookings`, path: "/bookings", color: "text-blue-500" },
+    { icon: Star, label: "My Reviews", value: "Reviews you wrote", path: "/profile/reviews", color: "text-amber-500" },
+    { icon: Bell, label: "Notifications", value: "Preferences", path: "/profile/notifications", color: "text-orange-500" },
+    { icon: Shield, label: "Privacy & Security", value: "Password, 2FA", path: "/profile/security", color: "text-purple-500" },
+    { icon: MessageSquare, label: "Support", value: "Help center", path: "/profile/support", color: "text-cyan-500" },
+    { icon: Settings, label: "Settings", value: "Preferences", path: "/profile/settings", color: "text-gray-500" },
   ];
 
   return (
@@ -55,22 +100,79 @@ const Profile = () => {
         <div className="container mx-auto px-4 max-w-2xl">
           <div className="bg-card rounded-2xl shadow-card p-6 mb-6">
             <div className="flex items-center gap-4">
-              <Avatar className="w-16 h-16 border-2 border-primary">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="bg-primary/10 text-primary text-xl font-semibold">
-                  {user.name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative group">
+                <Avatar className="w-20 h-20 border-4 border-gold/30">
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-2xl font-semibold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  onClick={handleAvatarClick}
+                  disabled={isUploading}
+                  className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-6 h-6 text-white" />
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
               <div className="flex-1">
                 <h1 className="text-xl font-serif font-bold text-foreground">
                   {user.name}
                 </h1>
-                <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
                   <Mail className="w-4 h-4" />
                   {user.email}
                 </div>
+                {user.phone && (
+                  <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
+                    <Phone className="w-4 h-4" />
+                    {user.phone}
+                  </div>
+                )}
+                {user.isVerified && (
+                  <span className="inline-flex items-center gap-1 text-xs text-green-600 mt-1">
+                    <Shield className="w-3 h-3" /> Verified account
+                  </span>
+                )}
+                {user.createdAt && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                    <Clock className="w-3 h-3" />
+                    Member since {new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                  </div>
+                )}
               </div>
+              <Link to="/profile/edit">
+                <Button variant="outline" size="sm">
+                  <Edit2 className="w-4 h-4 mr-1" /> Edit
+                </Button>
+              </Link>
             </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <Link to="/wishlist" className="bg-gradient-to-br from-primary/10 to-gold/10 rounded-xl p-4 text-center hover:opacity-90 transition-opacity">
+              <div className="text-2xl font-bold text-primary">{items.length}</div>
+              <div className="text-xs text-muted-foreground">Wishlisted</div>
+            </Link>
+            <Link to="/bookings" className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-xl p-4 text-center hover:opacity-90 transition-opacity">
+              <div className="text-2xl font-bold text-blue-600">{bookingCount ?? 0}</div>
+              <div className="text-xs text-muted-foreground">Total</div>
+            </Link>
+            <Link to="/bookings?status=COMPLETED" className="bg-gradient-to-br from-gold/10 to-heritage-brown/10 rounded-xl p-4 text-center hover:opacity-90 transition-opacity">
+              <div className="text-2xl font-bold text-gold">{completedBookings ?? 0}</div>
+              <div className="text-xs text-muted-foreground">Completed</div>
+            </Link>
           </div>
 
           <div className="bg-card rounded-2xl shadow-card overflow-hidden">
@@ -85,8 +187,8 @@ const Profile = () => {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-primary" />
+                    <div className={`w-10 h-10 rounded-xl bg-muted flex items-center justify-center`}>
+                      <Icon className={`w-5 h-5 ${item.color}`} />
                     </div>
                     <div>
                       <p className="font-medium text-foreground">{item.label}</p>
@@ -101,9 +203,19 @@ const Profile = () => {
             })}
           </div>
 
+          <div className="flex items-center justify-center gap-4 mt-6 text-sm text-muted-foreground">
+            <Link to="/terms" className="hover:text-foreground transition-colors">
+              Terms & Conditions
+            </Link>
+            <span className="text-border">|</span>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">
+              Privacy Policy
+            </Link>
+          </div>
+
           <Button
             variant="outline"
-            className="w-full mt-6 text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive"
+            className="w-full mt-4 text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive"
             onClick={handleLogout}
             disabled={isLoggingOut}
           >

@@ -25,7 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface Room {
@@ -83,11 +83,11 @@ const VendorRooms = () => {
     setIsLoading(true);
     try {
       const props = await api.vendor.getProperties();
-      setProperties(props.properties || []);
+      setProperties(props.data || []);
       
-      if (props.properties && props.properties.length > 0) {
-        setSelectedProperty(props.properties[0].id);
-        const roomsData = await api.vendor.getRooms(props.properties[0].id);
+      if (props.data && props.data.length > 0) {
+        setSelectedProperty(props.data[0].id);
+        const roomsData = await api.vendor.getRooms(props.data[0].id);
         setRooms(roomsData || []);
       }
     } catch (error) {

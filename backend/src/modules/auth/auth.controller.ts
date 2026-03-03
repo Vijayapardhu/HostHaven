@@ -114,12 +114,14 @@ export const AuthController = {
     try {
       const { code, state } = googleCallbackSchema.parse(request.query);
 
-      // Verify state
-      const stateData = await cacheService.get(cacheService.keys.stateToken(state));
-      if (!stateData) {
-        return sendError(reply, ERROR_CODES.INVALID_TOKEN, 'Invalid or expired state token', 400);
+      // Verify state (skip if Redis is disabled)
+      if (config.redis.enabled) {
+        const stateData = await cacheService.get(cacheService.keys.stateToken(state));
+        if (!stateData) {
+          return sendError(reply, ERROR_CODES.INVALID_TOKEN, ' Invalid or expired state token', 400);
+        }
+        await cacheService.del(cacheService.keys.stateToken(state));
       }
-      await cacheService.del(cacheService.keys.stateToken(state));
 
       const result = await authService.handleGoogleCallback(
         code,
@@ -328,6 +330,80 @@ export const AuthController = {
         return sendError(reply, error.code, error.message, 404);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to change password', 500);
+    }
+  },
+
+  // ==========================================
+  // PROFILE
+  // ==========================================
+
+  async updateProfile(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user.id;
+      const data = request.body as { name?: string; avatar?: string; phone?: string };
+      const result = await authService.updateProfile(userId, data);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Update profile failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update profile', 500);
+    }
+  },
+
+  // ==========================================
+  // ADDRESSES
+  // ==========================================
+
+  async getAddresses(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user.id;
+      const addresses = await authService.getAddresses(userId);
+      return sendSuccess(reply, { addresses });
+    } catch (error: any) {
+      logger.error({ error }, 'Get addresses failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to get addresses', 500);
+    }
+  },
+
+  async addAddress(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user.id;
+      const data = request.body as { label: string; address: string; city: string; state: string; pincode: string };
+      const address = await authService.addAddress(userId, data);
+      return sendSuccess(reply, { address }, 201);
+    } catch (error: any) {
+      logger.error({ error }, 'Add address failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to add address', 500);
+    }
+  },
+
+  async updateAddress(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user.id;
+      const { id } = request.params as { id: string };
+      const data = request.body as { label?: string; address?: string; city?: string; state?: string; pincode?: string };
+      const address = await authService.updateAddress(userId, id, data);
+      return sendSuccess(reply, { address });
+    } catch (error: any) {
+      logger.error({ error }, 'Update address failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update address', 500);
+    }
+  },
+
+  async deleteAddress(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const userId = (request as any).user.id;
+      const { id } = request.params as { id: string };
+      await authService.deleteAddress(userId, id);
+      return sendSuccess(reply, { message: 'Address deleted successfully' });
+    } catch (error: any) {
+      logger.error({ error }, 'Delete address failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to delete address', 500);
     }
   },
 };

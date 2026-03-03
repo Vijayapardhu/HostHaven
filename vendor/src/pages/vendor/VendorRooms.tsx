@@ -91,11 +91,12 @@ const VendorRooms = () => {
     setErrorMessage(null);
     try {
       const props = await vendorService.getProperties();
-      setProperties(props.properties || []);
+      const propList = props.data || props || [];
+      setProperties(propList);
       
-      if (props.properties && props.properties.length > 0) {
-        setSelectedProperty(props.properties[0].id);
-        const roomsData = await roomsService.getRooms(props.properties[0].id);
+      if (propList.length > 0) {
+        setSelectedProperty(propList[0].id);
+        const roomsData = await roomsService.getRooms(propList[0].id);
         setRooms(roomsData || []);
       }
     } catch (error) {

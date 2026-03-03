@@ -93,7 +93,7 @@ const VendorProperties = () => {
     setErrorMessage(null);
     try {
       const response = await vendorService.getProperties();
-      setProperties(response.properties || []);
+      setProperties(response.data || response || []);
     } catch (error) {
       console.error("Failed to fetch properties:", error);
       setErrorMessage("Failed to load hotel properties. Please try again.");

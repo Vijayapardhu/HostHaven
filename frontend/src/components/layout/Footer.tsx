@@ -10,7 +10,7 @@ const Footer = ({ className = "" }: FooterProps) => {
   return (
     <footer className={`bg-heritage-brown text-cream-light ${className}`}>
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="space-y-4">
             <img src={logo} alt="HostHaven" className="h-16 w-auto brightness-110" />
@@ -35,7 +35,7 @@ const Footer = ({ className = "" }: FooterProps) => {
           <div>
             <h4 className="font-serif text-lg font-semibold mb-4 text-gold-light">Quick Links</h4>
             <ul className="space-y-2">
-              {["Hotels", "Homes", "Temples", "Services", "About Us"].map((link) => (
+              {["Hotels", "Homes", "Temples", "Services", "Contact"].map((link) => (
                 <li key={link}>
                   <Link
                     to={`/${link.toLowerCase().replace(" ", "-")}`}
@@ -57,6 +57,29 @@ const Footer = ({ className = "" }: FooterProps) => {
                   <span className="text-cream-light/80 text-sm">{place}</span>
                 </li>
               ))}
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div>
+            <h4 className="font-serif text-lg font-semibold mb-4 text-gold-light">Legal</h4>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  to="/terms"
+                  className="text-cream-light/80 hover:text-gold-light transition-colors text-sm"
+                >
+                  Terms & Conditions
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/privacy"
+                  className="text-cream-light/80 hover:text-gold-light transition-colors text-sm"
+                >
+                  Privacy Policy
+                </Link>
+              </li>
             </ul>
           </div>
 

@@ -59,4 +59,32 @@ export const vendorService = {
 
     return response.data;
   },
+
+  getHotel: async () => {
+    const response = await api.get("/v1/vendor/properties");
+    const properties = response.data?.data || response.data || [];
+    return Array.isArray(properties) ? properties[0] || null : properties;
+  },
+
+  updateHotel: async (data: unknown) => {
+    const propsResp = await api.get("/v1/vendor/properties");
+    const properties = propsResp.data?.data || propsResp.data || [];
+    const hotel = Array.isArray(properties) ? properties[0] : null;
+    if (!hotel?.id) throw new Error("No hotel found");
+    const response = await api.put(`/v1/properties/${hotel.id}`, data);
+    return response.data;
+  },
+
+  uploadHotelImage: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post("/v1/uploads/single?folder=hosthaven", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+
+  deleteHotelImage: async (_imgId: string) => {
+    return { success: true };
+  },
 };

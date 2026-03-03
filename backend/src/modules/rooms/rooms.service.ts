@@ -278,7 +278,7 @@ export class RoomsService {
     return rooms.map(this.sanitizeRoom);
   }
 
-  private sanitizeRoom(room: any) {
+  private sanitizeRoom = (room: any) => {
     return {
       id: room.id,
       propertyId: room.propertyId,

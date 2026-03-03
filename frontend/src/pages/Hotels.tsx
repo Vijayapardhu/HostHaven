@@ -5,7 +5,7 @@ import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import WishlistButton from "@/components/WishlistButton";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   Pagination,
   PaginationContent,
@@ -41,15 +41,17 @@ const Hotels = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const result = await api.properties.getAll({
+        const params: Record<string, string> = {
           type: "HOTEL",
           page: page.toString(),
           limit: "12",
-          search: searchQuery || undefined,
-          city: selectedLocation !== "all" ? selectedLocation : undefined,
           sortBy: sortBy === "newest" ? "createdAt" : sortBy,
-        });
-        setHotels(result.properties || []);
+        };
+        if (searchQuery) params.search = searchQuery;
+        // Only send city if it's a valid city (not 'all' or undefined)
+        if (selectedLocation && selectedLocation !== "all") params.city = selectedLocation;
+        const result = await api.properties.getAll(params);
+        setHotels(result.data || []);
         setTotalPages(result.meta?.totalPages || 1);
       } catch (err: any) {
         setError(err?.message || "Failed to load hotels");

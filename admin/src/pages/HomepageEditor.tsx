@@ -12,11 +12,11 @@ import {
   Link2,
   MapPin,
 } from "lucide-react";
+import { ImageUpload, type UploadedImage } from "../components/ui/ImageUpload";
 import {
   settingsService,
   type HomepageConfig,
   type BannerSlide,
-  type DestinationItem,
   type FeatureCardItem,
   type ServiceCardItem,
   type TempleItem,
@@ -35,12 +35,13 @@ const defaultConfig: HomepageConfig = {
   sections: {
     banner: { isVisible: true, order: 0 },
     hero: { isVisible: true, order: 1 },
-    features: { isVisible: true, order: 2 },
-    destinations: { isVisible: true, order: 3 },
-    recommendations: { isVisible: true, order: 4 },
-    temples: { isVisible: true, order: 5 },
-    services: { isVisible: true, order: 6 },
-    becomePartner: { isVisible: true, order: 7 },
+    promoBanner: { isVisible: true, order: 2 },
+    features: { isVisible: true, order: 3 },
+    destinations: { isVisible: true, order: 4 },
+    recommendations: { isVisible: true, order: 5 },
+    temples: { isVisible: true, order: 6 },
+    services: { isVisible: true, order: 7 },
+    becomePartner: { isVisible: true, order: 8 },
   },
   bannerSlides: [],
   destinations: [],
@@ -53,11 +54,18 @@ const defaultConfig: HomepageConfig = {
     ctaText: "Become a Partner",
     ctaLink: "/vendor/signup",
   },
+  promoBanner: {
+    isVisible: true,
+    imageUrl: "",
+    link: "/",
+    title: "",
+  },
 };
 
 const SECTION_LABELS: Record<string, string> = {
   banner: "Banner Carousel",
   hero: "Search Hero",
+  promoBanner: "Promo Banner",
   features: "Feature Cards",
   destinations: "Top Destinations",
   recommendations: "Recommendations",
@@ -139,6 +147,7 @@ export default function HomepageEditor() {
   const tabs = [
     { id: "sections", label: "Sections" },
     { id: "banners", label: "Banners" },
+    { id: "promo", label: "Promo Banner" },
     { id: "destinations", label: "Destinations" },
     { id: "features", label: "Features" },
     { id: "temples", label: "Temples" },
@@ -177,7 +186,7 @@ export default function HomepageEditor() {
       <PageHeader
         title="Homepage Editor"
         description="Customize the frontend homepage sections, banners, destinations, and more."
-        action={
+        actions={
           <button
             type="button"
             onClick={handleSave}
@@ -196,11 +205,10 @@ export default function HomepageEditor() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
+            className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors ${activeTab === tab.id
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+              }`}
           >
             {tab.label}
           </button>
@@ -230,14 +238,12 @@ export default function HomepageEditor() {
                   <button
                     type="button"
                     onClick={() => toggleSection(key)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      config.sections[key]?.isVisible ? "bg-indigo-600" : "bg-slate-200"
-                    }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.sections[key]?.isVisible ? "bg-indigo-600" : "bg-slate-200"
+                      }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        config.sections[key]?.isVisible ? "translate-x-6" : "translate-x-1"
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.sections[key]?.isVisible ? "translate-x-6" : "translate-x-1"
+                        }`}
                     />
                   </button>
                 </div>
@@ -277,9 +283,9 @@ export default function HomepageEditor() {
             {config.bannerSlides.length === 0 ? (
               <p className="text-center text-sm text-slate-400 py-8">No banner slides configured. Add one to get started.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
                 {config.bannerSlides.map((slide, idx) => (
-                  <div key={slide.id} className="rounded-lg border border-slate-200 p-4 space-y-3">
+                  <div key={slide.id} className="rounded-lg border border-slate-200 p-4 space-y-3 shrink-0">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-slate-700">Slide {idx + 1}</span>
                       <div className="flex items-center gap-2">
@@ -316,7 +322,14 @@ export default function HomepageEditor() {
                       <InputField label="Title" value={slide.title} onChange={(v) => updateBannerField(idx, "title", v)} />
                       <InputField label="Subtitle" value={slide.subtitle} onChange={(v) => updateBannerField(idx, "subtitle", v)} />
                       <InputField label="Tags" value={slide.tags} onChange={(v) => updateBannerField(idx, "tags", v)} />
-                      <InputField label="Image URL" value={slide.imageUrl} onChange={(v) => updateBannerField(idx, "imageUrl", v)} />
+                      <div className="col-span-2">
+                        <ImageUpload
+                          label="Banner Image"
+                          maxImages={1}
+                          images={slide.imageUrl ? [{ url: slide.imageUrl, alt: slide.title }] : []}
+                          onChange={(imgs: UploadedImage[]) => updateBannerField(idx, "imageUrl", imgs[0]?.url || "")}
+                        />
+                      </div>
                       <InputField label="CTA Text" value={slide.ctaText} onChange={(v) => updateBannerField(idx, "ctaText", v)} />
                       <InputField label="CTA Link" value={slide.ctaLink} onChange={(v) => updateBannerField(idx, "ctaLink", v)} />
                     </div>
@@ -324,6 +337,74 @@ export default function HomepageEditor() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Destinations Tab */}
+      {activeTab === "promo" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Image className="h-4 w-4 text-slate-500" />
+              Promo Banner (Below Hero)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">Enable Promo Banner</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      sections: {
+                        ...prev.sections,
+                        promoBanner: { ...prev.sections.promoBanner, isVisible: !prev.sections.promoBanner?.isVisible },
+                      },
+                    }))
+                  }
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.sections.promoBanner?.isVisible ? "bg-indigo-600" : "bg-slate-200"
+                    }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.sections.promoBanner?.isVisible ? "translate-x-6" : "translate-x-1"
+                      }`}
+                  />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <InputField
+                  label="Banner Title"
+                  value={config.promoBanner?.title || ""}
+                  onChange={(v) => setConfig((prev) => ({ ...prev, promoBanner: { ...prev.promoBanner!, title: v } }))}
+                />
+                <div>
+                  <ImageUpload
+                    label="Promo Banner Image"
+                    maxImages={1}
+                    images={config.promoBanner?.imageUrl ? [{ url: config.promoBanner.imageUrl, alt: config.promoBanner.title }] : []}
+                    onChange={(imgs: UploadedImage[]) => setConfig((prev) => ({ ...prev, promoBanner: { ...prev.promoBanner!, imageUrl: imgs[0]?.url || "" } }))}
+                  />
+                </div>
+                <InputField
+                  label="Link (when clicked)"
+                  value={config.promoBanner?.link || ""}
+                  onChange={(v) => setConfig((prev) => ({ ...prev, promoBanner: { ...prev.promoBanner!, link: v } }))}
+                />
+              </div>
+              {config.promoBanner?.imageUrl && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-slate-700 mb-2">Preview</p>
+                  <img
+                    src={config.promoBanner.imageUrl}
+                    alt="Promo preview"
+                    className="w-full max-h-48 object-cover rounded-lg border border-slate-200"
+                  />
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -359,10 +440,17 @@ export default function HomepageEditor() {
               items={config.destinations}
               onUpdate={(items) => setConfig((prev) => ({ ...prev, destinations: items }))}
               renderFields={(item, idx) => (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <InputField label="Name" value={item.name} onChange={(v) => updateListField("destinations", idx, "name", v)} />
-                  <InputField label="Image URL" value={item.imageUrl} onChange={(v) => updateListField("destinations", idx, "imageUrl", v)} />
                   <InputField label="Link" value={item.link} onChange={(v) => updateListField("destinations", idx, "link", v)} />
+                  <div className="col-span-2">
+                    <ImageUpload
+                      label="Destination Image"
+                      maxImages={1}
+                      images={item.imageUrl ? [{ url: item.imageUrl, alt: item.name }] : []}
+                      onChange={(imgs: UploadedImage[]) => updateListField("destinations", idx, "imageUrl", imgs[0]?.url || "")}
+                    />
+                  </div>
                 </div>
               )}
             />
@@ -414,7 +502,7 @@ export default function HomepageEditor() {
                       ))}
                     </select>
                   </div>
-                  <InputField label="Title" value={item.name || (item as FeatureCardItem).title} onChange={(v) => updateListField("featureCards", idx, "title", v)} />
+                  <InputField label="Title" value={(item as FeatureCardItem).title || ""} onChange={(v) => updateListField("featureCards", idx, "title", v)} />
                   <InputField label="Description" value={(item as FeatureCardItem).description} onChange={(v) => updateListField("featureCards", idx, "description", v)} />
                   <InputField label="Badge Text" value={(item as FeatureCardItem).badge || ""} onChange={(v) => updateListField("featureCards", idx, "badge", v)} />
                   <InputField label="Link (optional)" value={(item as FeatureCardItem).link || ""} onChange={(v) => updateListField("featureCards", idx, "link", v)} />
@@ -459,8 +547,15 @@ export default function HomepageEditor() {
                 <div className="grid grid-cols-2 gap-3">
                   <InputField label="Name" value={(item as TempleItem).name} onChange={(v) => updateListField("temples", idx, "name", v)} />
                   <InputField label="Location" value={(item as TempleItem).location} onChange={(v) => updateListField("temples", idx, "location", v)} />
-                  <InputField label="Image URL" value={item.imageUrl || (item as TempleItem).imageUrl} onChange={(v) => updateListField("temples", idx, "imageUrl", v)} />
                   <InputField label="Link" value={(item as TempleItem).link} onChange={(v) => updateListField("temples", idx, "link", v)} />
+                  <div className="col-span-2">
+                    <ImageUpload
+                      label="Temple Image"
+                      maxImages={1}
+                      images={item.imageUrl || (item as TempleItem).imageUrl ? [{ url: item.imageUrl || (item as TempleItem).imageUrl, alt: (item as TempleItem).name }] : []}
+                      onChange={(imgs: UploadedImage[]) => updateListField("temples", idx, "imageUrl", imgs[0]?.url || "")}
+                    />
+                  </div>
                 </div>
               )}
             />
@@ -604,9 +699,9 @@ function ItemList<T extends { id: string; isActive: boolean }>({
     return <p className="text-center text-sm text-slate-400 py-8">No items configured. Add one to get started.</p>;
   }
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
       {items.map((item, idx) => (
-        <div key={item.id} className="rounded-lg border border-slate-200 p-4 space-y-3">
+        <div key={item.id} className="rounded-lg border border-slate-200 p-4 space-y-3 shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-700">Item {idx + 1}</span>
             <div className="flex items-center gap-2">

@@ -39,7 +39,7 @@ const EditRoom = () => {
     const fetchData = async () => {
       try {
         const propertiesResponse = await vendorService.getProperties();
-        const propertyOptions = (propertiesResponse.properties || []).map((p: any) => ({ id: p.id, name: p.name }));
+        const propertyOptions = (propertiesResponse.data || propertiesResponse || []).map((p: any) => ({ id: p.id, name: p.name }));
         setProperties(propertyOptions);
 
         let foundRoom: RoomRecord | null = null;

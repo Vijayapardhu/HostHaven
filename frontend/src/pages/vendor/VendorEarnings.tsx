@@ -4,7 +4,7 @@ import { DollarSign, TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, CreditC
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface Payout {
   id: string;

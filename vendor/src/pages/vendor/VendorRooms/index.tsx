@@ -42,7 +42,7 @@ const VendorRoomsIndex = () => {
 
 	const fetchProperties = async () => {
 		const response = await vendorService.getProperties();
-		const list = (response?.properties || []).map((property: any) => ({
+		const list = (response?.data || response || []).map((property: any) => ({
 			id: property.id,
 			name: property.name,
 		}));

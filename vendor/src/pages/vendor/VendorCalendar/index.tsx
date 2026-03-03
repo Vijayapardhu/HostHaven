@@ -34,7 +34,7 @@ const VendorCalendarIndex = () => {
   const fetchProperties = async () => {
     try {
       const response = await vendorService.getProperties();
-      const list = (response?.properties || []).map((p: any) => ({ id: p.id, name: p.name }));
+      const list = (response?.data || response || []).map((p: any) => ({ id: p.id, name: p.name }));
       setProperties(list);
 
       if (list.length > 0) {

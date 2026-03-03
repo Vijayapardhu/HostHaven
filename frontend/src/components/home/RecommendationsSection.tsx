@@ -1,48 +1,42 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 
 interface RecommendationItem {
   id: string;
   name: string;
   rating: number;
-  reviews: number;
-  price: number;
-  originalPrice: number;
-  image: string;
+  reviewCount?: number;
+  reviews?: number;
+  basePrice?: number;
+  price?: number;
+  originalPrice?: number;
+  image?: string;
+  images?: Array<{ url: string }>;
 }
 
-const recommendations: RecommendationItem[] = [
-  {
-    id: "1",
-    name: "Hotel 1",
-    rating: 4,
-    reviews: 502,
-    price: 1999,
-    originalPrice: 2499,
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600",
-  },
-  {
-    id: "2",
-    name: "Hotel 2",
-    rating: 4,
-    reviews: 502,
-    price: 1999,
-    originalPrice: 2499,
-    image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600",
-  },
-  {
-    id: "3",
-    name: "Hotel 3",
-    rating: 4,
-    reviews: 502,
-    price: 1999,
-    originalPrice: 2499,
-    image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600",
-  },
-];
+const getImage = (item: RecommendationItem) => {
+  if (item.image) return item.image;
+  if (item.images && item.images.length > 0) return item.images[0].url;
+  return "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600";
+};
 
 const RecommendationsSection = () => {
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
+
+  useEffect(() => {
+    api.properties.getFeatured()
+      .then((data: any) => {
+        const all = Array.isArray(data) ? data : data?.properties || [];
+        setRecommendations(all.slice(0, 3));
+      })
+      .catch(() => {});
+  }, []);
+
+  if (recommendations.length === 0) return null;
+
   return (
     <section className="py-6 bg-background">
       <div className="container mx-auto px-4">
@@ -51,54 +45,56 @@ const RecommendationsSection = () => {
         </h2>
 
         <div className="grid grid-cols-3 gap-3 md:gap-6">
-          {recommendations.map((item) => (
-            <Link
-              key={item.id}
-              to={`/hotels/${item.id}`}
-              className="group bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all"
-            >
-              <div className="aspect-[4/3] overflow-hidden">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-              </div>
-              <div className="p-2 md:p-4">
-                <h3 className="font-semibold text-sm md:text-base text-foreground truncate">
-                  {item.name}
-                </h3>
-                <div className="flex items-center gap-1 mt-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-3 h-3 ${
-                        i < item.rating
-                          ? "text-primary fill-primary"
-                          : "text-muted-foreground"
-                      }`}
-                    />
-                  ))}
-                  <span className="text-xs text-muted-foreground">({item.reviews})</span>
+          {recommendations.map((item) => {
+            const price = item.basePrice || item.price || 0;
+            const reviews = item.reviewCount || item.reviews || 0;
+            return (
+              <Link
+                key={item.id}
+                to={`/hotels/${item.id}`}
+                className="group bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all"
+              >
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img
+                    src={getImage(item)}
+                    alt={item.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
                 </div>
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="font-bold text-sm md:text-base text-foreground">
-                    ₹{item.price.toLocaleString()}
-                  </span>
-                  <span className="text-xs text-muted-foreground line-through">
-                    ({item.originalPrice.toLocaleString()})
-                  </span>
+                <div className="p-2 md:p-4">
+                  <h3 className="font-semibold text-sm md:text-base text-foreground truncate">
+                    {item.name}
+                  </h3>
+                  <div className="flex items-center gap-1 mt-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-3 h-3 ${
+                          i < Math.round(item.rating || 0)
+                            ? "text-primary fill-primary"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                    ))}
+                    <span className="text-xs text-muted-foreground">({reviews})</span>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="font-bold text-sm md:text-base text-foreground">
+                      ₹{price.toLocaleString()}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/night</span>
+                  </div>
+                  <Button 
+                    variant="goldOutline" 
+                    size="sm" 
+                    className="w-full mt-2 text-xs md:text-sm h-8"
+                  >
+                    View Details
+                  </Button>
                 </div>
-                <Button 
-                  variant="goldOutline" 
-                  size="sm" 
-                  className="w-full mt-2 text-xs md:text-sm h-8"
-                >
-                  View Details
-                </Button>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -1,95 +1,51 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, MapPin, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 
 interface FeaturedItem {
   id: string;
   name: string;
-  location: string;
-  price: number;
+  location?: string;
+  city?: string;
+  price?: number;
+  basePrice?: number;
   rating: number;
-  image: string;
-  type: "hotel" | "home";
+  image?: string;
+  images?: Array<{ url: string }>;
+  type: "hotel" | "home" | "HOTEL" | "HOME";
 }
-
-const featuredHotels: FeaturedItem[] = [
-  {
-    id: "1",
-    name: "Hotel Minerva Grand",
-    location: "Vijayawada",
-    price: 6500,
-    rating: 4.7,
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600",
-    type: "hotel",
-  },
-  {
-    id: "2",
-    name: "Sri Sai Residency",
-    location: "Nandyala",
-    price: 3200,
-    rating: 4.5,
-    image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=600",
-    type: "hotel",
-  },
-  {
-    id: "3",
-    name: "Beach View Resort",
-    location: "Vetapalem",
-    price: 4800,
-    rating: 4.6,
-    image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600",
-    type: "hotel",
-  },
-];
-
-const featuredHomes: FeaturedItem[] = [
-  {
-    id: "1",
-    name: "Krishna Riverside Villa",
-    location: "Vijayawada",
-    price: 4500,
-    rating: 4.7,
-    image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600",
-    type: "home",
-  },
-  {
-    id: "2",
-    name: "Heritage Cottage",
-    location: "Nandyala",
-    price: 2800,
-    rating: 4.4,
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600",
-    type: "home",
-  },
-  {
-    id: "3",
-    name: "Seaside Home",
-    location: "Vetapalem",
-    price: 3500,
-    rating: 4.6,
-    image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600",
-    type: "home",
-  },
-];
 
 interface FeaturedCardProps {
   item: FeaturedItem;
 }
 
+const getItemImage = (item: FeaturedItem) => {
+  if (item.image) return item.image;
+  if (item.images?.length) return item.images[0].url;
+  return "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600";
+};
+
+const getItemType = (item: FeaturedItem) => {
+  const t = item.type?.toLowerCase();
+  return t === "home" ? "home" : "hotel";
+};
+
 const FeaturedCard = ({ item }: FeaturedCardProps) => (
   <Link
-    to={`/${item.type}s/${item.id}`}
+    to={`/${getItemType(item)}s/${item.id}`}
     className="group block bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
   >
     <div className="relative h-48 overflow-hidden">
       <img
-        src={item.image}
+        src={getItemImage(item)}
         alt={item.name}
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
       />
       <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
         <Star className="w-4 h-4 text-primary fill-primary" />
-        <span className="text-sm font-medium">{item.rating}</span>
+        <span className="text-sm font-medium">{item.rating || 0}</span>
       </div>
     </div>
     <div className="p-4">
@@ -98,11 +54,11 @@ const FeaturedCard = ({ item }: FeaturedCardProps) => (
       </h3>
       <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
         <MapPin className="w-4 h-4" />
-        {item.location}
+        {item.city || item.location || ""}
       </div>
       <div className="flex items-center justify-between mt-3">
         <p className="font-semibold text-foreground">
-          ₹{item.price.toLocaleString()}
+          ₹{(item.basePrice || item.price || 0).toLocaleString()}
           <span className="text-muted-foreground font-normal text-sm">/night</span>
         </p>
         <Button variant="goldOutline" size="sm">
@@ -137,31 +93,61 @@ const FeaturedSection = ({ title, subtitle, items, viewAllLink }: FeaturedSectio
           </Button>
         </Link>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {items.map((item) => (
-          <FeaturedCard key={item.id} item={item} />
-        ))}
-      </div>
+      {items.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {items.map((item) => (
+            <FeaturedCard key={item.id} item={item} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-center text-muted-foreground py-8">No featured properties available yet.</p>
+      )}
     </div>
   </section>
 );
 
-export const FeaturedHotels = () => (
-  <FeaturedSection
-    title="Featured Hotels"
-    subtitle="Handpicked luxury stays across Andhra Pradesh"
-    items={featuredHotels}
-    viewAllLink="/hotels"
-  />
-);
+export const FeaturedHotels = () => {
+  const [items, setItems] = useState<FeaturedItem[]>([]);
 
-export const FeaturedHomes = () => (
-  <FeaturedSection
-    title="Featured Homes"
-    subtitle="Authentic home stays for a local experience"
-    items={featuredHomes}
-    viewAllLink="/homes"
-  />
-);
+  useEffect(() => {
+    api.properties.getFeatured()
+      .then((data: any) => {
+        const all = Array.isArray(data) ? data : data?.properties || [];
+        setItems(all.filter((p: any) => p.type?.toUpperCase() === "HOTEL").slice(0, 6));
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <FeaturedSection
+      title="Featured Hotels"
+      subtitle="Handpicked luxury stays across Andhra Pradesh"
+      items={items}
+      viewAllLink="/hotels"
+    />
+  );
+};
+
+export const FeaturedHomes = () => {
+  const [items, setItems] = useState<FeaturedItem[]>([]);
+
+  useEffect(() => {
+    api.properties.getFeatured()
+      .then((data: any) => {
+        const all = Array.isArray(data) ? data : data?.properties || [];
+        setItems(all.filter((p: any) => p.type?.toUpperCase() === "HOME").slice(0, 6));
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <FeaturedSection
+      title="Featured Homes"
+      subtitle="Authentic home stays for a local experience"
+      items={items}
+      viewAllLink="/homes"
+    />
+  );
+};
 
 export default FeaturedSection;

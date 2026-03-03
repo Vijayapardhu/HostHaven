@@ -61,7 +61,7 @@ const VendorInventory = () => {
   const fetchProperties = async () => {
     try {
       const response = await vendorService.getProperties();
-      const list = (response?.properties || []).map((p: any) => ({
+      const list = (response?.data || response || []).map((p: any) => ({
         id: p.id,
         name: p.name,
       }));

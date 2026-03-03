@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/v1';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000/v1').replace(/\/$/, '');
 
 interface ApiResponse<T> {
   success: boolean;
@@ -66,6 +66,20 @@ class ApiService {
     return this.handleResponse<T>(response);
   }
 
+  // For paginated endpoints where meta is sent as a sibling of data in the response envelope
+  private async getPage<T>(endpoint: string, includeAuth: boolean = true): Promise<{ data: T; meta: any }> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'GET',
+      headers: this.getHeaders(includeAuth),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      const error = json.error || { code: 'UNKNOWN_ERROR', message: 'An unexpected error occurred' };
+      throw new Error(error.message);
+    }
+    return { data: json.data as T, meta: json.meta };
+  }
+
   async post<T>(endpoint: string, body?: any, includeAuth: boolean = false): Promise<T> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'POST',
@@ -101,7 +115,7 @@ class ApiService {
 
   // Auth endpoints
   auth = {
-    register: (data: { name: string; email: string; password: string }) =>
+    register: (data: { name: string; email: string; password: string; confirmPassword: string }) =>
       this.post<{ user: any; message: string }>('/auth/register', data),
 
     login: (data: { email: string; password: string }) =>
@@ -143,8 +157,8 @@ class ApiService {
     forgotPassword: (email: string) =>
       this.post<{ message: string }>('/auth/forgot-password', { email }),
 
-    resetPassword: (token: string, password: string) =>
-      this.post<{ message: string }>('/auth/reset-password', { token, password }),
+    resetPassword: (token: string, password: string, confirmPassword: string) =>
+      this.post<{ message: string }>('/auth/reset-password', { token, password, confirmPassword }),
 
     linkGoogle: (idToken: string) =>
       this.post<{ message: string }>('/auth/link-google', { idToken }, true),
@@ -152,27 +166,77 @@ class ApiService {
     unlinkGoogle: () =>
       this.delete<{ message: string }>('/auth/unlink-google'),
 
+    updateProfile: (data: { name?: string; avatar?: string; phone?: string }) =>
+      this.put<{ user: any }>('/auth/profile', data),
+
+    changePassword: (currentPassword: string, newPassword: string) =>
+      this.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
+
+    uploadAvatar: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'hosthaven/avatars');
+
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${this.baseUrl}/uploads/single?folder=hosthaven/avatars`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error?.message || 'Upload failed');
+      }
+      return data.data.url;
+    },
+
     getNotifications: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
-      return this.get<any>(`/notifications${query}`);
+      return this.getPage<any[]>(`/notifications${query}`);
     },
 
     markNotificationRead: (id: string) =>
-      this.put<any>(`/notifications/${id}/read`),
+      this.put<any>(`/notifications/${id}/read`, {}),
 
     markAllNotificationsRead: () =>
-      this.put<any>(`/notifications/read-all`),
+      this.put<any>(`/notifications/read-all`, {}),
+
+    getAddresses: () =>
+      this.get<any[]>('/auth/addresses'),
+
+    addAddress: (data: { label: string; address: string; city: string; state: string; pincode: string }) =>
+      this.post<any>('/auth/addresses', data),
+
+    updateAddress: (id: string, data: { label?: string; address?: string; city?: string; state?: string; pincode?: string }) =>
+      this.put<any>(`/auth/addresses/${id}`, data),
+
+    deleteAddress: (id: string) =>
+      this.delete<any>(`/auth/addresses/${id}`),
   };
 
   // Properties endpoints
   properties = {
     getAll: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
-      return this.get<{ properties: any[]; meta: any }>(`/properties${query}`);
+      return this.getPage<any[]>(`/properties${query}`);
     },
 
     getById: (id: string) =>
       this.get<any>(`/properties/${id}`),
+
+    getFeatured: () =>
+      this.get<any[]>(`/properties/featured`, false),
+
+    getCities: () =>
+      this.get<Array<{ city: string; state: string; count: number }>>(`/properties/cities`, false),
+
+    search: (params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return this.getPage<any[]>(`/properties/search${query}`, false);
+    },
   };
 
   // Inventory endpoints
@@ -238,6 +302,11 @@ class ApiService {
 
     cancel: (bookingId: string, reason?: string) =>
       this.put<any>(`/bookings/${bookingId}/cancel`, { reason }, true),
+
+    getMy: (params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return this.getPage<any[]>(`/bookings${query}`);
+    },
   };
 
   // Support ticket endpoints
@@ -251,17 +320,61 @@ class ApiService {
 
     getMy: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
-      return this.get<any>(`/support/tickets/my${query}`, true);
+      return this.getPage<any[]>(`/support/tickets/my${query}`, true);
     },
+  };
+
+  // Temples endpoints
+  temples = {
+    getAll: (params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return this.getPage<any[]>(`/temples${query}`, false);
+    },
+
+    getById: (idOrSlug: string) =>
+      this.get<any>(`/temples/${idOrSlug}`, false),
+  };
+
+  // Services endpoints (public listing)
+  services = {
+    getAll: (params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return this.getPage<any[]>(`/services${query}`, false);
+    },
+
+    getById: (id: string) =>
+      this.get<any>(`/services/${id}`, false),
+  };
+
+  // Reviews endpoints (public)
+  reviews = {
+    getByProperty: (propertyId: string, params?: Record<string, string>) => {
+      const query = params ? `?${new URLSearchParams(params)}` : '';
+      return this.get<any>(`/reviews/property/${propertyId}${query}`, false);
+    },
+  };
+
+  // Contact form
+  contact = {
+    submit: (data: {
+      name: string;
+      email: string;
+      phone: string;
+      subject: string;
+      message: string;
+    }) => this.post<any>('/support/tickets', {
+      category: data.subject,
+      message: `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone}\n\n${data.message}`,
+    }, true),
   };
 
   // Wishlist endpoints
   wishlist = {
     getAll: () =>
-      this.get<{ items: any[] }>('/wishlist'),
+      this.getPage<any[]>('/wishlist'),
 
-    add: (itemType: string, itemId: string) =>
-      this.post<{ item: any }>('/wishlist', { itemType, itemId }, true),
+    add: (data: { itemType: string; itemId: string; itemName: string; itemImage: string; itemLocation: string; itemPrice?: number; itemRating?: number }) =>
+      this.post<{ item: any }>('/wishlist', data, true),
 
     remove: (id: string) =>
       this.delete<{ success: boolean }>(`/wishlist/${id}`),
@@ -293,8 +406,8 @@ class ApiService {
     forgotPassword: (email: string) =>
       this.post<{ message: string }>('/auth/forgot-password', { email }),
 
-    resetPassword: (token: string, password: string) =>
-      this.post<{ message: string }>('/auth/reset-password', { token, password }),
+    resetPassword: (token: string, password: string, confirmPassword: string) =>
+      this.post<{ message: string }>('/auth/reset-password', { token, password, confirmPassword }),
 
     getDashboard: () =>
       this.get<any>('/vendor/dashboard'),
@@ -319,7 +432,7 @@ class ApiService {
 
     getProperties: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
-      return this.get<any>(`/vendor/properties${query}`);
+      return this.getPage<any[]>(`/vendor/properties${query}`);
     },
 
     getPropertyById: (id: string) =>
@@ -348,15 +461,15 @@ class ApiService {
 
     getBookings: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
-      return this.get<any>(`/bookings/vendor/bookings${query}`);
+      return this.getPage<any[]>(`/bookings/vendor/bookings${query}`);
     },
 
     getBookingById: (id: string) =>
       this.get<any>(`/bookings/${id}`),
 
     updateBookingStatus: (id: string, status: string) => {
-      if (status === 'CHECKED_IN') return this.put<any>(`/bookings/vendor/${id}/check-in`);
-      if (status === 'CHECKED_OUT') return this.put<any>(`/bookings/vendor/${id}/check-out`);
+      if (status === 'CHECKED_IN') return this.put<any>(`/bookings/vendor/${id}/check-in`, {});
+      if (status === 'CHECKED_OUT') return this.put<any>(`/bookings/vendor/${id}/check-out`, {});
       if (status === 'CANCELLED') return this.put<any>(`/bookings/${id}/cancel`, { reason: 'Cancelled by vendor' });
       return this.put<any>(`/bookings/${id}/cancel`, { reason: status });
     },
@@ -377,10 +490,10 @@ class ApiService {
     }) => this.post<any>('/bookings/vendor/quick-booking', data, true),
 
     checkIn: (id: string) =>
-      this.put<any>(`/bookings/vendor/${id}/check-in`),
+      this.put<any>(`/bookings/vendor/${id}/check-in`, {}),
 
     checkOut: (id: string) =>
-      this.put<any>(`/bookings/vendor/${id}/check-out`),
+      this.put<any>(`/bookings/vendor/${id}/check-out`, {}),
 
     getInvoice: (id: string) =>
       this.get<any>(`/bookings/vendor/${id}/invoice`),
@@ -392,14 +505,14 @@ class ApiService {
 
     getNotifications: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
-      return this.get<any>(`/vendor/notifications${query}`);
+      return this.getPage<any[]>(`/vendor/notifications${query}`);
     },
 
     markNotificationRead: (id: string) =>
-      this.put<any>(`/vendor/notifications/${id}/read`),
+      this.put<any>(`/vendor/notifications/${id}/read`, {}),
 
     markAllNotificationsRead: () =>
-      this.put<any>(`/vendor/notifications/read-all`),
+      this.put<any>(`/vendor/notifications/read-all`, {}),
 
     getReviews: (propertyId: string) =>
       this.get<any>(`/reviews/property/${propertyId}`),
@@ -466,7 +579,7 @@ class ApiService {
     },
 
     approveVendor: (vendorId: string) =>
-      this.put<any>(`/vendor/${vendorId}/approve`),
+      this.put<any>(`/vendor/${vendorId}/approve`, {}),
 
     getNotifications: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
@@ -474,10 +587,10 @@ class ApiService {
     },
 
     markNotificationRead: (id: string) =>
-      this.put<any>(`/admin/notifications/${id}/read`),
+      this.put<any>(`/admin/notifications/${id}/read`, {}),
 
     markAllNotificationsRead: () =>
-      this.put<any>(`/admin/notifications/read-all`),
+      this.put<any>(`/admin/notifications/read-all`, {}),
   };
 }
 

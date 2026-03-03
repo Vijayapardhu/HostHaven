@@ -1,175 +1,181 @@
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MapPin, ChevronRight } from "lucide-react";
+import { MapPin, ChevronRight, Loader2, Search } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-
-import kanakaDurgaImg from "@/assets/temples/kanaka-durga.jpg";
-import undavalliImg from "@/assets/temples/undavalli.jpg";
-import prakasamImg from "@/assets/temples/prakasam-barrage.jpg";
-import mahanandiImg from "@/assets/temples/mahanandi.jpg";
-import ahobilamImg from "@/assets/temples/ahobilam.jpg";
-import srisailamImg from "@/assets/temples/srisailam.jpg";
-import vetapalemImg from "@/assets/temples/vetapalem-temple.jpg";
-import vodarevuImg from "@/assets/temples/vodarevu.jpg";
+import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
 
 interface Temple {
   id: string;
   name: string;
-  location: string;
-  region: string;
-  image: string;
-  description: string;
+  slug: string;
+  city: string;
+  fullAddress: string;
+  landmark?: string;
+  deityName?: string;
+  templeType?: string;
+  images?: Array<string | { url?: string; isPrimary?: boolean }>;
 }
 
-const temples: Temple[] = [
-  {
-    id: "kanaka-durga",
-    name: "Kanaka Durga Temple",
-    location: "Vijayawada",
-    region: "Vijayawada",
-    image: kanakaDurgaImg,
-    description: "Ancient temple dedicated to Goddess Durga, situated atop Indrakeeladri hill on Krishna riverbank.",
-  },
-  {
-    id: "undavalli",
-    name: "Undavalli Caves",
-    location: "Vijayawada",
-    region: "Vijayawada",
-    image: undavalliImg,
-    description: "Ancient rock-cut cave temples dating back to the 4th-5th century CE with stunning sculptures.",
-  },
-  {
-    id: "prakasam-barrage",
-    name: "Prakasam Barrage Temple",
-    location: "Vijayawada",
-    region: "Vijayawada",
-    image: prakasamImg,
-    description: "Sacred temple near the iconic Prakasam Barrage with beautiful Krishna river views.",
-  },
-  {
-    id: "mahanandi",
-    name: "Mahanandi Temple",
-    location: "Nandyala",
-    region: "Nandyala",
-    image: mahanandiImg,
-    description: "One of the nine Nandi temples, known for its perennial spring and ancient architecture.",
-  },
-  {
-    id: "ahobilam",
-    name: "Ahobilam Temple",
-    location: "Nandyala",
-    region: "Nandyala",
-    image: ahobilamImg,
-    description: "A cluster of nine Narasimha temples in the forested Nallamala Hills.",
-  },
-  {
-    id: "srisailam",
-    name: "Srisailam Temple",
-    location: "Nandyala",
-    region: "Nandyala",
-    image: srisailamImg,
-    description: "One of the 12 Jyotirlingas, this ancient temple is set amidst the dense Nallamala forests.",
-  },
-  {
-    id: "vetapalem-temple",
-    name: "Sri Venkateswara Temple",
-    location: "Vetapalem",
-    region: "Vetapalem",
-    image: vetapalemImg,
-    description: "Coastal temple dedicated to Lord Venkateswara with serene beach surroundings.",
-  },
-  {
-    id: "chirala-beach-temple",
-    name: "Vodarevu Beach Temple",
-    location: "Vetapalem",
-    region: "Vetapalem",
-    image: vodarevuImg,
-    description: "Beautiful seaside temple near the pristine Vodarevu beach.",
-  },
-];
+const formatCity = (city?: string) => {
+  if (!city) return "";
+  return city
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
-const regions = ["All Regions", "Vijayawada", "Nandyala", "Vetapalem"];
+const asImageUrl = (image: string | { url?: string; isPrimary?: boolean }) =>
+  typeof image === "string" ? image : image?.url;
+
+const getTempleImage = (temple: Temple) => {
+  if (temple.images?.length) {
+    const primary = temple.images.find((image) => typeof image !== "string" && image.isPrimary);
+    const primaryUrl = primary ? asImageUrl(primary) : undefined;
+    if (primaryUrl) return primaryUrl;
+
+    const fallback = asImageUrl(temple.images[0]);
+    if (fallback) return fallback;
+  }
+
+  return "https://images.unsplash.com/photo-1621427642694-46e7f7e4db14?w=800";
+};
 
 const Temples = () => {
-  const [selectedRegion, setSelectedRegion] = useState("All Regions");
+  const [temples, setTemples] = useState<Temple[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCity, setSelectedCity] = useState("ALL");
 
-  const filteredTemples = selectedRegion === "All Regions"
-    ? temples
-    : temples.filter((t) => t.region === selectedRegion);
+  useEffect(() => {
+    setIsLoading(true);
+    api.temples
+      .getAll({ limit: "50" })
+      .then((res: any) => {
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setTemples(list);
+      })
+      .catch(() => { })
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const cities = useMemo(() => ["ALL", ...Array.from(new Set(temples.map((temple) => temple.city).filter(Boolean)))], [temples]);
+
+  const filteredTemples = useMemo(() => {
+    return temples.filter((temple) => {
+      const cityMatch = selectedCity === "ALL" || temple.city === selectedCity;
+      if (!cityMatch) return false;
+
+      if (!searchQuery.trim()) return true;
+
+      const query = searchQuery.toLowerCase();
+      return [temple.name, temple.deityName, temple.templeType, temple.city]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [temples, selectedCity, searchQuery]);
 
   return (
     <Layout>
-      <div className="py-8">
-        <div className="container mx-auto px-4">
+      <div className="py-6 md:py-8">
+        <div className="container mx-auto px-4 sm:px-6">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="mb-8">
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-              Divine Temples of Andhra Pradesh
+              Sacred Temples
             </h1>
-            <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
-              Explore sacred temples across three distinct regions, each with its own 
-              unique spiritual significance and architectural beauty
+            <p className="text-muted-foreground mt-2">
+              Find temples by name, deity, and city.
             </p>
           </div>
 
-          {/* Region Filter */}
-          <div className="flex justify-center gap-2 flex-wrap mb-10">
-            {regions.map((region) => (
-              <button
-                key={region}
-                onClick={() => setSelectedRegion(region)}
-                className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  selectedRegion === region
-                    ? "gradient-gold text-primary-foreground shadow-gold"
-                    : "bg-card text-muted-foreground hover:bg-muted shadow-card"
-                }`}
-              >
-                {region}
-              </button>
-            ))}
+          {/* Filters */}
+          <div className="bg-card rounded-2xl shadow-card p-4 mb-8">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search temples..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-12 bg-muted border-0 rounded-xl"
+                />
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                {cities.map((city) => (
+                  <button
+                    key={city}
+                    onClick={() => setSelectedCity(city)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedCity === city
+                      ? "gradient-gold text-primary-foreground shadow-gold"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                  >
+                    {city === "ALL" ? "All Cities" : formatCity(city)}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Temples Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTemples.map((temple) => (
-              <Link
-                key={temple.id}
-                to={`/temples/${temple.id}`}
-                className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
-              >
-                <div className="relative h-56 overflow-hidden">
-                  <img
-                    src={temple.image}
-                    alt={temple.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/80 via-transparent to-transparent" />
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <span className="inline-block px-3 py-1 bg-primary/90 text-primary-foreground text-xs font-medium rounded-full mb-2">
-                      {temple.region}
-                    </span>
-                    <h3 className="font-serif font-semibold text-xl text-cream-light">
+          {isLoading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : filteredTemples.length === 0 ? (
+            <p className="text-center text-muted-foreground py-16">No temples found.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {filteredTemples.map((temple) => (
+                <Link
+                  key={temple.id}
+                  to={`/temples/${temple.slug || temple.id}`}
+                  className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
+                >
+                  <div className="relative h-52 overflow-hidden">
+                    <img
+                      src={getTempleImage(temple)}
+                      alt={temple.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    {temple.templeType && (
+                      <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center">
+                        <span className="text-sm font-medium text-foreground">{temple.templeType}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-5">
+                    <h3 className="font-serif font-semibold text-xl text-foreground group-hover:text-primary transition-colors">
                       {temple.name}
                     </h3>
+
+                    <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
+                      <MapPin className="w-4 h-4 flex-shrink-0" />
+                      <span className="line-clamp-1">
+                        {temple.fullAddress || temple.landmark || formatCity(temple.city)}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 text-sm text-muted-foreground flex items-center gap-1">
+                      <span className="font-medium text-foreground">Deity:</span>
+                      {temple.deityName || "Not specified"}
+                    </div>
+
+                    <div className="flex items-center justify-end mt-4 pt-4 border-t border-border">
+                      <Button variant="gold" size="sm">
+                        View Details
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="p-5">
-                  <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
-                    <MapPin className="w-4 h-4 text-primary" />
-                    {temple.location}
-                  </div>
-                  <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
-                    {temple.description}
-                  </p>
-                  <Button variant="goldOutline" className="w-full group-hover:variant-gold">
-                    Learn More
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Layout>

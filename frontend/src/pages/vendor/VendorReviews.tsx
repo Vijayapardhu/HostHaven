@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface Review {
   id: string;
@@ -32,13 +32,14 @@ const VendorReviews = () => {
     setIsLoading(true);
     try {
       const properties = await api.vendor.getProperties();
-      if (properties.properties && properties.properties.length > 0) {
+      if (properties.data && properties.data.length > 0) {
         const allReviews: Review[] = [];
-        for (const prop of properties.properties) {
+        for (const prop of properties.data) {
           try {
             const revs = await api.vendor.getReviews(prop.id);
-            if (revs && Array.isArray(revs)) {
-              allReviews.push(...revs.map((r: any) => ({ ...r, property: { id: prop.id, name: prop.name } })));
+            const reviewList = Array.isArray(revs) ? revs : revs?.reviews || [];
+            if (reviewList.length > 0) {
+              allReviews.push(...reviewList.map((r: any) => ({ ...r, property: { id: prop.id, name: prop.name } })));
             }
           } catch {}
         }

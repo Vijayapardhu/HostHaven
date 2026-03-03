@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { TempleItem } from "@/hooks/useHomepageConfig";
 
-const temples = [
+const defaultTemples = [
   {
     id: "kanaka-durga",
     name: "Kanaka Durga Temple",
@@ -23,7 +24,24 @@ const temples = [
   },
 ];
 
-const TemplesPreview = () => {
+interface Props {
+  items?: TempleItem[];
+}
+
+const TemplesPreview = ({ items }: Props) => {
+  const activeItems = items?.filter((i) => i.isActive);
+  const useConfig = activeItems && activeItems.length > 0;
+
+  const temples = useConfig
+    ? activeItems.map((t, i) => ({
+        id: t.id,
+        name: t.name || defaultTemples[i]?.name || "",
+        location: t.location || defaultTemples[i]?.location || "",
+        image: t.imageUrl || defaultTemples[i]?.image || "",
+        link: t.link || `/temples/${t.id}`,
+      }))
+    : defaultTemples.map((t) => ({ ...t, link: `/temples/${t.id}` }));
+
   return (
     <section className="py-6 bg-background">
       <div className="container mx-auto px-4">
@@ -43,7 +61,7 @@ const TemplesPreview = () => {
           {temples.map((temple) => (
             <Link
               key={temple.id}
-              to={`/temples/${temple.id}`}
+              to={temple.link}
               className="group relative rounded-xl overflow-hidden aspect-[3/4] shadow-card hover:shadow-card-hover transition-all"
             >
               <img

@@ -2,7 +2,23 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const BecomePartner = () => {
+interface PartnerConfig {
+  title: string;
+  subtitle: string;
+  ctaText: string;
+  ctaLink: string;
+}
+
+interface Props {
+  config?: PartnerConfig;
+}
+
+const BecomePartner = ({ config }: Props) => {
+  const title = config?.title || "Are you a property owner?";
+  const subtitle = config?.subtitle || "List your property on HostHaven and start earning today";
+  const ctaText = config?.ctaText || "Become a Partner";
+  const ctaLink = config?.ctaLink || "/vendor/signup";
+
   return (
     <section className="py-6 bg-background">
       <div className="container mx-auto px-4">
@@ -10,19 +26,19 @@ const BecomePartner = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl md:text-2xl font-serif font-bold text-cream-light mb-2">
-                Are you a property owner?
+                {title}
               </h2>
               <p className="text-cream-light/80 text-sm md:text-base">
-                List your property on HostHaven and start earning today
+                {subtitle}
               </p>
             </div>
-            <Link to="/vendor/signup">
+            <Link to={ctaLink}>
               <Button 
                 variant="gold" 
                 size="lg"
                 className="whitespace-nowrap"
               >
-                Become a Partner
+                {ctaText}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>

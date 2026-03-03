@@ -275,11 +275,14 @@ export class AuthService {
   // ==========================================
 
   async getGoogleAuthUrl(state: string) {
-    await cacheService.set(
-      cacheService.keys.stateToken(state),
-      { createdAt: new Date().toISOString() },
-      cacheService.getTTL().STATE_TOKEN
-    );
+    // Store state token only if Redis is enabled
+    if (config.redis.enabled) {
+      await cacheService.set(
+        cacheService.keys.stateToken(state),
+        { createdAt: new Date().toISOString() },
+        cacheService.getTTL().STATE_TOKEN
+      );
+    }
 
     const authUrl = googleClient.generateAuthUrl({
       access_type: 'offline',
@@ -801,6 +804,86 @@ export class AuthService {
         loginUrl: `${config.app.frontendUrl}/login`,
       },
     });
+  }
+
+  // ==========================================
+  // PROFILE MANAGEMENT
+  // ==========================================
+
+  async updateProfile(userId: string, data: { name?: string; avatar?: string; phone?: string }) {
+    const updateData: any = {};
+    
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.avatar !== undefined) updateData.avatarUrl = data.avatar;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    return { user: this.sanitizeUser(user) };
+  }
+
+  // ==========================================
+  // ADDRESS MANAGEMENT
+  // ==========================================
+
+  async getAddresses(userId: string) {
+    const addresses = await prisma.userAddress.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return addresses;
+  }
+
+  async addAddress(userId: string, data: { label: string; address: string; city: string; state: string; pincode: string }) {
+    const address = await prisma.userAddress.create({
+      data: {
+        userId,
+        label: data.label,
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        pincode: data.pincode,
+      },
+    });
+    return address;
+  }
+
+  async updateAddress(userId: string, addressId: string, data: { label?: string; address?: string; city?: string; state?: string; pincode?: string }) {
+    const existing = await prisma.userAddress.findFirst({
+      where: { id: addressId, userId },
+    });
+
+    if (!existing) {
+      const error = new Error('Address not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const address = await prisma.userAddress.update({
+      where: { id: addressId },
+      data: data,
+    });
+    return address;
+  }
+
+  async deleteAddress(userId: string, addressId: string) {
+    const existing = await prisma.userAddress.findFirst({
+      where: { id: addressId, userId },
+    });
+
+    if (!existing) {
+      const error = new Error('Address not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    await prisma.userAddress.delete({
+      where: { id: addressId },
+    });
+    return { message: 'Address deleted successfully' };
   }
 
   private sanitizeUser(user: any) {

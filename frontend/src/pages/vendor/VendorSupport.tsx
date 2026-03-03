@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface Ticket {
@@ -78,7 +78,7 @@ const VendorSupport = () => {
         params.status = statusFilter;
       }
       const response = await api.support.getMy(params);
-      setTickets(response.tickets || []);
+      setTickets(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (error) {
       console.error("Failed to fetch tickets:", error);

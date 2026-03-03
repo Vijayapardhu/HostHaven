@@ -10,6 +10,6 @@ export const reviewsService = {
     const response = await api.get("/v1/reviews/vendor", {
       params: { propertyId },
     });
-    return response.data?.reviews ?? response.data;
+    return response.data?.data ?? response.data;
   },
 };

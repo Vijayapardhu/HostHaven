@@ -1,7 +1,24 @@
 import { z } from 'zod';
 import { paginationSchema } from '../../utils/validators.util';
 
-export const allowedCitySchema = z.enum(['Vijayawada', 'Nandiyala', 'Vetlapalem']);
+const dbCityEnum = z.enum(['VIJAYAWADA', 'NANDIYALA', 'VETLAPALEM', 'TIRUPATI']);
+
+const normalizeCityValue = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value;
+
+  const normalized = value.trim().toLowerCase().replace(/[_\s-]+/g, '');
+  const cityMap: Record<string, z.infer<typeof dbCityEnum>> = {
+    vijayawada: 'VIJAYAWADA',
+    nandiyala: 'NANDIYALA',
+    nandyal: 'NANDIYALA',
+    vetlapalem: 'VETLAPALEM',
+    tirupati: 'TIRUPATI',
+  };
+
+  return cityMap[normalized] ?? value;
+};
+
+export const allowedCitySchema = z.preprocess(normalizeCityValue, dbCityEnum);
 
 export const createPropertySchema = z.object({
   type: z.enum(['HOTEL', 'HOME', 'TEMPLE']),

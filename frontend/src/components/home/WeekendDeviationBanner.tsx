@@ -4,8 +4,9 @@ import { ArrowRight } from "lucide-react";
 import bannerHotel from "@/assets/banner-hotel.jpg";
 import bannerHome from "@/assets/banner-home.jpg";
 import templeBanner from "@/assets/temple-banner-1.jpg";
+import type { BannerSlide } from "@/hooks/useHomepageConfig";
 
-const slides = [
+const defaultSlides = [
   {
     image: bannerHotel,
     title: "Planning a Weekend\nGetaway?",
@@ -32,23 +33,48 @@ const slides = [
   },
 ];
 
-const WeekendDeviationBanner = () => {
+const localImages: Record<string, string> = {
+  "": "",
+  "banner-hotel": bannerHotel,
+  "banner-home": bannerHome,
+  "temple-banner": templeBanner,
+};
+
+interface Props {
+  slides?: BannerSlide[];
+}
+
+const WeekendDeviationBanner = ({ slides: configSlides }: Props) => {
+  const activeSlides = configSlides?.filter((s) => s.isActive);
+  const useConfigSlides = activeSlides && activeSlides.length > 0;
+
+  const resolvedSlides = useConfigSlides
+    ? activeSlides.map((s, i) => ({
+        image: s.imageUrl || defaultSlides[i]?.image || bannerHotel,
+        title: s.title || defaultSlides[i]?.title || "",
+        subtitle: s.subtitle || defaultSlides[i]?.subtitle || "",
+        tags: s.tags || defaultSlides[i]?.tags || "",
+        link: s.ctaLink || defaultSlides[i]?.link || "/hotels",
+        cta: s.ctaText || defaultSlides[i]?.cta || "Learn More",
+      }))
+    : defaultSlides;
+
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % slides.length);
+      setCurrentIndex((prev) => (prev + 1) % resolvedSlides.length);
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [resolvedSlides.length]);
 
-  const current = slides[currentIndex];
+  const current = resolvedSlides[currentIndex];
 
   return (
     <section className="py-4 md:py-5">
       <div className="container mx-auto px-4">
         <div className="relative rounded-2xl overflow-hidden h-[220px] md:h-[340px] lg:h-[380px]">
-          {slides.map((slide, index) => (
+          {resolvedSlides.map((slide, index) => (
             <img
               key={index}
               src={slide.image}
@@ -81,7 +107,7 @@ const WeekendDeviationBanner = () => {
           </div>
 
           <div className="absolute bottom-3 right-4 flex gap-1.5">
-            {slides.map((_, index) => (
+            {resolvedSlides.map((_, index) => (
               <div
                 key={index}
                 className={`w-1.5 h-1.5 rounded-full transition-all ${

@@ -2,26 +2,37 @@ import { Link } from "react-router-dom";
 import vijayawadaImg from "@/assets/destinations/vijayawada.jpg";
 import nandyalaImg from "@/assets/destinations/nandyala.jpg";
 import vetapalemImg from "@/assets/destinations/vetapalem.jpg";
+import type { DestinationItem } from "@/hooks/useHomepageConfig";
 
-const destinations = [
-  {
-    id: "nandyala",
-    name: "Nandyala",
-    image: nandyalaImg,
-  },
-  {
-    id: "vijayawada",
-    name: "Vijayawada",
-    image: vijayawadaImg,
-  },
-  {
-    id: "vetapalem",
-    name: "Vetapalem",
-    image: vetapalemImg,
-  },
+const defaultDestinations = [
+  { id: "nandyala", name: "Nandyala", image: nandyalaImg },
+  { id: "vijayawada", name: "Vijayawada", image: vijayawadaImg },
+  { id: "vetapalem", name: "Vetapalem", image: vetapalemImg },
 ];
 
-const DestinationsSection = () => {
+const localImageMap: Record<string, string> = {
+  nandyala: nandyalaImg,
+  vijayawada: vijayawadaImg,
+  vetapalem: vetapalemImg,
+};
+
+interface Props {
+  items?: DestinationItem[];
+}
+
+const DestinationsSection = ({ items }: Props) => {
+  const activeItems = items?.filter((i) => i.isActive);
+  const useConfig = activeItems && activeItems.length > 0;
+
+  const destinations = useConfig
+    ? activeItems.map((item, i) => ({
+        id: item.id,
+        name: item.name || defaultDestinations[i]?.name || "",
+        image: item.imageUrl || localImageMap[item.name?.toLowerCase()] || defaultDestinations[i]?.image || nandyalaImg,
+        link: item.link || `/hotels?destination=${item.name?.toLowerCase()}`,
+      }))
+    : defaultDestinations.map((d) => ({ ...d, link: `/hotels?destination=${d.id}` }));
+
   return (
     <section className="py-6 bg-background">
       <div className="container mx-auto px-4">
@@ -33,7 +44,7 @@ const DestinationsSection = () => {
           {destinations.map((dest) => (
             <Link
               key={dest.id}
-              to={`/hotels?destination=${dest.id}`}
+              to={dest.link}
               className="group relative rounded-xl overflow-hidden aspect-[3/4] shadow-card hover:shadow-card-hover transition-all"
             >
               <img

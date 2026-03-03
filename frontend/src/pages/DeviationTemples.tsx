@@ -1,69 +1,43 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { MapPin, ChevronRight } from "lucide-react";
+import { MapPin, ChevronRight, Loader2 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
-
-import yagentiImg from "@/assets/temples/yaganti.jpg";
-import mahanandiImg from "@/assets/temples/mahanandi.jpg";
-import ahobilamImg from "@/assets/temples/ahobilam.jpg";
-import srisailamImg from "@/assets/temples/srisailam.jpg";
-import kanakaDurgaImg from "@/assets/temples/kanaka-durga.jpg";
-import undavalliImg from "@/assets/temples/undavalli.jpg";
+import { api } from "@/lib/api";
 
 interface DeviationTemple {
   id: string;
   name: string;
-  location: string;
-  tagline: string;
-  image: string;
+  slug?: string;
+  location?: string;
+  city?: string;
+  tagline?: string;
+  shortDesc?: string;
+  image?: string;
+  images?: Array<{ url: string }>;
 }
 
-const deviationTemples: DeviationTemple[] = [
-  {
-    id: "yaganti",
-    name: "Yaganti Temple",
-    location: "Kurnool District",
-    tagline: "The Growing Nandi Wonder",
-    image: yagentiImg,
-  },
-  {
-    id: "mahanandi",
-    name: "Mahanandi Temple",
-    location: "Nandyala",
-    tagline: "Sacred Springs of Shiva",
-    image: mahanandiImg,
-  },
-  {
-    id: "ahobilam",
-    name: "Ahobilam Temple",
-    location: "Nandyala",
-    tagline: "Nine Forms of Narasimha",
-    image: ahobilamImg,
-  },
-  {
-    id: "srisailam",
-    name: "Srisailam Temple",
-    location: "Nallamala Hills",
-    tagline: "Jyotirlinga in the Forests",
-    image: srisailamImg,
-  },
-  {
-    id: "kanaka-durga",
-    name: "Kanaka Durga Temple",
-    location: "Vijayawada",
-    tagline: "Goddess on Indrakeeladri",
-    image: kanakaDurgaImg,
-  },
-  {
-    id: "undavalli",
-    name: "Undavalli Caves",
-    location: "Vijayawada",
-    tagline: "Ancient Rock-Cut Marvels",
-    image: undavalliImg,
-  },
-];
+const getTempleImage = (temple: DeviationTemple) => {
+  if (temple.image) return temple.image;
+  if (temple.images && temple.images.length > 0) return temple.images[0].url;
+  return "https://images.unsplash.com/photo-1621427642694-46e7f7e4db14?w=800";
+};
 
 const DeviationTemples = () => {
+  const [temples, setTemples] = useState<DeviationTemple[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    api.temples.getAll({ limit: "12" })
+      .then((res: any) => {
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setTemples(list.slice(0, 6));
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, []);
+
   return (
     <Layout>
       <div className="py-8">
@@ -77,22 +51,31 @@ const DeviationTemples = () => {
             </p>
           </div>
 
+          {isLoading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : temples.length === 0 ? (
+            <p className="text-center text-muted-foreground py-16">No temples found.</p>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {deviationTemples.map((temple) => (
+            {temples.map((temple) => (
               <Link
                 key={temple.id}
-                to={`/temples/${temple.id}`}
+                to={`/temples/${temple.slug || temple.id}`}
                 className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
               >
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={temple.image}
+                    src={getTempleImage(temple)}
                     alt={temple.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/80 via-transparent to-transparent" />
                   <div className="absolute bottom-4 left-4 right-4">
-                    <p className="text-gold-light text-xs font-medium mb-1">{temple.tagline}</p>
+                    {(temple.tagline || temple.shortDesc) && (
+                      <p className="text-gold-light text-xs font-medium mb-1">{temple.tagline || temple.shortDesc}</p>
+                    )}
                     <h3 className="font-serif font-semibold text-lg text-cream-light">
                       {temple.name}
                     </h3>
@@ -101,7 +84,7 @@ const DeviationTemples = () => {
                 <div className="p-4">
                   <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
                     <MapPin className="w-4 h-4 text-primary" />
-                    {temple.location}
+                    {temple.location || temple.city || ""}
                   </div>
                   <Button variant="goldOutline" size="sm" className="w-full">
                     View Details
@@ -111,6 +94,7 @@ const DeviationTemples = () => {
               </Link>
             ))}
           </div>
+          )}
         </div>
       </div>
     </Layout>

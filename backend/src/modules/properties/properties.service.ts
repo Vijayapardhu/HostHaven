@@ -406,7 +406,7 @@ export class PropertiesService {
     return properties.map(this.sanitizeProperty);
   }
 
-  private sanitizeProperty(property: any) {
+  private sanitizeProperty = (property: any) => {
     return {
       id: property.id,
       type: property.type,
@@ -440,7 +440,7 @@ export class PropertiesService {
     };
   }
 
-  private sanitizeRoom(room: any) {
+  private sanitizeRoom = (room: any) => {
     return {
       id: room.id,
       name: room.name,

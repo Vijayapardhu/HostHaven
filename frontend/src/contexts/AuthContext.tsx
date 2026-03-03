@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   avatar?: string;
   role: string;
   isVerified: boolean;
@@ -18,7 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<{ isNewUser: boolean }>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, confirmPassword: string) => Promise<void>;
   logout: () => void;
   linkGoogle: (idToken: string) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -75,8 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { isNewUser: response.isNewUser };
   };
 
-  const signup = async (name: string, email: string, password: string) => {
-    await api.auth.register({ name, email, password });
+  const signup = async (name: string, email: string, password: string, confirmPassword: string) => {
+    await api.auth.register({ name, email, password, confirmPassword });
   };
 
   const logout = async () => {

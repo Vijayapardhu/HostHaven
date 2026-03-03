@@ -178,7 +178,7 @@ export default function Layout() {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-8">
+        <main className="p-4 lg:p-8 overflow-y-auto h-[calc(100vh-64px)]">
           <Outlet />
         </main>
       </div>

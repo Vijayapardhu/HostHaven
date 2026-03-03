@@ -90,7 +90,7 @@ const VendorPOSHistory = () => {
         params.paymentMethod = paymentFilter;
       }
       const response = await bookingsService.getBookings(params);
-      const bookings = response.bookings || [];
+      const bookings = response.data || response || [];
       const invoiceData: Invoice[] = bookings.map((b: any) => ({
         id: b.id,
         invoiceNumber: `INV-${b.bookingNumber}`,
@@ -124,7 +124,7 @@ const VendorPOSHistory = () => {
       });
       
       const summary: Record<string, DailySummary> = {};
-      const bookings = response.bookings || [];
+      const bookings = response.data || response || [];
       
       bookings.forEach((b: any) => {
         const date = new Date(b.createdAt).toISOString().split("T")[0];

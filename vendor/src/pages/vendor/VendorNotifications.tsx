@@ -39,7 +39,7 @@ const VendorNotifications = () => {
       const params: Record<string, string> = {};
       if (filter === "unread") params.isRead = "false";
       const response = await notificationsService.getNotifications(params);
-      setNotifications(response || []);
+      setNotifications(response.data || response || []);
       const meta = response?.meta || {};
       setUnreadCount(meta?.unreadCount || 0);
     } catch (error) {

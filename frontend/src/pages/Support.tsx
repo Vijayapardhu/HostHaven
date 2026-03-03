@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
 
@@ -26,7 +28,9 @@ const statusClasses: Record<TicketStatus, string> = {
 
 const Support = () => {
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [form, setForm] = useState({
     category: "",
@@ -34,11 +38,13 @@ const Support = () => {
     message: "",
     attachmentUrl: "",
   });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadTickets = async () => {
     try {
       const response = await api.support.getMy();
-      const list = (Array.isArray(response) ? response : (response as any)?.tickets || []) as SupportTicket[];
+      const list = (Array.isArray(response?.data) ? response.data : []) as SupportTicket[];
       setTickets(list);
     } catch {
       setTickets([]);
@@ -67,11 +73,48 @@ const Support = () => {
     );
   }
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please select an image file", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be less than 5MB", variant: "destructive" });
+      return;
+    }
+
+    setPreviewUrl(URL.createObjectURL(file));
+    setIsUploading(true);
+
+    try {
+      const uploadedUrl = await api.auth.uploadAvatar(file);
+      setForm((prev) => ({ ...prev, attachmentUrl: uploadedUrl }));
+      toast({ title: "Image uploaded successfully" });
+    } catch (error) {
+      toast({ title: "Failed to upload image", variant: "destructive" });
+      setPreviewUrl(null);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setPreviewUrl(null);
+    setForm((prev) => ({ ...prev, attachmentUrl: "" }));
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!form.category.trim() || !form.message.trim()) {
-      alert("Please fill category and message.");
+      toast({ title: "Please fill category and message", variant: "destructive" });
       return;
     }
 
@@ -84,11 +127,12 @@ const Support = () => {
         attachmentUrl: form.attachmentUrl || undefined,
       });
 
-      alert("Support ticket submitted.");
+      toast({ title: "Support ticket submitted successfully" });
       setForm({ category: "", bookingReference: "", message: "", attachmentUrl: "" });
+      setPreviewUrl(null);
       await loadTickets();
     } catch (error: any) {
-      alert(error?.message || "Failed to submit ticket.");
+      toast({ title: error?.message || "Failed to submit ticket", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -141,17 +185,54 @@ const Support = () => {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-foreground">Image Attachment URL (optional)</label>
+                  <label className="text-sm font-medium text-foreground">Image Attachment (optional)</label>
+                  
+                  {previewUrl || form.attachmentUrl ? (
+                    <div className="mt-2 relative inline-block">
+                      <img
+                        src={previewUrl || form.attachmentUrl}
+                        alt="Attachment preview"
+                        className="w-32 h-32 object-cover rounded-lg border border-border"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-1 hover:bg-destructive/80"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-2 border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                    >
+                      {isUploading ? (
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Uploading...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Upload className="w-8 h-8" />
+                          <span className="text-sm">Click to upload image</span>
+                          <span className="text-xs">Max 5MB (PNG, JPG, JPEG)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <input
-                    type="url"
-                    value={form.attachmentUrl}
-                    onChange={(e) => setForm((prev) => ({ ...prev, attachmentUrl: e.target.value }))}
-                    placeholder="https://..."
-                    className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={isUploading}
                   />
                 </div>
 
-                <Button type="submit" variant="gold" className="w-full" disabled={loading}>
+                <Button type="submit" variant="gold" className="w-full" disabled={loading || isUploading}>
                   {loading ? "Submitting..." : "Submit Ticket"}
                 </Button>
               </form>
@@ -174,6 +255,13 @@ const Support = () => {
                           {ticket.status.replace("_", " ")}
                         </span>
                       </div>
+                      {ticket.attachmentUrl && (
+                        <img
+                          src={ticket.attachmentUrl}
+                          alt="Attachment"
+                          className="mt-2 w-20 h-20 object-cover rounded-lg"
+                        />
+                      )}
                       {ticket.bookingReference && (
                         <p className="text-xs text-muted-foreground mt-2">Ref: {ticket.bookingReference}</p>
                       )}

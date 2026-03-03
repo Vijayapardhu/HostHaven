@@ -21,7 +21,7 @@ const AddRoom = () => {
     const fetchProperties = async () => {
       try {
         const response = await vendorService.getProperties();
-        setProperties((response.properties || []).map((p: any) => ({ id: p.id, name: p.name })));
+        setProperties((response.data || response || []).map((p: any) => ({ id: p.id, name: p.name })));
       } catch {
         toast({ title: "Error", description: "Failed to load hotels", variant: "destructive" });
       }

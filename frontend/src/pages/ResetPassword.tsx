@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -51,7 +51,7 @@ const ResetPassword = () => {
     setIsLoading(true);
 
     try {
-      await api.auth.resetPassword(token, password);
+      await api.auth.resetPassword(token, password, confirmPassword);
       setIsSuccess(true);
       toast({
         title: "Password reset!",

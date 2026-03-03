@@ -1,29 +1,38 @@
 import { Link } from "react-router-dom";
-import { Car, Bike, Wrench, ArrowRight } from "lucide-react";
+import { Car, Bike, Wrench, ArrowRight, Star, Heart, Clock, Settings2, RefreshCcw, ShieldCheck, Map, Home, Building, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ServiceCardItem } from "@/hooks/useHomepageConfig";
 
-const services = [
-  {
-    id: "car-rental",
-    name: "Car Rental",
-    description: "Explore Andhra Pradesh with our reliable car rental service",
-    icon: Car,
-  },
-  {
-    id: "bike-rental",
-    name: "Bike Rental",
-    description: "Two-wheelers for quick and easy local travel",
-    icon: Bike,
-  },
-  {
-    id: "car-services",
-    name: "Car Services",
-    description: "Professional car maintenance and repair services",
-    icon: Wrench,
-  },
+const iconMap: Record<string, React.ElementType> = {
+  car: Car, bike: Bike, wrench: Wrench, star: Star, heart: Heart, clock: Clock,
+  settings: Settings2, refresh: RefreshCcw, shield: ShieldCheck, map: Map,
+  home: Home, building: Building, phone: Phone, mail: Mail, zap: ArrowRight,
+};
+
+const defaultServices = [
+  { id: "car-rental", name: "Car Rental", description: "Explore Andhra Pradesh with our reliable car rental service", icon: Car },
+  { id: "bike-rental", name: "Bike Rental", description: "Two-wheelers for quick and easy local travel", icon: Bike },
+  { id: "car-services", name: "Car Services", description: "Professional car maintenance and repair services", icon: Wrench },
 ];
 
-const ServicesPreview = () => {
+interface Props {
+  items?: ServiceCardItem[];
+}
+
+const ServicesPreview = ({ items }: Props) => {
+  const activeItems = items?.filter((i) => i.isActive);
+  const useConfig = activeItems && activeItems.length > 0;
+
+  const services = useConfig
+    ? activeItems.map((s) => ({
+        id: s.id,
+        name: s.title,
+        description: s.description,
+        icon: iconMap[s.icon] || Car,
+        link: s.link || `/services#${s.id}`,
+      }))
+    : defaultServices.map((s) => ({ ...s, link: `/services#${s.id}` }));
+
   return (
     <section className="py-6 bg-secondary/30">
       <div className="container mx-auto px-4">
@@ -45,7 +54,7 @@ const ServicesPreview = () => {
             return (
               <Link
                 key={service.id}
-                to={`/services#${service.id}`}
+                to={service.link}
                 className="group bg-card rounded-xl p-4 md:p-6 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1"
               >
                 <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl gradient-gold flex items-center justify-center mb-3 group-hover:shadow-gold transition-shadow">

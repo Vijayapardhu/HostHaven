@@ -28,4 +28,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/change-password', { preHandler: [fastify.authenticate] }, AuthController.changePassword);
   fastify.post('/link-google', { preHandler: [fastify.authenticate] }, AuthController.linkGoogle);
   fastify.delete('/unlink-google', { preHandler: [fastify.authenticate] }, AuthController.unlinkGoogle);
+
+  // Profile routes
+  fastify.put('/profile', { preHandler: [fastify.authenticate] }, AuthController.updateProfile);
+
+  // Address routes
+  fastify.get('/addresses', { preHandler: [fastify.authenticate] }, AuthController.getAddresses);
+  fastify.post('/addresses', { preHandler: [fastify.authenticate] }, AuthController.addAddress);
+  fastify.put('/addresses/:id', { preHandler: [fastify.authenticate] }, AuthController.updateAddress);
+  fastify.delete('/addresses/:id', { preHandler: [fastify.authenticate] }, AuthController.deleteAddress);
 }

@@ -48,7 +48,7 @@ const VendorBookingsIndex = () => {
       }
 
       const response = await bookingsService.getBookings(params);
-      const bookingList = Array.isArray(response) ? response : response?.bookings || [];
+      const bookingList = Array.isArray(response) ? response : response?.data || [];
       setBookings(bookingList);
       setTotalPages(response?.meta?.totalPages || 1);
     } catch (error: any) {

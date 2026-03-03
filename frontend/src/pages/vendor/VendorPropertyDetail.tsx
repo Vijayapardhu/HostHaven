@@ -46,7 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface PropertyDetail {
@@ -118,17 +118,18 @@ const VendorPropertyDetail = () => {
   const fetchProperty = async () => {
     try {
       const response = await api.vendor.getPropertyById(id!);
-      setProperty(response.property);
+      const property = response;
+      setProperty(property);
       setFormData({
-        name: response.property.name,
-        description: response.property.description,
-        shortDesc: response.property.shortDesc || "",
-        address: response.property.address,
-        city: response.property.city,
-        state: response.property.state,
-        pincode: response.property.pincode,
-        basePrice: response.property.basePrice.toString(),
-        amenities: response.property.amenities || [],
+        name: property.name,
+        description: property.description,
+        shortDesc: property.shortDesc || "",
+        address: property.address,
+        city: property.city,
+        state: property.state,
+        pincode: property.pincode,
+        basePrice: property.basePrice.toString(),
+        amenities: property.amenities || [],
       });
     } catch (error) {
       console.error("Failed to fetch property:", error);

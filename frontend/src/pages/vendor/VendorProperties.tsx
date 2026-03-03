@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface Property {
@@ -88,7 +88,7 @@ const VendorProperties = () => {
   const fetchProperties = async () => {
     try {
       const response = await api.vendor.getProperties();
-      setProperties(response.properties || []);
+      setProperties(response.data || []);
     } catch (error) {
       console.error("Failed to fetch properties:", error);
     } finally {

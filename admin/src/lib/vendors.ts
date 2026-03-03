@@ -9,6 +9,7 @@ export interface Vendor {
   status: 'pending' | 'approved' | 'rejected' | 'suspended'
   isApproved: boolean
   commissionRate: number
+  propertiesCount?: number
   payoutDetails?: {
     upiId?: string
     bankAccount?: string
@@ -101,6 +102,7 @@ const mapVendor = (vendor: any): Vendor => {
     status: isApproved ? 'approved' : 'pending',
     isApproved,
     commissionRate: Number(vendor.commissionRate ?? 0),
+    propertiesCount: Number(vendor.propertiesCount ?? vendor._count?.properties ?? 0),
     payoutDetails: vendor.payoutDetails,
     hotelId: vendor.hotelId,
     createdAt: vendor.createdAt,

@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface Booking {
   id: string;
@@ -64,7 +64,7 @@ const VendorBookings = () => {
         params.status = statusFilter;
       }
       const response = await api.vendor.getBookings(params);
-      setBookings(response.bookings || []);
+      setBookings(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch (error) {
       console.error("Failed to fetch bookings:", error);

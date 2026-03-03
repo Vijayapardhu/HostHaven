@@ -47,7 +47,7 @@ const VendorSupportIndex = () => {
       }
 
       const response = await supportService.getMyTickets(params);
-      const ticketList = Array.isArray(response) ? response : response?.tickets || [];
+      const ticketList = Array.isArray(response) ? response : response?.data || [];
       setTickets(ticketList);
     } catch (error: any) {
       toast({ title: "Error", description: error?.message || "Failed to load tickets", variant: "destructive" });

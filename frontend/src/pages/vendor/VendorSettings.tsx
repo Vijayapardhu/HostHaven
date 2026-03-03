@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVendor } from "@/contexts/VendorContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 
 const VendorSettings = () => {
   const { vendor, refreshVendor } = useVendor();
