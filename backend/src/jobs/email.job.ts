@@ -34,7 +34,7 @@ export const emailWorker = config.redis.enabled
         }
       },
       {
-        connection: connection as Redis,
+        connection: connection as any,
         concurrency: 5,
       }
     )

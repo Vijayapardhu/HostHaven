@@ -8,7 +8,7 @@ const connection = config.redis.enabled
   : null;
 
 export const emailQueue = config.redis.enabled
-  ? new Queue('email-queue', { connection: connection as Redis })
+  ? new Queue('email-queue', { connection: connection as any })
   : null;
 
 export const queueService = config.redis.enabled
