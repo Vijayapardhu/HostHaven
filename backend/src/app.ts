@@ -45,6 +45,7 @@ export const buildApp = async () => {
       : { level: config.logging.level },
     requestIdHeader: "x-request-id",
     requestIdLogLabel: "requestId",
+    bodyLimit: 100 * 1024 * 1024, // 100MB
   });
 
   // Register multipart for file uploads
@@ -79,8 +80,11 @@ export const buildApp = async () => {
     origin: (origin, cb) => {
       // Allow all origins in development, or specific origins in production
       if (isProduction) {
-        const allowedOrigins = [config.app.frontendUrl];
-        if (origin && allowedOrigins.includes(origin)) {
+        const allowedOrigins = [
+          config.app.frontendUrl,
+          process.env.ADMIN_URL || "https://admin.hosthaven.in",
+        ].filter(Boolean);
+        if (!origin || allowedOrigins.includes(origin)) {
           cb(null, true);
         } else {
           cb(new Error("Not allowed"), false);

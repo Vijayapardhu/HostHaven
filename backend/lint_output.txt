@@ -1,0 +1,717 @@
+
+C:\knight21\Hosthaven\backend\src\app.ts
+    9:10  error  'logger' is defined but never used   @typescript-eslint/no-unused-vars
+  166:69  error  'request' is defined but never used  @typescript-eslint/no-unused-vars
+  166:78  error  'reply' is defined but never used    @typescript-eslint/no-unused-vars
+  170:14  error  'error' is defined but never used    @typescript-eslint/no-unused-vars
+
+C:\knight21\Hosthaven\backend\src\config\database.ts
+  19:3  warning  Unused eslint-disable directive (no problems were reported from 'no-var')
+
+C:\knight21\Hosthaven\backend\src\config\redis.ts
+  14:17  error    '_key' is defined but never used                                           @typescript-eslint/no-unused-vars
+  15:17  error    '_key' is defined but never used                                           @typescript-eslint/no-unused-vars
+  15:31  error    '_value' is defined but never used                                         @typescript-eslint/no-unused-vars
+  15:50  error    '_args' is defined but never used                                          @typescript-eslint/no-unused-vars
+  15:57  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  16:19  error    '_key' is defined but never used                                           @typescript-eslint/no-unused-vars
+  16:33  error    '_seconds' is defined but never used                                       @typescript-eslint/no-unused-vars
+  16:51  error    '_value' is defined but never used                                         @typescript-eslint/no-unused-vars
+  17:20  error    '_keys' is defined but never used                                          @typescript-eslint/no-unused-vars
+  17:27  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  18:18  error    '_pattern' is defined but never used                                       @typescript-eslint/no-unused-vars
+  19:23  error    '_keys' is defined but never used                                          @typescript-eslint/no-unused-vars
+  19:30  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+  25:3   warning  Unused eslint-disable directive (no problems were reported from 'no-var')
+  31:26  error    Unexpected any. Specify a different type                                   @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\constants\booking-status.ts
+  23:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  27:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\constants\payment-status.ts
+  20:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  24:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\jobs\email.job.ts
+    5:8   error  'prisma' is defined but never used        @typescript-eslint/no-unused-vars
+   37:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   53:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   92:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  161:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\middleware\auth.middleware.ts
+   1:40  error  'HookHandlerDoneFunction' is defined but never used  @typescript-eslint/no-unused-vars
+  15:19  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  75:3   error  'reply' is defined but never used                    @typescript-eslint/no-unused-vars
+
+C:\knight21\Hosthaven\backend\src\middleware\error.middleware.ts
+   2:10  error  'sendError' is defined but never used     @typescript-eslint/no-unused-vars
+  53:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  54:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\middleware\validation.middleware.ts
+   1:40  error  'HookHandlerDoneFunction' is defined but never used  @typescript-eslint/no-unused-vars
+  10:21  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  12:35  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  28:54  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  29:21  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  31:35  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  47:56  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  48:21  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  50:35  error  Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\admin\admin.controller.ts
+    30:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    51:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    67:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    82:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    98:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   113:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   124:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   135:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   146:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   164:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   183:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   197:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   211:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   225:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   239:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   259:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   281:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   297:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   301:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   325:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   337:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   341:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   355:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   366:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   376:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   398:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   419:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   448:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   475:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   489:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   500:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   512:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   534:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   561:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   576:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   590:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   601:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   610:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   623:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   633:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   646:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   654:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   672:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   696:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   721:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   747:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   763:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   787:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   821:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   847:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   857:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   874:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   887:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   900:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   910:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   921:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   935:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   949:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   964:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   978:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   997:63  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1003:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\admin\admin.routes.ts
+  7:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\admin\admin.service.ts
+   156:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   159:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   236:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   245:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   256:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   291:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   291:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   295:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   295:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   313:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   375:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   429:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   443:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   458:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   473:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   513:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   559:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   581:66  error  'reason' is defined but never used        @typescript-eslint/no-unused-vars
+   586:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   592:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   603:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   698:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   710:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   713:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   718:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   776:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   790:62  error  'reason' is defined but never used        @typescript-eslint/no-unused-vars
+   795:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   799:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   828:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   847:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   855:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   859:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   870:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   911:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   944:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   979:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   991:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   992:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   993:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1001:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1008:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1013:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1037:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1058:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1090:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1123:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1143:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1180:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1203:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1233:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1266:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1278:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1320:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1340:71  error  'notes' is defined but never used         @typescript-eslint/no-unused-vars
+  1345:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1378:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1384:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1432:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1479:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1547:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1549:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1569:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1605:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1610:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1644:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1708:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1729:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\auth\auth.controller.ts
+   28:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   50:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   81:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  107:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  139:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  158:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  169:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  173:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  183:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  186:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  199:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  211:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  222:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  233:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  244:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  256:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  268:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  281:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  289:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  292:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  300:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  303:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  311:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  324:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  342:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  346:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  358:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  361:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  369:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  373:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  381:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  386:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  397:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  401:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\auth\auth.service.ts
+   36:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   84:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   90:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   96:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  105:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  111:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  152:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  158:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  164:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  173:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  179:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  246:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  305:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  322:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  388:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  423:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  433:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  454:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  460:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  485:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  569:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  630:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  645:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  691:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  698:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  735:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  755:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  814:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  861:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  879:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  889:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\bookings\bookings.controller.ts
+   18:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   28:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   48:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   52:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   66:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   77:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   87:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   91:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  116:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  130:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  141:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  149:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  173:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  185:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  189:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  201:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  205:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  217:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  221:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  232:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  238:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\bookings\bookings.service.ts
+   22:20  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+   39:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+   47:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+   78:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+   85:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  174:51  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  174:66  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  277:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  298:40  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  363:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  369:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  464:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  474:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  517:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  523:33  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  546:18  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  607:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  617:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  637:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  641:11  error  'nights' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  715:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  746:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  785:17  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  792:40  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  792:55  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  792:66  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  792:77  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  792:91  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  895:36  error  Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\inventory\inventory.controller.ts
+  14:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  26:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  35:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  53:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  56:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\inventory\inventory.service.ts
+    9:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   63:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   84:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\notifications\notifications.controller.ts
+    9:3   error  'markReadSchema' is defined but never used  @typescript-eslint/no-unused-vars
+   16:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   28:21  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   37:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   49:21  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   58:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   62:21  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   74:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   78:21  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   89:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   93:21  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  102:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  106:21  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  117:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  121:21  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\notifications\notifications.service.ts
+   52:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   64:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   88:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\payments\payments.controller.ts
+  16:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  20:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  37:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  41:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  63:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  72:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  76:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\payments\payments.service.ts
+   24:17  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+   30:17  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+   93:17  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+   99:17  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  120:17  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  170:32  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  208:62  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  237:9   error  Unexpected lexical declaration in case block  no-case-declarations
+  281:17  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\properties\properties.controller.ts
+   37:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   71:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   87:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  100:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  105:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  158:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  161:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  171:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  187:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  195:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  217:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\properties\properties.service.ts
+   41:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   45:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   65:12  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  136:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  172:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  199:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  212:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  218:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  249:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  262:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  268:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  272:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  301:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  327:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  409:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  443:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\push\push.routes.ts
+   3:10  error  'requireRole' is defined but never used   @typescript-eslint/no-unused-vars
+  32:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  38:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  53:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\reviews\reviews.controller.ts
+   26:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   40:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   61:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   69:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   88:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   98:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  118:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  140:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  145:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  161:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  166:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\reviews\reviews.service.ts
+   99:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  126:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  162:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  216:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  244:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  341:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  411:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  470:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  486:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  502:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  517:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  535:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\rooms\rooms.controller.ts
+   29:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   43:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   96:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  115:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  137:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\rooms\rooms.service.ts
+   95:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  112:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  114:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  163:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  165:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  177:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  181:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  213:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  237:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  281:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\service-bookings\service-bookings.controller.ts
+   18:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   26:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   41:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   46:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   73:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   90:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  107:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\service-bookings\service-bookings.routes.ts
+  6:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\service-bookings\service-bookings.service.ts
+   24:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   74:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   86:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  181:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\services\services.controller.ts
+   17:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   33:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   58:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   85:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  123:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  166:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\services\services.routes.ts
+  7:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\services\services.service.ts
+  29:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  54:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  72:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  82:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\support\support.controller.ts
+   17:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   21:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   33:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   37:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   48:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   61:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   78:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   94:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   97:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  111:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\support\support.service.ts
+   31:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   50:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   89:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   93:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  116:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  138:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\temples\temples.controller.ts
+  113:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  176:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  197:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  202:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  223:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  260:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  288:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  318:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  337:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  356:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\temples\temples.service.ts
+   29:36  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   64:43  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+   83:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  103:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  112:43  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  124:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  137:22  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  238:34  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  245:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  250:17  error  '_id' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  250:28  error  '_slug' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  272:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  296:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  320:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+  336:45  error  'days' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  343:17  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\uploads\uploads.controller.ts
+    4:10  error  'config' is defined but never used        @typescript-eslint/no-unused-vars
+   55:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   71:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   86:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  136:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  152:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  185:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  221:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\uploads\uploads.routes.ts
+  3:10  error  'requireRole' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\knight21\Hosthaven\backend\src\modules\vendor\vendor.controller.ts
+   23:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   42:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   64:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   75:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   80:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   91:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   97:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  111:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  116:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  134:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  142:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  162:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  168:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  179:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  191:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  216:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  228:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  233:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  245:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  250:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\vendor\vendor.service.ts
+   15:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   32:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   40:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  111:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  117:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  167:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  223:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  256:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  282:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  290:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  378:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  393:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  418:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  424:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  452:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  491:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  527:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  534:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  542:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  598:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  621:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  650:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  707:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  718:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  735:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\wishlist\wishlist.controller.ts
+  16:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  37:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  42:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  57:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  62:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  79:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  83:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  91:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  96:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\modules\wishlist\wishlist.service.ts
+   64:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   93:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  117:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  155:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\services\cache.service.ts
+  35:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  83:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\services\cloudinary.service.ts
+  26:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  71:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\services\email.service.ts
+  19:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  27:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\services\queue.service.ts
+  11:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\services\temple-ai.service.ts
+   289:7   error  'fetchWikipediaSummary' is assigned a value but never used    @typescript-eslint/no-unused-vars
+   321:7   error  'fetchWikipediaBestTitle' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   338:60  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   347:55  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   362:63  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   378:7   error  'fetchWikidataFacts' is assigned a value but never used       @typescript-eslint/no-unused-vars
+   386:63  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   387:72  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   508:7   error  'runGeminiJson' is assigned a value but never used            @typescript-eslint/no-unused-vars
+   513:16  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   533:44  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   554:20  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   596:46  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   899:17  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   903:15  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   921:31  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+   931:31  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1357:46  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1358:31  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1363:46  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1364:31  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1368:81  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1370:83  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1428:33  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+  1433:33  error  Unexpected any. Specify a different type                      @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\services\webpush.service.ts
+  29:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  95:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\types\index.ts
+   1:10  error  'FastifyRequest' is defined but never used  @typescript-eslint/no-unused-vars
+  70:18  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\utils\csv.util.ts
+   1:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  14:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  19:22  error  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+C:\knight21\Hosthaven\backend\src\utils\response.util.ts
+  16:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\knight21\Hosthaven\backend\src\utils\token.util.ts
+  18:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 603 problems (601 errors, 2 warnings)
+  0 errors and 2 warnings potentially fixable with the `--fix` option.
+
