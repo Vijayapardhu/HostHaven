@@ -176,6 +176,16 @@ export const buildApp = async () => {
     }
   });
 
+  // Public endpoint: expose Razorpay key ID to front-end (key secret never leaves backend)
+  fastify.get(`/${config.app.apiVersion}/config/payment-key`, async (_request, _reply) => {
+    return {
+      success: true,
+      data: {
+        keyId: config.razorpay?.keyId || "",
+      },
+    };
+  });
+
   // API routes
   await fastify.register(authRoutes, {
     prefix: `/${config.app.apiVersion}/auth`,

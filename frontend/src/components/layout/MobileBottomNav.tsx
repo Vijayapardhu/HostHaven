@@ -16,11 +16,6 @@ const MobileBottomNav = () => {
       activePaths: ["/", "/hotels", "/homes", "/services"],
     },
     {
-      name: "Temples",
-      path: "/temples",
-      icon: Landmark,
-    },
-    {
       name: "Wishlist",
       path: "/wishlist",
       icon: Heart,

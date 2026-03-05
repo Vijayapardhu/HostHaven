@@ -306,10 +306,10 @@ export default function AddTemple() {
     () =>
       Boolean(
         formValues.name.trim() &&
-          formValues.city &&
-          formValues.fullAddress.trim() &&
-          formValues.latitude.trim() &&
-          formValues.longitude.trim(),
+        formValues.city &&
+        formValues.fullAddress.trim() &&
+        formValues.latitude.trim() &&
+        formValues.longitude.trim(),
       ),
     [formValues.name, formValues.city, formValues.fullAddress, formValues.latitude, formValues.longitude],
   )
@@ -318,10 +318,10 @@ export default function AddTemple() {
     () =>
       Boolean(
         formValues.name.trim() &&
-          formValues.city &&
-          formValues.fullAddress.trim() &&
-          formValues.latitude.trim() &&
-          formValues.longitude.trim(),
+        formValues.city &&
+        formValues.fullAddress.trim() &&
+        formValues.latitude.trim() &&
+        formValues.longitude.trim(),
       ),
     [formValues.name, formValues.city, formValues.fullAddress, formValues.latitude, formValues.longitude],
   )
@@ -359,25 +359,111 @@ export default function AddTemple() {
       const cityCandidate = data.city?.charAt(0).toUpperCase() + data.city?.slice(1).toLowerCase()
       setFormValues((prev) => ({
         ...prev,
-        name: data.name,
-        slug: slugify(data.name),
-        description: data.description,
+        name: data.name || '',
+        slug: slugify(data.name || ''),
+        description: data.description || '',
         shortDescription: data.shortDesc || data.description?.slice(0, 150) || '',
         city: CITY_OPTIONS.includes(cityCandidate as TempleFormValues['city'])
           ? (cityCandidate as TempleFormValues['city'])
           : '',
         fullAddress: data.fullAddress || '',
+        landmark: data.landmark || '',
         latitude: data.latitude != null ? String(data.latitude) : '',
         longitude: data.longitude != null ? String(data.longitude) : '',
+        deityName: data.deityName || '',
+
+        templeType: data.templeType || '',
+        builtYear: data.builtYear || '',
+        founder: data.founder || '',
+        mythologicalSignificance: data.mythologicalSignificance || '',
+        historicalSignificance: data.historicalSignificance || '',
+        architectureStyle: data.architectureStyle || '',
+        uniqueFeatures: data.uniqueFeatures || '',
+        sacredNearby: data.sacredNearby || '',
+        associatedLegends: data.associatedLegends || '',
+
+        darshanTimings: Array.isArray(data.darshanTimings) && data.darshanTimings.length > 0
+          ? data.darshanTimings
+          : [emptyTiming()],
+        morningAarti: data.morningAarti || '',
+        afternoonAarti: data.afternoonAarti || '',
+        eveningAarti: data.eveningAarti || '',
+        specialSevas: data.specialSevas || '',
+        festivalSpecificTimings: data.festivalSpecificTimings || '',
+
+        generalEntryFee: data.generalEntryFee || '',
+        specialDarshanFee: data.specialDarshanFee || '',
+        vipDarshanFee: data.vipDarshanFee || '',
+        parkingAvailable: !!data.parkingAvailable,
+        wheelchairAccessible: !!data.wheelchairAccessible,
+        cloakroomAvailable: !!data.cloakroomAvailable,
+        restroomsAvailable: !!data.restroomsAvailable,
+        drinkingWaterAvailable: !!data.drinkingWaterAvailable,
+        prasadamCounterAvailable: !!data.prasadamCounterAvailable,
+        photographyAllowed: data.photographyAllowed ?? true,
+        mobileRestrictions: data.mobileRestrictions || '',
+        dressCodeMen: data.dressCodeMen || '',
+        dressCodeWomen: data.dressCodeWomen || '',
+        securityNotes: data.securityNotes || '',
+
+        majorFestivals: data.majorFestivals || '',
+        festivalDates: data.festivalDates || '',
+        annualBrahmotsavam: data.annualBrahmotsavam || '',
+        rathotsavamDetails: data.rathotsavamDetails || '',
+        crowdExpectationLevel: data.crowdExpectationLevel || '',
+        specialPoojas: data.specialPoojas || '',
+        specialDecorationDays: data.specialDecorationDays || '',
+
+        bestMonths: data.bestMonths || '',
+        bestTimeOfDay: data.bestTimeOfDay || '',
+        peakCrowdDays: data.peakCrowdDays || '',
+        avoidDays: data.avoidDays || '',
+        weatherConditions: data.weatherConditions || '',
+
+        nearbyTemples: data.nearbyTemples || '',
+        nearbyBeachesOrHills: data.nearbyBeachesOrHills || '',
+        nearbyRestaurants: data.nearbyRestaurants || '',
+        nearbyHotels: data.nearbyHotels || '',
+        distanceRailwayStation: data.distanceRailwayStation || '',
+        distanceBusStand: data.distanceBusStand || '',
+        distanceAirport: data.distanceAirport || '',
+
         images:
           Array.isArray(data.images) && data.images.length > 0
-            ? data.images.map((url, index) => ({
-                url: typeof url === 'string' ? url : String(url || ''),
-                alt: `${data.name} image ${index + 1}`,
-                isPrimary: index === 0,
-              }))
+            ? data.images.map((img: any, index: number) => {
+              const url = typeof img === 'string' ? img : img?.url || '';
+              return {
+                url,
+                alt: typeof img === 'string' ? `${data.name} image ${index + 1}` : img?.alt || `${data.name} image ${index + 1}`,
+                isPrimary: typeof img === 'string' ? index === 0 : !!img?.isPrimary,
+              }
+            })
             : prev.images,
-        active: data.active,
+        videos: Array.isArray(data.videos) && data.videos.length > 0 ? data.videos : [''],
+        virtualTourUrl: data.virtualTourUrl || '',
+
+        metaTitle: data.metaTitle || '',
+        metaDescription: data.metaDescription || '',
+        searchKeywords: data.searchKeywords || '',
+        canonicalUrl: data.canonicalUrl || '',
+        openGraphImage: data.openGraphImage || '',
+        structuredDataJsonLd: data.structuredDataJsonLd || '',
+
+        devoteeTips: data.devoteeTips || '',
+        thingsToCarry: data.thingsToCarry || '',
+        thingsNotAllowed: data.thingsNotAllowed || '',
+        idealVisitDuration: data.idealVisitDuration || '',
+        suggestedItinerary: data.suggestedItinerary || '',
+        localFoodRecommendations: data.localFoodRecommendations || '',
+        faqs: typeof data.faqs === 'string' ? data.faqs : data.faqs ? JSON.stringify(data.faqs, null, 2) : '',
+
+        emergencyContact: data.emergencyContact || '',
+        templeOfficePhone: data.templeOfficePhone || '',
+        lostAndFoundDesk: data.lostAndFoundDesk || '',
+        medicalFacilityNearby: data.medicalFacilityNearby || '',
+        policeStationNearby: data.policeStationNearby || '',
+
+        active: data.active ?? true,
       }))
       setMaxUnlockedStep(10)
     } catch (err: any) {
@@ -717,14 +803,14 @@ export default function AddTemple() {
         for (const key of stringKeys) {
           const value = draft[key as string]
           if (typeof value === 'string' && value.trim().length > 0) {
-            ;(next[key] as string) = value.trim()
+            ; (next[key] as string) = value.trim()
           }
         }
 
         for (const key of booleanKeys) {
           const value = draft[key as string]
           if (typeof value === 'boolean') {
-            ;(next[key] as boolean) = value
+            ; (next[key] as boolean) = value
           }
         }
 
@@ -986,13 +1072,12 @@ export default function AddTemple() {
                 type="button"
                 onClick={() => goToStep(stepNumber)}
                 disabled={!isUnlocked}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  isActive
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${isActive
                     ? 'border-slate-900 bg-slate-900 text-white'
                     : isUnlocked
                       ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                       : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                }`}
+                  }`}
               >
                 {stepNumber}. {step}
               </button>
@@ -1674,22 +1759,22 @@ export default function AddTemple() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/temples')}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-          {activeStep === 10 ? (
             <button
-              type="submit"
-              disabled={isSaving}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              type="button"
+              onClick={() => navigate('/temples')}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              {isSaving ? 'Saving...' : id ? 'Update temple' : 'Create temple'}
+              Cancel
             </button>
-          ) : null}
+            {activeStep === 10 ? (
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {isSaving ? 'Saving...' : id ? 'Update temple' : 'Create temple'}
+              </button>
+            ) : null}
           </div>
         </div>
       </form>

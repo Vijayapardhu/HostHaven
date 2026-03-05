@@ -63,10 +63,10 @@ const mapProperty = (property: any): Property => ({
   address: property.address ?? '',
   description: property.description,
   amenities: property.amenities,
-  images: property.images,
-  video: property.video,
-  mapLocation: property.mapLocation,
-  pricing: property.pricing,
+  images: property.images, // Returns the exact JSON representation instead of trying to map it exclusively to strings
+  video: property.video || property.videos?.[0],
+  mapLocation: property.mapLocation || { lat: property.latitude, lng: property.longitude },
+  pricing: property.pricing || { basePrice: property.basePrice, weekendPrice: property.weekendPrice },
   status: normalizeStatus(property.status),
   vendorId: property.vendor?.id ?? property.vendorId,
   rating: property.rating,
@@ -82,11 +82,11 @@ const normalizeList = (payload: any) => {
     data: Array.isArray(data) ? data.map(mapProperty) : [],
     pagination: meta
       ? {
-          total: meta.total ?? 0,
-          page: meta.page ?? 1,
-          limit: meta.limit ?? 10,
-          totalPages: meta.totalPages ?? meta.pages ?? 1,
-        }
+        total: meta.total ?? 0,
+        page: meta.page ?? 1,
+        limit: meta.limit ?? 10,
+        totalPages: meta.totalPages ?? meta.pages ?? 1,
+      }
       : { total: 0, page: 1, limit: 10, totalPages: 1 },
   }
 }

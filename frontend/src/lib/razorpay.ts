@@ -36,34 +36,40 @@ export interface RazorpayResponse {
   razorpay_signature?: string;
 }
 
-// Razorpay Key Configuration
-const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY || "";
+// Razorpay Key — used only as fallback when backend does not return keyId
+const RAZORPAY_KEY_FALLBACK = import.meta.env.VITE_RAZORPAY_KEY || "";
 
-export const initiatePayment = (options: Partial<RazorpayOptions>) => {
+/**
+ * Opens the Razorpay payment modal.
+ * Prefer passing `keyId` from the backend createOrder response so the key
+ * is never hard-coded in the frontend. VITE_RAZORPAY_KEY is a local fallback.
+ */
+export const initiatePayment = (
+  options: Partial<RazorpayOptions> & { keyId?: string }
+) => {
   return new Promise((resolve, reject) => {
-    // Check if Razorpay key is configured
-    if (!RAZORPAY_KEY) {
-      const errorMsg = 
+    const razorpayKey = options.keyId || RAZORPAY_KEY_FALLBACK;
+
+    if (!razorpayKey) {
+      alert(
         "Razorpay API key not configured!\n\n" +
-        "To enable payments:\n" +
-        "1. Sign up at https://dashboard.razorpay.com/signup (FREE)\n" +
-        "2. Go to Settings → API Keys → Generate Test Key\n" +
-        "3. Add to frontend/.env file:\n" +
-        "   VITE_RAZORPAY_KEY=rzp_test_YourKeyHere\n" +
-        "4. Restart the development server";
-      
-      alert(errorMsg);
+        "Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your backend .env and restart the server."
+      );
       reject(new Error("Razorpay API key not configured"));
       return;
     }
 
     if (!window.Razorpay) {
-      reject(new Error("Razorpay SDK not loaded. Please check your internet connection."));
+      reject(
+        new Error(
+          "Razorpay SDK not loaded. Please check your internet connection."
+        )
+      );
       return;
     }
 
-    const defaultOptions: RazorpayOptions = {
-      key: RAZORPAY_KEY,
+    const rzpOptions: RazorpayOptions = {
+      key: razorpayKey,
       amount: options.amount || 0,
       currency: options.currency || "INR",
       name: options.name || "HostHaven",
@@ -84,7 +90,11 @@ export const initiatePayment = (options: Partial<RazorpayOptions>) => {
       },
     };
 
-    const razorpayInstance = new window.Razorpay(defaultOptions);
+    if (options.order_id) {
+      rzpOptions.order_id = options.order_id;
+    }
+
+    const razorpayInstance = new window.Razorpay(rzpOptions);
     razorpayInstance.open();
   });
 };
@@ -97,6 +107,7 @@ export const createBookingPayment = async ({
   checkOut,
   guests,
   orderId,
+  keyId,
   notes,
   userName,
   userEmail,
@@ -109,6 +120,7 @@ export const createBookingPayment = async ({
   checkOut: string;
   guests: number;
   orderId?: string;
+  keyId?: string; // from backend createOrder response
   notes?: Record<string, string>;
   userName?: string;
   userEmail?: string;
@@ -116,10 +128,11 @@ export const createBookingPayment = async ({
 }) => {
   try {
     const response = await initiatePayment({
-      amount: amount * 100, // Razorpay expects amount in paise
+      amount: amount * 100, // Razorpay expects paise
       name: "HostHaven",
       description: `${propertyName} - ${nights} Night${nights > 1 ? "s" : ""}`,
       order_id: orderId,
+      keyId, // key from backend
       prefill: {
         name: userName,
         email: userEmail,

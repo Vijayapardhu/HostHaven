@@ -88,11 +88,14 @@ export default function AddProperty() {
       })
       if (data.images && data.images.length > 0) {
         setPropertyImages(
-          data.images.map((url: string, index: number) => ({
-            url,
-            alt: `${data.name} image ${index + 1}`,
-            isPrimary: index === 0,
-          }))
+          data.images.map((img: any, index: number) => {
+            const url = typeof img === 'string' ? img : img?.url || ''
+            return {
+              url,
+              alt: typeof img === 'string' ? `${data.name} image ${index + 1}` : img?.alt || `${data.name} image ${index + 1}`,
+              isPrimary: typeof img === 'string' ? index === 0 : !!img?.isPrimary,
+            }
+          })
         )
       }
     } catch (err: any) {
@@ -153,10 +156,10 @@ export default function AddProperty() {
       basePrice: formValues.basePrice,
       weekendPrice: formValues.weekendPrice,
       amenities: formValues.amenities,
-      images: propertyImages.filter(img => img.url.trim().length > 0).map((img, index) => ({ 
-        url: img.url, 
-        alt: img.alt || `${formValues.name} image ${index + 1}`, 
-        isPrimary: img.isPrimary || index === 0 
+      images: propertyImages.filter(img => img.url.trim().length > 0).map((img, index) => ({
+        url: img.url,
+        alt: img.alt || `${formValues.name} image ${index + 1}`,
+        isPrimary: img.isPrimary || index === 0
       })),
       mapLocation: formValues.latitude && formValues.longitude ? {
         lat: formValues.latitude,
@@ -404,11 +407,10 @@ export default function AddProperty() {
                   key={amenity}
                   type="button"
                   onClick={() => toggleAmenity(amenity)}
-                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                    (formValues.amenities || []).includes(amenity)
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${(formValues.amenities || []).includes(amenity)
                       ? 'bg-slate-900 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                    }`}
                 >
                   {amenity}
                 </button>

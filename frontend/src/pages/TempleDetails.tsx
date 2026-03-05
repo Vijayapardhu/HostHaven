@@ -291,9 +291,19 @@ const TempleDetails = () => {
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-card rounded-2xl shadow-card p-4 md:p-5">
                 <h2 className="text-xl font-serif font-semibold mb-3 pb-2 border-b-2 border-gold/60">Overview</h2>
-                <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {temple.shortDesc || temple.description || "Temple description not available."}
-                </p>
+                {temple.shortDesc && (
+                  <p className="text-foreground font-medium text-base mb-3 leading-snug">
+                    {temple.shortDesc}
+                  </p>
+                )}
+                {temple.description && (
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
+                    {temple.description}
+                  </p>
+                )}
+                {!temple.shortDesc && !temple.description && (
+                  <p className="text-muted-foreground">Temple description not available.</p>
+                )}
               </div>
 
               <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-4">

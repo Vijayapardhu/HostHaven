@@ -68,6 +68,11 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config || {}
 
+    // Exclude login/refresh routes from interceptor retry logic
+    if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
+      return Promise.reject(error)
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
@@ -78,7 +83,11 @@ api.interceptors.response.use(
         return api(originalRequest)
       } catch {
         clearAuthStorage()
+        window.location.href = '/login'
       }
+    } else if (error.response?.status === 401) {
+      clearAuthStorage()
+      window.location.href = '/login'
     }
 
     return Promise.reject(error)

@@ -93,6 +93,51 @@ export class PaymentsService {
     };
   }
 
+  async createVendorOrder(bookingId: string, vendorId: string) {
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId },
+      include: { property: true, payment: true },
+    });
+
+    if (!booking || booking.property.vendorId !== vendorId) {
+      const error = new Error('Booking not found');
+      (error as any).code = ERROR_CODES.BOOKING_NOT_FOUND;
+      throw error;
+    }
+
+    const amount = booking.totalAmount.toNumber() * 100;
+
+    const order = await getRazorpayClient().orders.create({
+      amount,
+      currency: 'INR',
+      receipt: booking.bookingNumber,
+      notes: {
+        bookingId: booking.id,
+        propertyName: booking.property.name,
+      },
+    });
+
+    if (booking.payment) {
+      await prisma.payment.update({
+        where: { id: booking.payment.id },
+        data: {
+          razorpayOrderId: order.id,
+          status: 'PROCESSING',
+        },
+      });
+    }
+
+    logger.info({ bookingId, orderId: order.id }, 'Vendor payment order created');
+
+    return {
+      orderId: order.id,
+      amount: amount / 100,
+      currency: 'INR',
+      keyId: config.razorpay.keyId,
+      bookingId: booking.id,
+    };
+  }
+
   async verifyPayment(data: {
     razorpay_order_id: string;
     razorpay_payment_id: string;
@@ -189,7 +234,7 @@ export class PaymentsService {
 
   async handleWebhook(payload: any, signature: string) {
     const webhookSecret = config.razorpay.webhookSecret;
-    
+
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
       .update(JSON.stringify(payload))

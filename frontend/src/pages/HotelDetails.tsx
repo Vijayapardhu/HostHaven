@@ -192,6 +192,7 @@ const HotelDetails = () => {
         checkOut: format(checkOut, "MMM dd, yyyy"),
         guests: guests,
         orderId: order.orderId,
+        keyId: order.keyId,  // key from backend \u2014 no VITE_RAZORPAY_KEY needed
         notes: {
           propertyId: hotel.id,
           roomId: selectedRoom.id,

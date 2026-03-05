@@ -18,10 +18,27 @@ interface Service {
   image?: string;
   images?: Array<{ url: string }>;
   category: string;
-  advanceAmount: number;
+  // fields from backend DB
+  price: number;
+  priceUnit?: string;
+  advanceType?: string;   // 'percentage' | 'fixed'
+  advanceValue?: number;  // e.g. 50 for 50% or 300 for fixed ₹300
+  // legacy computed field (may be absent)
+  advanceAmount?: number;
   basePrice?: number;
+  duration?: string;
   isActive?: boolean;
 }
+
+/** Compute the advance amount to be paid from backend fields */
+const computeAdvance = (service: Service): number => {
+  if (service.advanceAmount) return Number(service.advanceAmount);
+  const price = Number(service.price || service.basePrice || 0);
+  const value = Number(service.advanceValue ?? 30);
+  if (service.advanceType === 'fixed') return value;
+  // default: percentage
+  return Math.round((price * value) / 100);
+};
 
 const iconMap: Record<string, typeof Car> = {
   car: Car,
@@ -91,13 +108,26 @@ const Services = () => {
       return;
     }
 
+    const advanceAmount = computeAdvance(selectedService);
+
     try {
       setIsSubmitting(true);
 
+      // Fetch Razorpay key from backend config
+      let backendKey: string | undefined;
+      try {
+        const cfg = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/v1'}/config/payment-key`);
+        if (cfg.ok) {
+          const cfgData = await cfg.json();
+          backendKey = cfgData?.data?.keyId || cfgData?.keyId;
+        }
+      } catch { /* use fallback */ }
+
       const paymentResult = (await initiatePayment({
-        amount: selectedService.advanceAmount * 100,
+        amount: advanceAmount * 100,
         name: "HostHaven",
         description: `${selectedService.name} - Advance Payment`,
+        keyId: backendKey,
         prefill: {
           name: user?.name,
           email: user?.email,
@@ -117,8 +147,8 @@ const Services = () => {
         serviceTime: form.serviceTime,
         location: form.location,
         notes: form.notes,
-        advanceAmount: selectedService.advanceAmount,
-        totalAmount: selectedService.advanceAmount,
+        advanceAmount: advanceAmount,
+        totalAmount: Number(selectedService.price || selectedService.basePrice || advanceAmount),
         razorpayPaymentId: paymentResult.razorpay_payment_id,
         razorpayOrderId: paymentResult.razorpay_order_id,
       });
@@ -184,7 +214,11 @@ const Services = () => {
                           ))}
                         </ul>
                       )}
-                      <p className="text-sm font-medium text-primary mb-4">Advance: ₹{service.advanceAmount || service.basePrice || 0}</p>
+                      <p className="text-sm font-medium text-primary mb-4">
+                        {selectedService && computeAdvance(service) > 0
+                          ? `Advance: ₹${computeAdvance(service)}`
+                          : `Price: ₹${Number(service.price || service.basePrice || 0)}`}
+                      </p>
                       <Button variant="gold" className="w-full" onClick={() => handleServiceClick(service)}>
                         Book Now
                       </Button>
@@ -226,7 +260,13 @@ const Services = () => {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
-              <p className="font-medium">Advance Amount: ₹{selectedService?.advanceAmount || 0}</p>
+              <p className="font-medium">Advance Amount: ₹{selectedService ? computeAdvance(selectedService) : 0}</p>
+              {selectedService && (
+                <p className="text-xs text-muted-foreground">
+                  Full service price: ₹{Number(selectedService.price || selectedService.basePrice || 0)}
+                  {selectedService.priceUnit ? ` / ${selectedService.priceUnit.replace('_', ' ')}` : ''}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground mt-1">
                 Advance payment is mandatory. Remaining amount is handled offline. Refunds are admin-controlled.
               </p>
@@ -284,7 +324,7 @@ const Services = () => {
             </div>
 
             <Button type="submit" variant="gold" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Processing..." : `Pay ₹${selectedService?.advanceAmount || 0} & Submit`}
+              {isSubmitting ? "Processing..." : `Pay ₹${selectedService ? computeAdvance(selectedService) : 0} & Submit`}
             </Button>
           </form>
         </DialogContent>

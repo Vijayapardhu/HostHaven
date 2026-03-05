@@ -3,6 +3,7 @@ import paymentsService from './payments.service';
 import { sendSuccess, sendError } from '../../utils/response.util';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { logger } from '../../utils/logger.util';
+import { config } from '../../config';
 import {
   createPaymentOrderSchema,
   verifyPaymentSchema,
@@ -10,6 +11,34 @@ import {
 } from './payments.schema';
 
 export const PaymentsController = {
+  async getPublicKey(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const publicKey = config.razorpay.keyId;
+      return sendSuccess(reply, { publicKey });
+    } catch (error: any) {
+      logger.error({ error }, 'Get public key failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to get public key', 500);
+    }
+  },
+
+  async createVendorOrder(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { bookingId } = request.body as { bookingId: string };
+      const vendorId = (request as any).user.vendorId;
+
+      const result = await paymentsService.createVendorOrder(bookingId, vendorId);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Create vendor payment order failed');
+      
+      if (error.code === ERROR_CODES.BOOKING_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      
+      return sendError(reply, ERROR_CODES.PAYMENT_FAILED, 'Failed to create payment order', 500);
+    }
+  },
+
   async createOrder(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { bookingId } = createPaymentOrderSchema.parse(request.body);

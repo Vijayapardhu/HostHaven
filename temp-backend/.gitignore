@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+.env.production
+*.log
+npm-debug.log*
+.DS_Store
+prisma/*.db
+prisma/*.db-journal
+coverage/
+.idea/
+.vscode/
+*.swp
+*.swo
+tsconfig.tsbuildinfo
+lint_output.txt
+
+# Database dumps (may contain sensitive data)
+supabase_dump.sql
+supabase_dump_help.txt
+*.dump.sql

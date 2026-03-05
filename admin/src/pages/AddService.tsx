@@ -60,6 +60,18 @@ export default function AddService() {
         advanceValue: data.advanceValue ?? 0,
         active: data.active,
       })
+      if (data.images && data.images.length > 0) {
+        setServiceImages(
+          data.images.map((img: any, index: number) => {
+            const url = typeof img === 'string' ? img : img?.url || ''
+            return {
+              url,
+              alt: typeof img === 'string' ? `${data.name} image ${index + 1}` : img?.alt || `${data.name} image ${index + 1}`,
+              isPrimary: typeof img === 'string' ? index === 0 : !!img?.isPrimary,
+            }
+          })
+        )
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to load service details.')
     } finally {
@@ -100,12 +112,12 @@ export default function AddService() {
       const imageUrls = serviceImages
         .filter(img => img.url.trim().length > 0)
         .map(img => img.url)
-      
+
       const payload = {
         ...formValues,
         images: imageUrls,
       }
-      
+
       if (id) {
         await servicesService.updateService(id, payload)
         toast.success('Service updated successfully.')
