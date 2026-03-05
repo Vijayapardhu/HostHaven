@@ -1103,6 +1103,130 @@ async function main() {
     });
     console.log("✅ Temple created:", templeData.name);
   }
+
+  // Create sample services
+  const services = [
+    {
+      name: "Tirupati VIP Darshan & Guide",
+      description:
+        "Skip the lines and get expert insights into the history and architecture of Tirumala. A dedicated guide will take you through the temple rituals, ensure you get a comfortable VIP darshan, and assist with Prasadam collection.",
+      category: "Guide",
+      searchText: "guide tirupati darshan vip",
+      price: 2500,
+      priceUnit: "per_person",
+      advanceType: "percentage",
+      advanceValue: 50,
+      duration: "4-6 Hours",
+      isActive: true,
+      isVerified: true,
+      rating: 4.8,
+      reviewCount: 420,
+      images: [
+        {
+          url: "https://images.unsplash.com/photo-1627885078712-16a7f4ea6c94?q=80&w=2070",
+          alt: "VIP Darshan",
+          isPrimary: true,
+        },
+        {
+          url: "https://images.unsplash.com/photo-1596791220463-54cd8c21da8a?q=80&w=1924",
+          alt: "Temple Guide",
+          isPrimary: false,
+        }
+      ]
+    },
+    {
+      name: "Luxury AC Cab - Vijayawada Airport Transfer",
+      description:
+        "Comfortable and hassle-free airport transfer connecting Vijayawada International Airport to any hotel in the city limits. Professional drivers, pristine air-conditioned sedans or SUVs, and complimentary bottled water.",
+      category: "Transport",
+      searchText: "cab taxi airport transfer vijayawada",
+      price: 1200,
+      priceUnit: "per_trip",
+      advanceType: "fixed",
+      advanceValue: 300,
+      duration: "1 Hour",
+      isActive: true,
+      isVerified: true,
+      rating: 4.9,
+      reviewCount: 156,
+      images: [
+        {
+          url: "https://images.unsplash.com/photo-1549317661-bc61c8ee0145?q=80&w=2070",
+          alt: "Luxury Sedan",
+          isPrimary: true,
+        },
+        {
+          url: "https://images.unsplash.com/photo-1622396090075-ab1b9fe358a9?q=80&w=2070",
+          alt: "Chauffeur Service",
+          isPrimary: false,
+        }
+      ]
+    },
+    {
+      name: "Srikalahasti Rahu-Ketu Pooja Package",
+      description:
+        "A full spiritual package for the famous Rahu-Ketu Sarpa Dosha Nivarana Pooja. Includes all pooja completely arranged by a local pandit, premium entry tickets, and assistance throughout the complex rituals.",
+      category: "Religious",
+      searchText: "srikalahasti rahu ketu pooja",
+      price: 3500,
+      priceUnit: "per_couple",
+      advanceType: "percentage",
+      advanceValue: 100,
+      duration: "3 Hours",
+      isActive: true,
+      isVerified: true,
+      rating: 4.7,
+      reviewCount: 89,
+      images: [
+        {
+          url: "https://images.unsplash.com/photo-1602002418082-a4443e081dd1?q=80&w=800",
+          alt: "Pooja Items",
+          isPrimary: true,
+        },
+        {
+          url: "https://images.unsplash.com/photo-1579222622722-1d529eb4bf8a?q=80&w=2074",
+          alt: "Temple Rituals",
+          isPrimary: false,
+        }
+      ]
+    },
+    {
+      name: "Full-Day Vijayawada Heritage Photography Tour",
+      description:
+        "Explore the incredible heritage of Vijayawada with a professional photographer. Visit the ancient Undavalli Caves, Prakasam Barrage, and Kanaka Durga Temple. You'll receive 50+ professionally edited portrait and landscape photographs of your journey.",
+      category: "Photography",
+      searchText: "tour photography photoshoot vijayawada",
+      price: 4500,
+      priceUnit: "per_day",
+      advanceType: "percentage",
+      advanceValue: 20,
+      duration: "8 Hours",
+      isActive: true,
+      isVerified: true,
+      rating: 5.0,
+      reviewCount: 34,
+      images: [
+        {
+          url: "https://images.unsplash.com/photo-1516961642265-531546e84af2?q=80&w=1974",
+          alt: "Photographer with Camera",
+          isPrimary: true,
+        },
+        {
+          url: "https://images.unsplash.com/photo-1452587925148-ce544e77e70d?q=80&w=1974",
+          alt: "Camera Lens",
+          isPrimary: false,
+        }
+      ]
+    }
+  ];
+
+  await prisma.service.deleteMany(); // Clear existing
+  for (const serviceData of services) {
+    const s = await prisma.service.create({
+      data: serviceData,
+    });
+    console.log("✅ Service created:", s.name);
+  }
 }
 
 main()
