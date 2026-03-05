@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { initiatePayment, RazorpayResponse } from "@/lib/razorpay";
+import LocationPicker from "@/components/ui/LocationPicker";
 
 interface Service {
   id: string;
@@ -66,7 +67,7 @@ const Services = () => {
         const list = Array.isArray(result?.data) ? result.data : [];
         setServices(list.filter((s: Service) => s.isActive !== false));
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setIsLoadingServices(false));
   }, []);
 
@@ -151,47 +152,47 @@ const Services = () => {
           ) : services.length === 0 ? (
             <p className="text-center text-muted-foreground py-16">No services available at the moment.</p>
           ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {services.map((service) => {
-              const Icon = getIcon(service);
-              const features = Array.isArray(service.features) ? service.features : [];
-              return (
-                <div
-                  key={service.id}
-                  id={service.id}
-                  className="bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
-                >
-                  <div className="relative h-48 overflow-hidden">
-                    <img src={getImage(service)} alt={service.name} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/80 via-heritage-brown/20 to-transparent" />
-                    <div className="absolute bottom-4 left-4">
-                      <div className="w-12 h-12 rounded-xl gradient-gold flex items-center justify-center mb-2">
-                        <Icon className="w-6 h-6 text-primary-foreground" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {services.map((service) => {
+                const Icon = getIcon(service);
+                const features = Array.isArray(service.features) ? service.features : [];
+                return (
+                  <div
+                    key={service.id}
+                    id={service.id}
+                    className="bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
+                  >
+                    <div className="relative h-48 overflow-hidden">
+                      <img src={getImage(service)} alt={service.name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/80 via-heritage-brown/20 to-transparent" />
+                      <div className="absolute bottom-4 left-4">
+                        <div className="w-12 h-12 rounded-xl gradient-gold flex items-center justify-center mb-2">
+                          <Icon className="w-6 h-6 text-primary-foreground" />
+                        </div>
+                        <h3 className="font-serif font-semibold text-xl text-cream-light">{service.name}</h3>
                       </div>
-                      <h3 className="font-serif font-semibold text-xl text-cream-light">{service.name}</h3>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-muted-foreground text-sm mb-4">{service.description}</p>
+                      {features.length > 0 && (
+                        <ul className="space-y-2 mb-4">
+                          {features.map((feature, index) => (
+                            <li key={index} className="flex items-center gap-2 text-sm text-foreground">
+                              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                              {feature}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className="text-sm font-medium text-primary mb-4">Advance: ₹{service.advanceAmount || service.basePrice || 0}</p>
+                      <Button variant="gold" className="w-full" onClick={() => handleServiceClick(service)}>
+                        Book Now
+                      </Button>
                     </div>
                   </div>
-                  <div className="p-6">
-                    <p className="text-muted-foreground text-sm mb-4">{service.description}</p>
-                    {features.length > 0 && (
-                    <ul className="space-y-2 mb-4">
-                      {features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2 text-sm text-foreground">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    )}
-                    <p className="text-sm font-medium text-primary mb-4">Advance: ₹{service.advanceAmount || service.basePrice || 0}</p>
-                    <Button variant="gold" className="w-full" onClick={() => handleServiceClick(service)}>
-                      Book Now
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
           )}
 
           <div className="mt-16 bg-card rounded-2xl shadow-card p-8 text-center">
@@ -218,7 +219,7 @@ const Services = () => {
       </div>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl">Book {selectedService?.name}</DialogTitle>
           </DialogHeader>
@@ -259,17 +260,16 @@ const Services = () => {
             </div>
 
             <div>
-              <label htmlFor="service-location" className="text-sm font-medium text-foreground">Location</label>
-              <input
-                id="service-location"
-                type="text"
-                required
-                title="Enter service location"
-                placeholder="Pickup or service location"
-                value={form.location}
-                onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
+              <label className="text-sm font-medium text-foreground">Location</label>
+              <div className="mt-1">
+                <LocationPicker
+                  value={form.location}
+                  onChange={(address) => setForm((prev) => ({ ...prev, location: address }))}
+                />
+              </div>
+              {!form.location && (
+                <p className="text-xs text-destructive mt-1">Please select a location from the map</p>
+              )}
             </div>
 
             <div>
