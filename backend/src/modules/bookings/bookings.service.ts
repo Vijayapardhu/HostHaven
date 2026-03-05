@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import notificationsService from '../notifications/notifications.service';
 import { webPushService } from '../../services/webpush.service';
 import adminService from '../admin/admin.service';
+import { cacheService } from '../../services/cache.service';
 
 export class BookingsService {
   async create(data: {
@@ -157,6 +158,9 @@ export class BookingsService {
     });
 
     logger.info({ bookingId: booking.id, bookingNumber: booking.bookingNumber }, 'Booking created');
+
+    // Invalidate per-user booking cache
+    await cacheService.invalidate(`hosthaven:bookings:user:${data.userId}:*`);
 
     // Send notifications
     await this.sendBookingNotifications(booking, property, 'CREATED');
@@ -308,6 +312,10 @@ export class BookingsService {
       }
     }
 
+    const cacheKey = cacheService.keys.userBookings(userId, JSON.stringify(filters));
+    const cached = await cacheService.get<any>(cacheKey);
+    if (cached) return cached;
+
     const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
         where,
@@ -341,8 +349,8 @@ export class BookingsService {
       prisma.booking.count({ where }),
     ]);
 
-    return {
-      bookings: bookings.map(this.sanitizeBooking),
+    const result = {
+      bookings: bookings.map(b => this.sanitizeBooking(b)),
       meta: {
         page,
         limit,
@@ -350,6 +358,9 @@ export class BookingsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    await cacheService.set(cacheKey, result, cacheService.getTTL().SHORT_LIST);
+    return result;
   }
 
   async cancel(id: string, userId: string, reason?: string) {
@@ -436,6 +447,9 @@ export class BookingsService {
     }
 
     await this.sendBookingNotifications({ ...updated, user: { name: '' } }, booking.property, 'CANCELLED');
+
+    // Invalidate per-user booking cache
+    await cacheService.invalidate(`hosthaven:bookings:user:${userId}:*`);
 
     logger.info({ bookingId: id }, 'Booking cancelled');
 
@@ -578,7 +592,7 @@ export class BookingsService {
     ]);
 
     return {
-      bookings: bookings.map(this.sanitizeBooking),
+      bookings: bookings.map(b => this.sanitizeBooking(b)),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }

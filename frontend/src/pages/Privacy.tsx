@@ -3,9 +3,12 @@ import { ArrowLeft, Shield, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
+import SEOHead from "@/components/SEOHead";
 
 const Privacy = () => {
   return (
+    <>
+    <SEOHead title="Privacy Policy" description="HostHaven's privacy policy — how we collect, use, and protect your personal information when booking hotels and travel services in Andhra Pradesh." />
     <div className="min-h-screen bg-gradient-to-br from-cream via-background to-cream-light">
       {/* Decorative Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
@@ -228,6 +231,7 @@ const Privacy = () => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 

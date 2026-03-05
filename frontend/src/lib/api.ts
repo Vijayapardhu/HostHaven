@@ -169,9 +169,6 @@ class ApiService {
     updateProfile: (data: { name?: string; avatar?: string; phone?: string }) =>
       this.put<{ user: any }>('/auth/profile', data),
 
-    changePassword: (currentPassword: string, newPassword: string) =>
-      this.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
-
     uploadAvatar: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
@@ -199,10 +196,10 @@ class ApiService {
     },
 
     markNotificationRead: (id: string) =>
-      this.put<any>(`/notifications/${id}/read`, {}),
+      this.put<any>(`/notifications/${id}/read`),
 
     markAllNotificationsRead: () =>
-      this.put<any>(`/notifications/read-all`, {}),
+      this.put<any>(`/notifications/read-all`),
 
     getAddresses: () =>
       this.get<any[]>('/auth/addresses'),
@@ -468,8 +465,8 @@ class ApiService {
       this.get<any>(`/bookings/${id}`),
 
     updateBookingStatus: (id: string, status: string) => {
-      if (status === 'CHECKED_IN') return this.put<any>(`/bookings/vendor/${id}/check-in`, {});
-      if (status === 'CHECKED_OUT') return this.put<any>(`/bookings/vendor/${id}/check-out`, {});
+      if (status === 'CHECKED_IN') return this.put<any>(`/bookings/vendor/${id}/check-in`);
+      if (status === 'CHECKED_OUT') return this.put<any>(`/bookings/vendor/${id}/check-out`);
       if (status === 'CANCELLED') return this.put<any>(`/bookings/${id}/cancel`, { reason: 'Cancelled by vendor' });
       return this.put<any>(`/bookings/${id}/cancel`, { reason: status });
     },
@@ -490,10 +487,10 @@ class ApiService {
     }) => this.post<any>('/bookings/vendor/quick-booking', data, true),
 
     checkIn: (id: string) =>
-      this.put<any>(`/bookings/vendor/${id}/check-in`, {}),
+      this.put<any>(`/bookings/vendor/${id}/check-in`),
 
     checkOut: (id: string) =>
-      this.put<any>(`/bookings/vendor/${id}/check-out`, {}),
+      this.put<any>(`/bookings/vendor/${id}/check-out`),
 
     getInvoice: (id: string) =>
       this.get<any>(`/bookings/vendor/${id}/invoice`),
@@ -509,10 +506,10 @@ class ApiService {
     },
 
     markNotificationRead: (id: string) =>
-      this.put<any>(`/vendor/notifications/${id}/read`, {}),
+      this.put<any>(`/vendor/notifications/${id}/read`),
 
     markAllNotificationsRead: () =>
-      this.put<any>(`/vendor/notifications/read-all`, {}),
+      this.put<any>(`/vendor/notifications/read-all`),
 
     getReviews: (propertyId: string) =>
       this.get<any>(`/reviews/property/${propertyId}`),
@@ -579,7 +576,7 @@ class ApiService {
     },
 
     approveVendor: (vendorId: string) =>
-      this.put<any>(`/vendor/${vendorId}/approve`, {}),
+      this.put<any>(`/vendor/${vendorId}/approve`),
 
     getNotifications: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : '';
@@ -587,10 +584,10 @@ class ApiService {
     },
 
     markNotificationRead: (id: string) =>
-      this.put<any>(`/admin/notifications/${id}/read`, {}),
+      this.put<any>(`/admin/notifications/${id}/read`),
 
     markAllNotificationsRead: () =>
-      this.put<any>(`/admin/notifications/read-all`, {}),
+      this.put<any>(`/admin/notifications/read-all`),
   };
 }
 

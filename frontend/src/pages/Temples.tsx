@@ -57,7 +57,7 @@ const Temples = () => {
         const list = Array.isArray(res?.data) ? res.data : [];
         setTemples(list);
       })
-      .catch(() => { })
+      .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -81,44 +81,38 @@ const Temples = () => {
     <Layout>
       <div className="py-6 md:py-8">
         <div className="container mx-auto px-4 sm:px-6">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-              Sacred Temples
-            </h1>
-            <p className="text-muted-foreground mt-2">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">Sacred Temples</h1>
+            <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
               Find temples by name, deity, and city.
             </p>
           </div>
 
-          {/* Filters */}
-          <div className="bg-card rounded-2xl shadow-card p-4 mb-8">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search temples..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-12 bg-muted border-0 rounded-xl"
-                />
-              </div>
+          <div className="bg-card rounded-2xl shadow-card p-4 mb-8 space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by temple name, deity, or city..."
+                className="pl-10 h-11 bg-muted border-0 rounded-xl"
+              />
+            </div>
 
-              <div className="flex gap-2 flex-wrap">
-                {cities.map((city) => (
-                  <button
-                    key={city}
-                    onClick={() => setSelectedCity(city)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedCity === city
+            <div className="flex gap-2 flex-wrap">
+              {cities.map((city) => (
+                <button
+                  key={city}
+                  onClick={() => setSelectedCity(city)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    selectedCity === city
                       ? "gradient-gold text-primary-foreground shadow-gold"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      }`}
-                  >
-                    {city === "ALL" ? "All Cities" : formatCity(city)}
-                  </button>
-                ))}
-              </div>
+                  }`}
+                >
+                  {city === "ALL" ? "All Cities" : formatCity(city)}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -134,43 +128,38 @@ const Temples = () => {
                 <Link
                   key={temple.id}
                   to={`/temples/${temple.slug || temple.id}`}
-                  className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
+                  className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 border border-border/40"
                 >
-                  <div className="relative h-52 overflow-hidden">
+                  <div className="relative h-52 sm:h-56 md:h-52 lg:h-56 overflow-hidden">
                     <img
                       src={getTempleImage(temple)}
                       alt={temple.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    {temple.templeType && (
-                      <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center">
-                        <span className="text-sm font-medium text-foreground">{temple.templeType}</span>
-                      </div>
-                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/90 via-heritage-brown/20 to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4">
+                      {temple.templeType && (
+                        <span className="inline-block px-3 py-1 bg-primary/90 text-primary-foreground text-xs font-medium rounded-full mb-2">
+                          {temple.templeType}
+                        </span>
+                      )}
+                      <h3 className="font-serif font-semibold text-xl text-cream-light leading-tight">{temple.name}</h3>
+                    </div>
                   </div>
 
-                  <div className="p-5">
-                    <h3 className="font-serif font-semibold text-xl text-foreground group-hover:text-primary transition-colors">
-                      {temple.name}
-                    </h3>
+                  <div className="p-4 space-y-2">
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold">Deity:</span> {temple.deityName || "Not specified"}
+                    </p>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      <span className="line-clamp-1">{temple.fullAddress || temple.landmark || formatCity(temple.city)}</span>
+                    </p>
 
-                    <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
-                      <MapPin className="w-4 h-4 flex-shrink-0" />
-                      <span className="line-clamp-1">
-                        {temple.fullAddress || temple.landmark || formatCity(temple.city)}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 text-sm text-muted-foreground flex items-center gap-1">
-                      <span className="font-medium text-foreground">Deity:</span>
-                      {temple.deityName || "Not specified"}
-                    </div>
-
-                    <div className="flex items-center justify-end mt-4 pt-4 border-t border-border">
-                      <Button variant="gold" size="sm">
-                        View Details
-                      </Button>
-                    </div>
+                    <Button variant="goldOutline" className="w-full mt-2">
+                      View Details
+                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </Button>
                   </div>
                 </Link>
               ))}

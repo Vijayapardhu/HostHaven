@@ -12,3 +12,29 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://hosthaven.in/sitemap.xml
+
+# Block auth and vendor dashboard pages
+Disallow: /vendor/dashboard
+Disallow: /vendor/pos
+Disallow: /vendor/bookings
+Disallow: /vendor/earnings
+Disallow: /vendor/settings
+Disallow: /vendor/notifications
+Disallow: /vendor/reports
+Disallow: /vendor/support
+Disallow: /vendor/properties
+Disallow: /vendor/rooms
+Disallow: /vendor/calendar
+Disallow: /vendor/reviews
+Disallow: /profile
+Disallow: /profile/edit
+Disallow: /profile/security
+Disallow: /profile/settings
+Disallow: /profile/notifications
+Disallow: /bookings
+Disallow: /auth/callback
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password

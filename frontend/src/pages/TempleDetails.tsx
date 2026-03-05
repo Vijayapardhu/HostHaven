@@ -28,6 +28,7 @@ interface TempleDetailsData {
   name: string;
   slug: string;
   city: string;
+  state?: string;
   fullAddress: string;
   landmark?: string;
   description?: string;
@@ -263,9 +264,8 @@ const TempleDetails = () => {
                   key={index}
                   type="button"
                   onClick={() => setActiveImageIndex(index)}
-                  className={`h-2.5 rounded-full transition-all ${
-                    index === activeImageIndex ? "w-6 bg-primary" : "w-2.5 bg-muted-foreground/40"
-                  }`}
+                  className={`h-2.5 rounded-full transition-all ${index === activeImageIndex ? "w-6 bg-primary" : "w-2.5 bg-muted-foreground/40"
+                    }`}
                   aria-label={`Go to image ${index + 1}`}
                 />
               ))}
@@ -377,83 +377,86 @@ const TempleDetails = () => {
                 </div>
               )}
 
-              <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-4">
-                <h2 className="text-xl font-serif font-semibold pb-2 border-b-2 border-gold/60">Timings & Rituals</h2>
-                {timingOptions.length ? (
-                  <div className="space-y-2">
-                    <div className="flex gap-2 flex-wrap">
-                      {timingOptions.map((option) => (
-                        <button
-                          key={option.key}
-                          type="button"
-                          onClick={() => setSelectedTimingDay(option.key)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            selectedTimingDay === option.key
+              {(timingOptions.length > 0 || temple.morningAarti || temple.afternoonAarti || temple.eveningAarti || temple.specialSevas || temple.festivalSpecificTimings) && (
+                <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-4">
+                  <h2 className="text-xl font-serif font-semibold pb-2 border-b-2 border-gold/60">Timings & Rituals</h2>
+                  {timingOptions.length ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {timingOptions.map((option) => (
+                          <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => setSelectedTimingDay(option.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedTimingDay === option.key
                               ? "gradient-gold text-primary-foreground"
                               : "bg-muted text-muted-foreground hover:bg-muted/80"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
+                              }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
 
-                    {selectedTiming && (
-                      <div className="p-3 rounded-xl bg-muted/60 text-sm">
-                        <p className="font-semibold text-foreground mb-1">{asDayLabel(selectedTiming.day)}</p>
-                        <p className="text-muted-foreground">
-                          Morning: {selectedTiming.morningOpen && selectedTiming.morningClose ? `${selectedTiming.morningOpen} - ${selectedTiming.morningClose}` : "N/A"}
-                        </p>
-                        <p className="text-muted-foreground">
-                          Evening: {selectedTiming.eveningOpen && selectedTiming.eveningClose ? `${selectedTiming.eveningOpen} - ${selectedTiming.eveningClose}` : "N/A"}
-                        </p>
+                      {selectedTiming && (
+                        <div className="p-3 rounded-xl bg-muted/60 text-sm">
+                          <p className="font-semibold text-foreground mb-1">{asDayLabel(selectedTiming.day)}</p>
+                          <p className="text-muted-foreground">
+                            Morning: {selectedTiming.morningOpen && selectedTiming.morningClose ? `${selectedTiming.morningOpen} - ${selectedTiming.morningClose}` : "N/A"}
+                          </p>
+                          <p className="text-muted-foreground">
+                            Evening: {selectedTiming.eveningOpen && selectedTiming.eveningClose ? `${selectedTiming.eveningOpen} - ${selectedTiming.eveningClose}` : "N/A"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">Darshan timings not available.</p>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {temple.morningAarti && <p><span className="font-semibold">Morning Aarti:</span> {temple.morningAarti}</p>}
+                    {temple.afternoonAarti && <p><span className="font-semibold">Afternoon Aarti:</span> {temple.afternoonAarti}</p>}
+                    {temple.eveningAarti && <p><span className="font-semibold">Evening Aarti:</span> {temple.eveningAarti}</p>}
+                    {temple.specialSevas && <p><span className="font-semibold">Special Sevas:</span> {temple.specialSevas}</p>}
+                    {temple.festivalSpecificTimings && <p className="md:col-span-2"><span className="font-semibold">Festival Timings:</span> {temple.festivalSpecificTimings}</p>}
+                  </div>
+                </div>
+              )}
+
+              {(temple.generalEntryFee || temple.specialDarshanFee || temple.vipDarshanFee || temple.dressCodeMen || temple.dressCodeWomen || temple.mobileRestrictions || temple.securityNotes || temple.parkingAvailable || temple.wheelchairAccessible || temple.cloakroomAvailable || temple.restroomsAvailable || temple.drinkingWaterAvailable || temple.prasadamCounterAvailable || temple.photographyAllowed !== undefined) && (
+                <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-4">
+                  <h2 className="text-xl font-serif font-semibold pb-2 border-b-2 border-gold/60">Entry, Rules & Facilities</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {(temple.generalEntryFee || temple.specialDarshanFee || temple.vipDarshanFee) && (
+                      <div className="md:col-span-2">
+                        <p><span className="font-semibold">General Entry:</span> {temple.generalEntryFee || "Free"}</p>
+                        {temple.specialDarshanFee && <p><span className="font-semibold">Special Darshan:</span> {temple.specialDarshanFee}</p>}
+                        {temple.vipDarshanFee && <p><span className="font-semibold">VIP Darshan:</span> {temple.vipDarshanFee}</p>}
                       </div>
                     )}
+                    {temple.dressCodeMen && <p><span className="font-semibold">Dress Code (Men):</span> {temple.dressCodeMen}</p>}
+                    {temple.dressCodeWomen && <p><span className="font-semibold">Dress Code (Women):</span> {temple.dressCodeWomen}</p>}
+                    {temple.mobileRestrictions && <p className="md:col-span-2"><span className="font-semibold">Mobile Restrictions:</span> {temple.mobileRestrictions}</p>}
+                    {temple.securityNotes && <p className="md:col-span-2"><span className="font-semibold">Security Notes:</span> {temple.securityNotes}</p>}
                   </div>
-                ) : (
-                  <p className="text-muted-foreground">Darshan timings not available.</p>
-                )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {temple.morningAarti && <p><span className="font-semibold">Morning Aarti:</span> {temple.morningAarti}</p>}
-                  {temple.afternoonAarti && <p><span className="font-semibold">Afternoon Aarti:</span> {temple.afternoonAarti}</p>}
-                  {temple.eveningAarti && <p><span className="font-semibold">Evening Aarti:</span> {temple.eveningAarti}</p>}
-                  {temple.specialSevas && <p><span className="font-semibold">Special Sevas:</span> {temple.specialSevas}</p>}
-                  {temple.festivalSpecificTimings && <p className="md:col-span-2"><span className="font-semibold">Festival Timings:</span> {temple.festivalSpecificTimings}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    {temple.parkingAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted inline-flex items-center gap-1"><Car className="w-3 h-3" />Parking</span>}
+                    {temple.wheelchairAccessible && <span className="px-2.5 py-1 rounded-full text-xs bg-muted inline-flex items-center gap-1"><Accessibility className="w-3 h-3" />Wheelchair Accessible</span>}
+                    {temple.cloakroomAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Cloakroom</span>}
+                    {temple.restroomsAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Restrooms</span>}
+                    {temple.drinkingWaterAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Drinking Water</span>}
+                    {temple.prasadamCounterAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Prasadam Counter</span>}
+                    {temple.photographyAllowed !== undefined && (
+                      <span className="px-2.5 py-1 rounded-full text-xs bg-muted inline-flex items-center gap-1">
+                        <Camera className="w-3 h-3" />
+                        {temple.photographyAllowed ? "Photography Allowed" : "No Photography"}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-4">
-                <h2 className="text-xl font-serif font-semibold pb-2 border-b-2 border-gold/60">Entry, Rules & Facilities</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {(temple.generalEntryFee || temple.specialDarshanFee || temple.vipDarshanFee) && (
-                    <div className="md:col-span-2">
-                      <p><span className="font-semibold">General Entry:</span> {temple.generalEntryFee || "Free"}</p>
-                      {temple.specialDarshanFee && <p><span className="font-semibold">Special Darshan:</span> {temple.specialDarshanFee}</p>}
-                      {temple.vipDarshanFee && <p><span className="font-semibold">VIP Darshan:</span> {temple.vipDarshanFee}</p>}
-                    </div>
-                  )}
-                  {temple.dressCodeMen && <p><span className="font-semibold">Dress Code (Men):</span> {temple.dressCodeMen}</p>}
-                  {temple.dressCodeWomen && <p><span className="font-semibold">Dress Code (Women):</span> {temple.dressCodeWomen}</p>}
-                  {temple.mobileRestrictions && <p className="md:col-span-2"><span className="font-semibold">Mobile Restrictions:</span> {temple.mobileRestrictions}</p>}
-                  {temple.securityNotes && <p className="md:col-span-2"><span className="font-semibold">Security Notes:</span> {temple.securityNotes}</p>}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {temple.parkingAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted inline-flex items-center gap-1"><Car className="w-3 h-3" />Parking</span>}
-                  {temple.wheelchairAccessible && <span className="px-2.5 py-1 rounded-full text-xs bg-muted inline-flex items-center gap-1"><Accessibility className="w-3 h-3" />Wheelchair Accessible</span>}
-                  {temple.cloakroomAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Cloakroom</span>}
-                  {temple.restroomsAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Restrooms</span>}
-                  {temple.drinkingWaterAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Drinking Water</span>}
-                  {temple.prasadamCounterAvailable && <span className="px-2.5 py-1 rounded-full text-xs bg-muted">Prasadam Counter</span>}
-                  {temple.photographyAllowed !== undefined && (
-                    <span className="px-2.5 py-1 rounded-full text-xs bg-muted inline-flex items-center gap-1">
-                      <Camera className="w-3 h-3" />
-                      {temple.photographyAllowed ? "Photography Allowed" : "No Photography"}
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
 
               {(temple.majorFestivals || temple.festivalDates || temple.annualBrahmotsavam || temple.rathotsavamDetails || temple.specialPoojas) && (
                 <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3">
@@ -480,52 +483,57 @@ const TempleDetails = () => {
             </div>
 
             <div className="lg:col-span-1 space-y-6">
-              <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3 xl:sticky xl:top-24">
-                <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60">Temple Facts</h3>
-                <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><Landmark className="w-4 h-4 text-primary" /> Deity: {temple.deityName || "Not specified"}</p>
-                {temple.templeType && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Type:</span> {temple.templeType}</p>}
-                {temple.builtYear && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Built Year:</span> {temple.builtYear}</p>}
-                {temple.founder && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Founder:</span> {temple.founder}</p>}
-                {temple.architectureStyle && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Architecture:</span> {temple.architectureStyle}</p>}
-                {temple.uniqueFeatures && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Unique Features:</span> {temple.uniqueFeatures}</p>}
-                {temple.sacredNearby && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Sacred Nearby:</span> {temple.sacredNearby}</p>}
-              </div>
+              {(temple.deityName || temple.templeType || temple.builtYear || temple.founder || temple.architectureStyle || temple.uniqueFeatures || temple.sacredNearby) && (
+                <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3 xl:sticky xl:top-24">
+                  <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60">Temple Facts</h3>
+                  {temple.deityName && <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><Landmark className="w-4 h-4 text-primary" /> Deity: {temple.deityName}</p>}
+                  {temple.templeType && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Type:</span> {temple.templeType}</p>}
+                  {temple.builtYear && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Built Year:</span> {temple.builtYear}</p>}
+                  {temple.founder && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Founder:</span> {temple.founder}</p>}
+                  {temple.architectureStyle && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Architecture:</span> {temple.architectureStyle}</p>}
+                  {temple.uniqueFeatures && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Unique Features:</span> {temple.uniqueFeatures}</p>}
+                  {temple.sacredNearby && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Sacred Nearby:</span> {temple.sacredNearby}</p>}
+                </div>
+              )}
 
-              <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3">
-                <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60 inline-flex items-center gap-2"><CalendarDays className="w-5 h-5 text-gold" /> Best Time to Visit</h3>
-                {temple.bestMonths && <p className="text-sm"><span className="font-semibold">Best Months:</span> {temple.bestMonths}</p>}
-                {temple.bestTimeOfDay && <p className="text-sm"><span className="font-semibold">Best Time of Day:</span> {temple.bestTimeOfDay}</p>}
-                {temple.peakCrowdDays && <p className="text-sm"><span className="font-semibold">Peak Crowd Days:</span> {temple.peakCrowdDays}</p>}
-                {temple.avoidDays && <p className="text-sm"><span className="font-semibold">Avoid Days:</span> {temple.avoidDays}</p>}
-                {temple.weatherConditions && <p className="text-sm"><span className="font-semibold">Weather:</span> {temple.weatherConditions}</p>}
-                {temple.crowdExpectationLevel && <p className="text-sm"><span className="font-semibold">Crowd Level:</span> {temple.crowdExpectationLevel}</p>}
-              </div>
+              {(temple.bestMonths || temple.bestTimeOfDay || temple.peakCrowdDays || temple.avoidDays || temple.weatherConditions || temple.crowdExpectationLevel) && (
+                <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3">
+                  <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60 inline-flex items-center gap-2"><CalendarDays className="w-5 h-5 text-gold" /> Best Time to Visit</h3>
+                  {temple.bestMonths && <p className="text-sm"><span className="font-semibold">Best Months:</span> {temple.bestMonths}</p>}
+                  {temple.bestTimeOfDay && <p className="text-sm"><span className="font-semibold">Best Time of Day:</span> {temple.bestTimeOfDay}</p>}
+                  {temple.peakCrowdDays && <p className="text-sm"><span className="font-semibold">Peak Crowd Days:</span> {temple.peakCrowdDays}</p>}
+                  {temple.avoidDays && <p className="text-sm"><span className="font-semibold">Avoid Days:</span> {temple.avoidDays}</p>}
+                  {temple.weatherConditions && <p className="text-sm"><span className="font-semibold">Weather:</span> {temple.weatherConditions}</p>}
+                  {temple.crowdExpectationLevel && <p className="text-sm"><span className="font-semibold">Crowd Level:</span> {temple.crowdExpectationLevel}</p>}
+                </div>
+              )}
 
-              <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3">
-                <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60">Nearby & Transit</h3>
-                {nearbyTemples.length > 0 && <p className="text-sm"><span className="font-semibold">Nearby Temples:</span> {nearbyTemples.join(", ")}</p>}
-                {nearbyHotels.length > 0 && <p className="text-sm"><span className="font-semibold">Nearby Hotels:</span> {nearbyHotels.join(", ")}</p>}
-                {nearbyRestaurants.length > 0 && <p className="text-sm"><span className="font-semibold">Nearby Restaurants:</span> {nearbyRestaurants.join(", ")}</p>}
-                {nearbyNature.length > 0 && <p className="text-sm"><span className="font-semibold">Beaches/Hills:</span> {nearbyNature.join(", ")}</p>}
-                {temple.distanceRailwayStation && <p className="text-sm inline-flex items-center gap-2"><Train className="w-4 h-4 text-primary" /> Railway: {temple.distanceRailwayStation}</p>}
-                {temple.distanceBusStand && <p className="text-sm inline-flex items-center gap-2"><Bus className="w-4 h-4 text-primary" /> Bus Stand: {temple.distanceBusStand}</p>}
-                {temple.distanceAirport && <p className="text-sm inline-flex items-center gap-2"><Plane className="w-4 h-4 text-primary" /> Airport: {temple.distanceAirport}</p>}
-                <Link to="/hotels" className="block pt-2">
-                  <Button variant="gold" className="w-full">Book Nearby Stay</Button>
-                </Link>
-              </div>
+              {(nearbyTemples.length > 0 || nearbyHotels.length > 0 || nearbyRestaurants.length > 0 || nearbyNature.length > 0 || temple.distanceRailwayStation || temple.distanceBusStand || temple.distanceAirport) && (
+                <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3">
+                  <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60">Nearby & Transit</h3>
+                  {nearbyTemples.length > 0 && <p className="text-sm"><span className="font-semibold">Nearby Temples:</span> {nearbyTemples.join(", ")}</p>}
+                  {nearbyHotels.length > 0 && <p className="text-sm"><span className="font-semibold">Nearby Hotels:</span> {nearbyHotels.join(", ")}</p>}
+                  {nearbyRestaurants.length > 0 && <p className="text-sm"><span className="font-semibold">Nearby Restaurants:</span> {nearbyRestaurants.join(", ")}</p>}
+                  {nearbyNature.length > 0 && <p className="text-sm"><span className="font-semibold">Beaches/Hills:</span> {nearbyNature.join(", ")}</p>}
+                  {temple.distanceRailwayStation && <p className="text-sm inline-flex items-center gap-2"><Train className="w-4 h-4 text-primary" /> Railway: {temple.distanceRailwayStation}</p>}
+                  {temple.distanceBusStand && <p className="text-sm inline-flex items-center gap-2"><Bus className="w-4 h-4 text-primary" /> Bus Stand: {temple.distanceBusStand}</p>}
+                  {temple.distanceAirport && <p className="text-sm inline-flex items-center gap-2"><Plane className="w-4 h-4 text-primary" /> Airport: {temple.distanceAirport}</p>}
+                  <Link to="/hotels" className="block pt-2">
+                    <Button variant="gold" className="w-full">Book Nearby Stay</Button>
+                  </Link>
+                </div>
+              )}
 
-              <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3">
-                <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60 inline-flex items-center gap-2"><Phone className="w-5 h-5 text-gold" /> Contacts & Emergency</h3>
-                {temple.templeOfficePhone && <p className="text-sm"><span className="font-semibold">Temple Office:</span> {temple.templeOfficePhone}</p>}
-                {temple.emergencyContact && <p className="text-sm"><span className="font-semibold">Emergency Contact:</span> {temple.emergencyContact}</p>}
-                {temple.lostAndFoundDesk && <p className="text-sm"><span className="font-semibold">Lost & Found:</span> {temple.lostAndFoundDesk}</p>}
-                {temple.medicalFacilityNearby && <p className="text-sm"><span className="font-semibold">Medical Facility:</span> {temple.medicalFacilityNearby}</p>}
-                {temple.policeStationNearby && <p className="text-sm"><span className="font-semibold">Police Station:</span> {temple.policeStationNearby}</p>}
-                {!temple.templeOfficePhone && !temple.emergencyContact && !temple.lostAndFoundDesk && !temple.medicalFacilityNearby && !temple.policeStationNearby && (
-                  <p className="text-sm text-muted-foreground">Contact details not available.</p>
-                )}
-              </div>
+              {(temple.templeOfficePhone || temple.emergencyContact || temple.lostAndFoundDesk || temple.medicalFacilityNearby || temple.policeStationNearby) && (
+                <div className="bg-card rounded-2xl shadow-card p-4 md:p-5 space-y-3">
+                  <h3 className="text-lg font-serif font-semibold pb-2 border-b-2 border-gold/60 inline-flex items-center gap-2"><Phone className="w-5 h-5 text-gold" /> Contacts & Emergency</h3>
+                  {temple.templeOfficePhone && <p className="text-sm"><span className="font-semibold">Temple Office:</span> {temple.templeOfficePhone}</p>}
+                  {temple.emergencyContact && <p className="text-sm"><span className="font-semibold">Emergency Contact:</span> {temple.emergencyContact}</p>}
+                  {temple.lostAndFoundDesk && <p className="text-sm"><span className="font-semibold">Lost & Found:</span> {temple.lostAndFoundDesk}</p>}
+                  {temple.medicalFacilityNearby && <p className="text-sm"><span className="font-semibold">Medical Facility:</span> {temple.medicalFacilityNearby}</p>}
+                  {temple.policeStationNearby && <p className="text-sm"><span className="font-semibold">Police Station:</span> {temple.policeStationNearby}</p>}
+                </div>
+              )}
             </div>
           </div>
         </div>

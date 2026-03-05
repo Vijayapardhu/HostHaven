@@ -16,17 +16,82 @@
   <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="apple-touch-icon" href="/logo.png" />
 
-  <!-- SEO / OG -->
+  <!-- SEO essentials -->
   <meta name="author" content="HostHaven" />
-  <meta property="og:title" content="HostHaven" />
-  <meta property="og:description" content="Find and book hotels, homes and unique stays in Andhra Pradesh" />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="/logo.png" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:image" content="/logo.png" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="googlebot" content="index, follow" />
+  <link rel="canonical" href="https://hosthaven.in/" />
 
-  <title>HostHaven - Book Hotels &amp; Homes</title>
-  <meta name="description" content="Find and book hotels, homes, and unique stays in Andhra Pradesh" />
+  <!-- Geo targeting -->
+  <meta name="geo.region" content="IN-AP" />
+  <meta name="geo.placename" content="Andhra Pradesh" />
+  <meta name="geo.position" content="15.9129;79.7400" />
+  <meta name="ICBM" content="15.9129, 79.7400" />
+  <meta name="content-language" content="en-IN" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="HostHaven - Book Hotels & Homes in Andhra Pradesh" />
+  <meta property="og:description" content="Find and book hotels, homes, and unique stays in Andhra Pradesh. Explore sacred temples, travel services, and heritage destinations." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://hosthaven.in/logo.png" />
+  <meta property="og:url" content="https://hosthaven.in/" />
+  <meta property="og:site_name" content="HostHaven" />
+  <meta property="og:locale" content="en_IN" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="HostHaven - Book Hotels & Homes in Andhra Pradesh" />
+  <meta name="twitter:description" content="Find and book hotels, homes, and unique stays in Andhra Pradesh." />
+  <meta name="twitter:image" content="https://hosthaven.in/logo.png" />
+
+  <title>HostHaven - Book Hotels &amp; Homes in Andhra Pradesh</title>
+  <meta name="description" content="Find and book hotels, homes, and unique stays in Andhra Pradesh. Explore sacred temples, travel services, and heritage destinations with HostHaven." />
+  <meta name="keywords" content="hotels Andhra Pradesh, homestays AP, book hotels Vijayawada, rental homes, temples Andhra Pradesh, travel services, HostHaven, accommodation AP" />
+
+  <!-- Structured Data - WebSite -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "HostHaven",
+    "url": "https://hosthaven.in",
+    "description": "Find and book hotels, homes, and unique stays in Andhra Pradesh",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://hosthaven.in/hotels?search={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+
+  <!-- Structured Data - LocalBusiness -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TravelAgency",
+    "name": "HostHaven",
+    "url": "https://hosthaven.in",
+    "logo": "https://hosthaven.in/logo.png",
+    "description": "Book hotels, homes, and travel services across Andhra Pradesh",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Vijayawada",
+      "addressRegion": "Andhra Pradesh",
+      "addressCountry": "IN"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "16.5062",
+      "longitude": "80.6480"
+    },
+    "email": "info@hosthaven.in",
+    "areaServed": {
+      "@type": "State",
+      "name": "Andhra Pradesh"
+    },
+    "priceRange": "₹₹"
+  }
+  </script>
 
   <!-- Razorpay -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>

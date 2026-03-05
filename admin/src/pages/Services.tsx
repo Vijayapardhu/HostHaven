@@ -224,7 +224,7 @@ export default function Services() {
                 </TableCell>
                 <TableCell>
                   <span className="text-sm font-semibold text-slate-900">
-                    ₹{service.basePrice.toLocaleString()}
+                    ₹{(service.basePrice ?? 0).toLocaleString()}
                   </span>
                 </TableCell>
                 <TableCell>

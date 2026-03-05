@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import {
-  MessageSquare, X, Clock, User2, Send, RefreshCw,
-  CheckCircle, XCircle, AlertCircle, ChevronRight, StickyNote, Phone, Mail
+  MessageSquare, X, User2, Send, RefreshCw,
+  CheckCircle, XCircle, ChevronRight, StickyNote, Mail
 } from 'lucide-react'
 import { supportService, type SupportTicket } from '../lib/support'
 import { FiltersBar } from '../components/ui/FiltersBar'
@@ -58,7 +58,7 @@ export default function Support() {
     setDetailLoading(true)
     try {
       const full = await supportService.getTicketById(ticket.id)
-      setSelectedTicket(full)
+      setSelectedTicket(full ?? null)
     } catch { /* keep the list version */ }
     finally { setDetailLoading(false) }
   }
@@ -76,7 +76,7 @@ export default function Support() {
     if (!selectedTicket || !noteText.trim()) return
     setNoteSending(true)
     try {
-      const updated = await supportService.addNote(selectedTicket.id, noteText.trim())
+      const updated = await supportService.addNote(selectedTicket.id, { content: noteText.trim() })
       setSelectedTicket(updated)
       setNoteText('')
       toast.success('Note added.')
@@ -200,7 +200,6 @@ export default function Support() {
                     <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 space-y-2">
                       <div className="flex items-center gap-2 text-sm"><User2 className="h-4 w-4 text-slate-400" /> <span className="font-semibold text-slate-900">{selectedTicket.userName || 'Unknown'}</span></div>
                       <div className="flex items-center gap-2 text-xs text-slate-500"><Mail className="h-3.5 w-3.5" /> {selectedTicket.email}</div>
-                      {selectedTicket.userPhone && <div className="flex items-center gap-2 text-xs text-slate-500"><Phone className="h-3.5 w-3.5" /> {selectedTicket.userPhone}</div>}
                       {selectedTicket.userId && <Link to={`/users/${selectedTicket.userId}`} className="text-xs text-indigo-600 hover:underline">View user profile →</Link>}
                     </div>
 
@@ -231,15 +230,15 @@ export default function Support() {
                     {/* Admin Notes / History */}
                     <div>
                       <h4 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
-                        <StickyNote className="h-4 w-4 text-amber-500" /> Internal Notes ({selectedTicket.parsedNotes?.length ?? 0})
+                        <StickyNote className="h-4 w-4 text-amber-500" /> Internal Notes ({selectedTicket.notes?.length ?? 0})
                       </h4>
-                      {selectedTicket.parsedNotes && selectedTicket.parsedNotes.length > 0 ? (
+                      {selectedTicket.notes && selectedTicket.notes.length > 0 ? (
                         <div className="space-y-2 max-h-48 overflow-y-auto">
-                          {selectedTicket.parsedNotes.map((note, i) => (
+                          {selectedTicket.notes.map((note, i) => (
                             <div key={i} className="rounded-lg border border-amber-100 bg-amber-50/50 p-2.5">
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs font-semibold text-amber-700">{note.author}</span>
-                                <span className="text-[10px] text-amber-500">{note.timestamp ? new Date(note.timestamp).toLocaleString() : ''}</span>
+                                <span className="text-xs font-semibold text-amber-700">{note.addedBy}</span>
+                                <span className="text-[10px] text-amber-500">{note.createdAt ? new Date(note.createdAt).toLocaleString() : ''}</span>
                               </div>
                               <p className="text-sm text-slate-700">{note.content}</p>
                             </div>

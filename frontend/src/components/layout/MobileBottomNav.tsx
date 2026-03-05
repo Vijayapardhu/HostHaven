@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Compass, Heart, User, LogIn } from "lucide-react";
+import { Compass, Heart, User, LogIn, Landmark } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 
@@ -13,7 +13,12 @@ const MobileBottomNav = () => {
       name: "Explore",
       path: "/",
       icon: Compass,
-      activePaths: ["/", "/hotels", "/homes", "/temples", "/services"],
+      activePaths: ["/", "/hotels", "/homes", "/services"],
+    },
+    {
+      name: "Temples",
+      path: "/temples",
+      icon: Landmark,
     },
     {
       name: "Wishlist",
@@ -48,9 +53,8 @@ const MobileBottomNav = () => {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center flex-1 h-full relative ${
-                active ? "text-primary" : "text-muted-foreground"
-              }`}
+              className={`flex flex-col items-center justify-center flex-1 h-full relative ${active ? "text-primary" : "text-muted-foreground"
+                }`}
             >
               <div className="relative">
                 <Icon className={`w-6 h-6 ${active ? "fill-primary/20" : ""}`} />

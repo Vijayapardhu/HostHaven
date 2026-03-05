@@ -3,9 +3,12 @@ import { ArrowLeft, FileText, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
+import SEOHead from "@/components/SEOHead";
 
 const Terms = () => {
   return (
+    <>
+    <SEOHead title="Terms & Conditions" description="Read HostHaven's terms and conditions for booking hotels, homes, and travel services in Andhra Pradesh." />
     <div className="min-h-screen bg-gradient-to-br from-cream via-background to-cream-light">
       {/* Decorative Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
@@ -195,6 +198,7 @@ const Terms = () => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 

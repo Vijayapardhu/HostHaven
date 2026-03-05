@@ -18,11 +18,11 @@ interface Notification {
   createdAt: string;
 }
 
-const defaultNavLinks = [
-  { name: "Hotels", path: "/hotels", emoji: "🏨", type: "HOTEL" },
-  { name: "Homes", path: "/homes", emoji: "🏡", type: "HOME" },
-  { name: "Temples", path: "/temples", emoji: "🛕", type: "TEMPLE" },
-  { name: "Services", path: "/services", emoji: "🔧", type: "SERVICE" },
+const navLinks = [
+  { name: "Hotels", path: "/hotels", emoji: "🏨" },
+  { name: "Homes", path: "/homes", emoji: "🏡" },
+  { name: "Temples", path: "/temples", emoji: "🛕" },
+  { name: "Services", path: "/services", emoji: "🔧" },
 ];
 
 const Header = () => {
@@ -30,42 +30,10 @@ const Header = () => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [navLinks, setNavLinks] = useState(defaultNavLinks);
-  const [isLoadingNav, setIsLoadingNav] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
   const { items } = useWishlist();
-
-  useEffect(() => {
-    const checkAvailableContent = async () => {
-      try {
-        const availableTypes: string[] = [];
-        
-        for (const link of defaultNavLinks) {
-          if (link.type === "SERVICE") {
-            availableTypes.push(link.name);
-          } else {
-            try {
-              const propRes = await api.properties.getAll?.({ type: link.type, limit: "1" });
-              if (propRes?.data?.length > 0 || propRes?.length > 0) {
-                availableTypes.push(link.name);
-              }
-            } catch { continue; }
-          }
-        }
-        
-        const filtered = defaultNavLinks.filter(link => availableTypes.includes(link.name));
-        setNavLinks(filtered.length > 0 ? filtered : defaultNavLinks);
-      } catch {
-        setNavLinks(defaultNavLinks);
-      } finally {
-        setIsLoadingNav(false);
-      }
-    };
-
-    checkAvailableContent();
-  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -299,7 +267,7 @@ const Header = () => {
                               className="w-full text-sm"
                               onClick={() => {
                                 setIsNotificationsOpen(false);
-                                navigate("/notifications");
+                                navigate("/profile");
                               }}
                             >
                               View all notifications

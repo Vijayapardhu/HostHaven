@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
+import SEOHead from "@/components/SEOHead";
 
 const Contact = () => {
   const { isAuthenticated } = useAuth();
@@ -51,7 +52,31 @@ const Contact = () => {
   };
 
   return (
-    <Layout>
+    <>
+      <SEOHead
+        title="Contact Us"
+        description="Get in touch with HostHaven for hotel bookings, travel services, or partnership inquiries in Andhra Pradesh. 24/7 customer support available."
+        keywords="contact HostHaven, customer support, hotel booking help, travel inquiry Andhra Pradesh, partnership HostHaven"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          name: "Contact HostHaven",
+          description: "Get in touch with HostHaven for bookings and inquiries",
+          url: "https://hosthaven.in/contact",
+          mainEntity: {
+            "@type": "Organization",
+            name: "HostHaven",
+            address: {
+              "@type": "PostalAddress",
+              addressLocality: "Vijayawada",
+              addressRegion: "Andhra Pradesh",
+              addressCountry: "IN",
+            },
+            email: "info@hosthaven.in",
+          },
+        }}
+      />
+      <Layout>
       <div className="py-8 md:py-12 bg-background min-h-screen">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10">
@@ -209,7 +234,8 @@ const Contact = () => {
           </div>
         </div>
       </div>
-    </Layout>
+      </Layout>
+    </>
   );
 };
 

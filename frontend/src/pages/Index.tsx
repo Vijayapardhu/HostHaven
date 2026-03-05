@@ -10,6 +10,7 @@ import ServicesPreview from "@/components/home/ServicesPreview";
 import BecomePartner from "@/components/home/BecomePartner";
 import PromoBanner from "@/components/home/PromoBanner";
 import { useHomepageConfig } from "@/hooks/useHomepageConfig";
+import SEOHead from "@/components/SEOHead";
 
 const Index = () => {
   const { config, isSectionVisible } = useHomepageConfig();
@@ -40,13 +41,39 @@ const Index = () => {
   }, [config, isSectionVisible]);
 
   return (
-    <Layout>
-      {sortedSections.map(({ key, render }) => (
-        <React.Fragment key={key}>
-          {render()}
-        </React.Fragment>
-      ))}
-    </Layout>
+    <>
+      <SEOHead
+        description="Discover and book the best hotels, rental homes, and unique stays across Andhra Pradesh. Explore sacred temples, travel services, and heritage destinations with HostHaven."
+        keywords="hotels Andhra Pradesh, homestays AP, book hotels Vijayawada, rental homes Nandyala, temples Andhra Pradesh, travel services AP, HostHaven"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "HostHaven",
+          url: "https://hosthaven.in",
+          logo: "https://hosthaven.in/logo.png",
+          description: "Find and book hotels, homes, and unique stays in Andhra Pradesh",
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: "Vijayawada",
+            addressRegion: "Andhra Pradesh",
+            addressCountry: "IN",
+          },
+          sameAs: [],
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer service",
+            availableLanguage: ["English", "Telugu"],
+          },
+        }}
+      />
+      <Layout>
+        {sortedSections.map(({ key, render }) => (
+          <React.Fragment key={key}>
+            {render()}
+          </React.Fragment>
+        ))}
+      </Layout>
+    </>
   );
 };
 
