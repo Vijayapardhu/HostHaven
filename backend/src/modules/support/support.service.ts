@@ -1,11 +1,13 @@
 import prisma from '../../config/database';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { logger } from '../../utils/logger.util';
+import { webPushService } from '../../services/webpush.service';
+import notificationsService from '../notifications/notifications.service';
 
 const generateTicketNumber = () => `SUP-${Date.now().toString(36).toUpperCase()}`;
 
 export class SupportService {
-  async create(userId: string, data: {
+  async create(userId: string | undefined, data: {
     category: string;
     bookingReference?: string;
     message: string;
@@ -13,7 +15,7 @@ export class SupportService {
   }) {
     const ticket = await prisma.supportTicket.create({
       data: {
-        userId,
+        userId: userId || null, // Allow null for unauthenticated users
         ticketNumber: generateTicketNumber(),
         category: data.category,
         bookingReference: data.bookingReference,
@@ -24,6 +26,48 @@ export class SupportService {
     });
     logger.info({ supportTicketId: ticket.id }, 'Support ticket created');
     return ticket;
+  }
+
+  async notifyAdmins(ticket: any) {
+    try {
+      // Get all admin users
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN', isActive: true },
+        select: { id: true, name: true },
+      });
+
+      const title = 'New Support Ticket';
+      const message = `Ticket #${ticket.ticketNumber}: ${ticket.category}`;
+      
+      // Send web push to all admins
+      for (const admin of admins) {
+        await notificationsService.create({
+          userId: admin.id,
+          type: 'SUPPORT_TICKET_CREATED',
+          title,
+          message,
+          data: {
+            ticketId: ticket.id,
+            ticketNumber: ticket.ticketNumber,
+            category: ticket.category,
+          },
+        });
+
+        await webPushService.sendNotification(admin.id, {
+          title,
+          body: message,
+          tag: `support-ticket-${ticket.id}`,
+          data: {
+            ticketId: ticket.id,
+            ticketNumber: ticket.ticketNumber,
+          },
+        });
+      }
+
+      logger.info({ ticketId: ticket.id, adminCount: admins.length }, 'Admin notifications sent');
+    } catch (error) {
+      logger.error({ error, ticketId: ticket.id }, 'Failed to send admin notifications');
+    }
   }
 
   async getMyTickets(userId: string, filters: { page: number; limit: number; status?: string }) {
@@ -68,7 +112,7 @@ export class SupportService {
   }
 
   async getTicketById(id: string) {
-    const ticket = await prisma.supportTicket.findUnique({
+    const ticket = await prisma.supportTicket.findFirst({
       where: { id, isDeleted: false },
       include: {
         user: { select: { id: true, name: true, email: true, phone: true } },
@@ -82,8 +126,23 @@ export class SupportService {
     return ticket;
   }
 
+  async getMyTicketById(userId: string, ticketId: string) {
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { id: ticketId, userId, isDeleted: false },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true } },
+      },
+    });
+    if (!ticket) {
+      const error = new Error('Support ticket not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+    return ticket;
+  }
+
   async updateTicket(id: string, data: { status?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'; adminNotes?: string }) {
-    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
+    const existing = await prisma.supportTicket.findFirst({ where: { id, isDeleted: false } });
     if (!existing) {
       const error = new Error('Support ticket not found');
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
@@ -110,7 +169,7 @@ export class SupportService {
   }
 
   async addNote(id: string, content: string, addedBy: string) {
-    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
+    const existing = await prisma.supportTicket.findFirst({ where: { id, isDeleted: false } });
     if (!existing) {
       const error = new Error('Support ticket not found');
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
@@ -132,7 +191,7 @@ export class SupportService {
   }
 
   async reopenTicket(id: string) {
-    const existing = await prisma.supportTicket.findUnique({ where: { id, isDeleted: false } });
+    const existing = await prisma.supportTicket.findFirst({ where: { id, isDeleted: false } });
     if (!existing) {
       const error = new Error('Support ticket not found');
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;

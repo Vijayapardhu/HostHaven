@@ -20,26 +20,38 @@ export default async function templesRoutes(fastify: FastifyInstance) {
   );
 
   fastify.put(
-    "/:id",
+    "/:idOrSlug",
     { preHandler: [authMiddleware, requireRole("ADMIN")] },
     TemplesController.update,
   );
 
   fastify.patch(
-    "/:id/activate",
+    "/:idOrSlug/activate",
     { preHandler: [authMiddleware, requireRole("ADMIN")] },
     TemplesController.activate,
   );
 
   fastify.patch(
-    "/:id/deactivate",
+    "/:idOrSlug/deactivate",
     { preHandler: [authMiddleware, requireRole("ADMIN")] },
     TemplesController.deactivate,
   );
 
   fastify.delete(
-    "/:id",
+    "/:idOrSlug",
     { preHandler: [authMiddleware, requireRole("ADMIN")] },
     TemplesController.delete,
+  );
+
+  fastify.get(
+    "/export",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.exportTemples,
+  );
+
+  fastify.post(
+    "/import",
+    { preHandler: [authMiddleware, requireRole("ADMIN")] },
+    TemplesController.importTemples,
   );
 }

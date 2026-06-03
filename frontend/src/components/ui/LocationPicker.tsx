@@ -79,7 +79,6 @@ const LocationPicker = ({ value, onChange }: LocationPickerProps) => {
             map.remove();
             mapInstanceRef.current = null;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isMapVisible]);
 
     const placeMarker = (map: L.Map, lat: number, lng: number) => {

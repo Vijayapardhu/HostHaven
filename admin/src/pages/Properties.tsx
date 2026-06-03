@@ -20,9 +20,12 @@ import {
 import { PageLoader } from "../components/ui/PageLoader";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { downloadCsvExport } from "../lib/export";
+import { ImportExportButtons } from "../components/ui/ImportExportButtons";
 
-type PropertyStatus = "approved" | "pending" | "rejected" | "inactive";
-type PropertyType = "hotel" | "home";
+type PropertyStatus = "approved" | "pending" | "rejected" | "inactive" | "draft";
+type PropertyType = "hotel" | "home" | "temple";
+
+type PropertyImage = string | { url?: string };
 
 const statusOptions: Array<{ label: string; value: "all" | PropertyStatus }> = [
   { label: "All status", value: "all" },
@@ -30,12 +33,14 @@ const statusOptions: Array<{ label: string; value: "all" | PropertyStatus }> = [
   { label: "Pending", value: "pending" },
   { label: "Rejected", value: "rejected" },
   { label: "Inactive", value: "inactive" },
+  { label: "Draft", value: "draft" },
 ];
 
 const typeOptions: Array<{ label: string; value: "all" | PropertyType }> = [
   { label: "All types", value: "all" },
   { label: "Hotels", value: "hotel" },
   { label: "Homes", value: "home" },
+  { label: "Temples", value: "temple" },
 ];
 
 const statusLabels: Record<PropertyStatus, string> = {
@@ -43,6 +48,7 @@ const statusLabels: Record<PropertyStatus, string> = {
   pending: "Pending",
   rejected: "Rejected",
   inactive: "Inactive",
+  draft: "Draft",
 };
 
 const statusVariants: Record<
@@ -53,6 +59,18 @@ const statusVariants: Record<
   pending: "warning",
   rejected: "danger",
   inactive: "neutral",
+  draft: "neutral",
+};
+
+const getPropertyImageUrl = (image?: PropertyImage) => {
+  if (!image) return "";
+  return typeof image === "string" ? image : image.url || "";
+};
+
+const getPropertyTypeLabel = (type: PropertyType) => {
+  if (type === "hotel") return "Hotel";
+  if (type === "home") return "Home";
+  return "Temple";
 };
 
 export default function Properties() {
@@ -71,6 +89,7 @@ export default function Properties() {
     propertyId: string;
     nextStatus: PropertyStatus;
   } | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const fetchProperties = async () => {
     setIsLoading(true);
@@ -110,7 +129,11 @@ export default function Properties() {
       if (nextStatus === "approved") {
         await propertiesService.approveProperty(propertyId);
       } else if (nextStatus === "rejected") {
-        await propertiesService.rejectProperty(propertyId);
+        if (!rejectionReason.trim() || rejectionReason.trim().length < 10) {
+          toast.error("Please provide a detailed rejection reason.");
+          return;
+        }
+        await propertiesService.rejectProperty(propertyId, rejectionReason.trim());
       } else {
         await propertiesService.updateProperty(propertyId, {
           status: nextStatus,
@@ -119,7 +142,16 @@ export default function Properties() {
       setProperties((prev) =>
         prev.map((property) =>
           property.id === propertyId
-            ? { ...property, status: nextStatus }
+            ? {
+                ...property,
+                status: nextStatus,
+                rejectionReason:
+                  nextStatus === "rejected"
+                    ? rejectionReason.trim()
+                    : nextStatus === "approved"
+                      ? null
+                      : property.rejectionReason,
+              }
             : property,
         ),
       );
@@ -130,6 +162,7 @@ export default function Properties() {
       );
     } finally {
       setConfirmAction(null);
+      setRejectionReason("");
     }
   };
 
@@ -155,6 +188,10 @@ export default function Properties() {
         description="Manage hotels and homes across all approved cities."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <ImportExportButtons 
+              entity="properties" 
+              onImportComplete={() => fetchProperties()}
+            />
             <button
               onClick={handleExport}
               className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
@@ -294,7 +331,7 @@ export default function Properties() {
                     </TableCell>
                     <TableCell>
                       <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
-                        {property.type === "hotel" ? "Hotel" : "Home"}
+                        {getPropertyTypeLabel(property.type)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -325,14 +362,14 @@ export default function Properties() {
                     <TableCell className="text-right">
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <Link
-                          to={`/properties/${property.id}`}
+                          to={`/properties/${property.slug}`}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           <Eye className="h-4 w-4" />
                           View
                         </Link>
                         <Link
-                          to={`/properties/${property.id}/edit`}
+                          to={`/properties/${property.slug}/edit`}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           <Pencil className="h-4 w-4" />
@@ -380,9 +417,7 @@ export default function Properties() {
                   {property.images && property.images.length > 0 ? (
                     <img
                       src={
-                        typeof property.images[0] === "string"
-                          ? property.images[0]
-                          : (property.images[0] as any)?.url || ""
+                          getPropertyImageUrl(property.images[0] as PropertyImage)
                       }
                       alt={property.name}
                       className="h-20 w-20 flex-shrink-0 rounded-lg object-cover"
@@ -401,7 +436,7 @@ export default function Properties() {
                     </p>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
-                        {property.type === "hotel" ? "Hotel" : "Home"}
+                        {getPropertyTypeLabel(property.type)}
                       </span>
                       <StatusBadge
                         label={statusLabels[property.status]}
@@ -420,14 +455,14 @@ export default function Properties() {
                   </div>
                   <div className="flex gap-2">
                     <Link
-                      to={`/properties/${property.id}`}
+                      to={`/properties/${property.slug}`}
                       className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       <Eye className="h-4 w-4" />
                       View
                     </Link>
                     <Link
-                      to={`/properties/${property.id}/edit`}
+                      to={`/properties/${property.slug}/edit`}
                       className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       <Pencil className="h-4 w-4" />
@@ -477,30 +512,52 @@ export default function Properties() {
       <ConfirmDialog
         open={Boolean(confirmAction)}
         onOpenChange={(open) => {
-          if (!open) setConfirmAction(null);
+          if (!open) {
+            setConfirmAction(null);
+            setRejectionReason("");
+          }
         }}
         title={
           confirmAction?.nextStatus === "inactive"
             ? "Deactivate this property?"
             : confirmAction?.nextStatus === "approved"
               ? "Activate this property?"
+              : confirmAction?.nextStatus === "rejected"
+                ? "Reject this property?"
               : "Update property status?"
         }
         description={
           confirmAction?.nextStatus === "inactive"
             ? "The property will be hidden from listings."
-            : "The property will be visible to users."
+            : confirmAction?.nextStatus === "rejected"
+              ? "The property application will be rejected and the reason will be saved."
+              : "The property will be visible to users."
         }
         confirmText={
           confirmAction?.nextStatus === "inactive"
             ? "Deactivate property"
-            : "Activate property"
+            : confirmAction?.nextStatus === "rejected"
+              ? "Reject property"
+              : "Activate property"
         }
         variant={
-          confirmAction?.nextStatus === "inactive" ? "danger" : "default"
+          confirmAction?.nextStatus === "inactive" || confirmAction?.nextStatus === "rejected" ? "danger" : "default"
         }
         onConfirm={confirmStatusChange}
-      />
+      >
+        {confirmAction?.nextStatus === "rejected" ? (
+          <div className="mt-4 space-y-2">
+            <label className="text-sm font-medium text-slate-700">Rejection Reason</label>
+            <textarea
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+              placeholder="Explain why this property is being rejected..."
+              rows={4}
+              className="w-full rounded-lg border border-slate-200 p-3 text-sm"
+            />
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

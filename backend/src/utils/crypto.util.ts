@@ -27,6 +27,11 @@ export const generateStateToken = (): string => {
   return crypto.randomBytes(16).toString('hex');
 };
 
+export const generateInvoiceId = (bookingNumber: string): string => {
+  const year = new Date().getFullYear();
+  return `HH-${year}-${bookingNumber}`;
+};
+
 export const encryptData = (data: string, key: string): string => {
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(

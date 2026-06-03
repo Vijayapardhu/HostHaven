@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { handleError } from '../lib/errorHandler';
 
 export interface BannerSlide {
   id: string;
@@ -40,6 +41,7 @@ export interface ServiceCardItem {
 
 export interface TempleItem {
   id: string;
+  slug?: string;
   name: string;
   location: string;
   imageUrl: string;
@@ -53,6 +55,7 @@ export interface SectionConfig {
 }
 
 export interface HomepageConfig {
+  pageBackground?: string;
   sections: Record<string, SectionConfig>;
   bannerSlides: BannerSlide[];
   destinations: DestinationItem[];
@@ -73,11 +76,36 @@ export interface HomepageConfig {
   };
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/v1';
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+const API_URL = `${BASE_URL}/v1`;
+
+const EMPTY_CONFIG: HomepageConfig = {
+  pageBackground: "",
+  sections: {
+    banner: { isVisible: true, order: 0 },
+    hero: { isVisible: true, order: 1 },
+    search: { isVisible: true, order: 2 },
+    promoBanner: { isVisible: true, order: 3 },
+    features: { isVisible: true, order: 4 },
+    destinations: { isVisible: true, order: 5 },
+    recommendations: { isVisible: true, order: 6 },
+    temples: { isVisible: true, order: 7 },
+    services: { isVisible: true, order: 8 },
+    becomePartner: { isVisible: true, order: 9 },
+  },
+  bannerSlides: [],
+  destinations: [],
+  featureCards: [],
+  serviceCards: [],
+  temples: [],
+  partnerSection: { title: "", subtitle: "", ctaText: "", ctaLink: "" },
+  promoBanner: { isVisible: true, imageUrl: "", link: "/", title: "" },
+};
 
 export function useHomepageConfig() {
   const [config, setConfig] = useState<HomepageConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,23 +118,44 @@ export function useHomepageConfig() {
             "Pragma": "no-cache",
           }
         });
-        const json = await res.json();
-        if (!cancelled && json?.data) {
-          setConfig(json.data);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
         }
-      } catch {
-        // Config unavailable — components use built-in defaults
+        
+        const json = await res.json();
+        
+        if (!cancelled && json?.data && typeof json.data === "object") {
+          const data = json.data as HomepageConfig;
+          setConfig({
+            ...EMPTY_CONFIG,
+            ...data,
+            sections: {
+              ...EMPTY_CONFIG.sections,
+              ...(data.sections || {}),
+            },
+          });
+          setHasLoaded(true);
+        }
+      } catch (error) {
+        handleError(error, 'api');
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setConfig((prev) => prev ?? EMPTY_CONFIG);
+          setHasLoaded(true);
+          setIsLoading(false);
+        }
       }
     })();
     return () => { cancelled = true; };
   }, []);
 
   const isSectionVisible = (key: string): boolean => {
-    if (!config?.sections?.[key]) return true; // default visible
-    return config.sections[key].isVisible;
+    if (!hasLoaded || !config) return false;
+    if (!config.sections) return true;
+    if (!config.sections[key]) return true;
+    return config.sections[key].isVisible !== false;
   };
 
-  return { config, isLoading, isSectionVisible };
+  return { config: hasLoaded ? config : null, isLoading, isSectionVisible };
 }

@@ -1,15 +1,118 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { cloudinaryService } from "../../services/cloudinary.service";
 import { r2StorageService } from "../../services/r2.service";
+import { imageCompressService } from "../../services/image-compress.service";
 import { config } from "../../config";
 import { sendSuccess, sendError } from "../../utils/response.util";
 import { ERROR_CODES } from "../../constants/error-codes";
 import { logger } from "../../utils/logger.util";
 
-const useR2 = (): boolean => {
-  // R2 is disabled - using Cloudinary instead
-  return false;
+const hasCloudinaryConfig = () =>
+  Boolean(
+    config.cloudinary.cloudName &&
+      config.cloudinary.apiKey &&
+      config.cloudinary.apiSecret,
+  );
+
+const hasR2Config = () =>
+  Boolean(
+    config.r2.accountId &&
+      config.r2.accessKeyId &&
+      config.r2.secretAccessKey &&
+      config.r2.bucketName &&
+      config.r2.publicUrl,
+  );
+
+const getPreferredProvider = (): "r2" | "cloudinary" => {
+  if (hasR2Config()) return "r2";
+  return "cloudinary";
 };
+
+const getFallbackProvider = (
+  provider: "r2" | "cloudinary",
+): "r2" | "cloudinary" | null => {
+  if (provider === "r2" && hasCloudinaryConfig()) return "cloudinary";
+  if (provider === "cloudinary" && hasR2Config()) return "r2";
+  return null;
+};
+
+const uploadWithProvider = async (
+  provider: "r2" | "cloudinary",
+  fileBuffer: Buffer,
+  options: {
+    folder: string;
+    filename?: string;
+    contentType?: string;
+    resourceType?: "image" | "video" | "raw" | "auto";
+  },
+) => {
+  if (provider === "r2") {
+    const result = await r2StorageService.upload(fileBuffer, {
+      folder: options.folder,
+      filename: options.filename,
+      contentType: options.contentType,
+    });
+
+    return {
+      url: result.url,
+      key: result.key,
+      format: result.format,
+      bytes: result.bytes,
+    };
+  }
+
+  const result = await cloudinaryService.uploadImage(fileBuffer, {
+    folder: options.folder,
+    resourceType: options.resourceType,
+  });
+
+  return {
+    url: result.url,
+    publicId: result.publicId,
+    format: result.format,
+    width: result.width,
+    height: result.height,
+    bytes: result.bytes,
+  };
+};
+
+const uploadWithFallback = async (
+  fileBuffer: Buffer,
+  options: {
+    folder: string;
+    filename?: string;
+    contentType?: string;
+    resourceType?: "image" | "video" | "raw" | "auto";
+  },
+) => {
+  const preferredProvider = getPreferredProvider();
+
+  try {
+    return await uploadWithProvider(preferredProvider, fileBuffer, options);
+  } catch (error) {
+    const fallbackProvider = getFallbackProvider(preferredProvider);
+
+    logger.error(
+      {
+        error,
+        preferredProvider,
+        fallbackProvider,
+        folder: options.folder,
+        filename: options.filename,
+      },
+      "Primary upload provider failed",
+    );
+
+    if (!fallbackProvider) {
+      throw error;
+    }
+
+    return uploadWithProvider(fallbackProvider, fileBuffer, options);
+  }
+};
+
+const isImageMimeType = (mimetype: string) => 
+  mimetype.startsWith('image/');
 
 export const UploadsController = {
   async uploadSingle(request: FastifyRequest, reply: FastifyReply) {
@@ -25,55 +128,55 @@ export const UploadsController = {
         );
       }
 
-      const query = request.query as { folder?: string; resourceType?: string };
+      const query = request.query as { folder?: string; resourceType?: string; compress?: string };
       const folder = query.folder || "hosthaven";
+      const shouldCompress = query.compress !== 'false';
 
-      const fileBuffer = await data.toBuffer();
+      let fileBuffer = await data.toBuffer();
 
-      if (useR2()) {
-        const contentType = data.mimetype || "application/octet-stream";
-        const result = await r2StorageService.upload(fileBuffer, {
-          folder,
-          filename: data.filename,
-          contentType,
-        });
+      if (shouldCompress && isImageMimeType(data.mimetype || '')) {
+        try {
+          fileBuffer = await imageCompressService.compress(fileBuffer);
+        } catch (compressError) {
+          logger.warn({ error: compressError }, 'Image compression failed, using original');
+        }
+      }
 
-        return sendSuccess(
+      const resourceType = (query.resourceType || "image") as
+        | "image"
+        | "video"
+        | "raw"
+        | "auto";
+      const result = await uploadWithFallback(fileBuffer, {
+        folder,
+        filename: data.filename,
+        contentType: data.mimetype || "application/octet-stream",
+        resourceType,
+      });
+
+      return sendSuccess(reply, result, 201);
+    } catch (error: any) {
+      logger.error({ error, headers: request.headers }, "Upload failed");
+      if (error?.statusCode === 406 || error?.code === "FST_INVALID_MULTIPART_CONTENT_TYPE") {
+        return sendError(
           reply,
-          {
-            url: result.url,
-            key: result.key,
-            format: result.format,
-            bytes: result.bytes,
-          },
-          201,
-        );
-      } else {
-        const resourceType = query.resourceType || "image";
-        const result = await cloudinaryService.uploadImage(fileBuffer, {
-          folder,
-          resourceType: resourceType as any,
-        });
-
-        return sendSuccess(
-          reply,
-          {
-            url: result.url,
-            publicId: result.publicId,
-            format: result.format,
-            width: result.width,
-            height: result.height,
-            bytes: result.bytes,
-          },
-          201,
+          ERROR_CODES.VALIDATION_ERROR,
+          "Upload request must be sent as multipart/form-data",
+          400,
         );
       }
-    } catch (error: any) {
-      logger.error({ error }, "Upload failed");
+      if (error?.statusCode === 413) {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "File too large. Maximum file size is 500MB.",
+          413,
+        );
+      }
       return sendError(
         reply,
         ERROR_CODES.INTERNAL_ERROR,
-        "Failed to upload file",
+        error?.message || "Failed to upload file",
         500,
       );
     }
@@ -101,60 +204,60 @@ export const UploadsController = {
         );
       }
 
-      const query = request.query as { folder?: string; resourceType?: string };
+      const query = request.query as { folder?: string; resourceType?: string; compress?: string };
       const folder = query.folder || "hosthaven";
+      const shouldCompress = query.compress !== 'false';
 
-      if (useR2()) {
-        const contentTypes = fileArray.map(
-          (f) => f.mimetype || "application/octet-stream",
-        );
-        const filenames = fileArray.map((f) => f.filename);
+      const resourceType = (query.resourceType || "image") as
+        | "image"
+        | "video"
+        | "raw"
+        | "auto";
 
-        const results = await r2StorageService.uploadMultiple(
-          fileArray.map((f) => f.data),
-          {
+      const results = await Promise.all(
+        fileArray.map(async (file) => {
+          let fileBuffer = file.data;
+          
+          if (shouldCompress && isImageMimeType(file.mimetype || '')) {
+            try {
+              fileBuffer = await imageCompressService.compress(fileBuffer);
+            } catch (compressError) {
+              logger.warn({ error: compressError }, 'Image compression failed, using original');
+            }
+          }
+          
+          return uploadWithFallback(fileBuffer, {
             folder,
-            filenames,
-            contentTypes,
-          },
-        );
-
-        const formattedResults = results.map((result) => ({
-          url: result.url,
-          key: result.key,
-          format: result.format,
-          bytes: result.bytes,
-        }));
-
-        return sendSuccess(reply, formattedResults, 201);
-      } else {
-        const resourceType = query.resourceType || "image";
-
-        const uploadPromises = fileArray.map(async (file) => {
-          const result = await cloudinaryService.uploadImage(file.data, {
-            folder,
-            resourceType: resourceType as any,
+            filename: file.filename,
+            contentType: file.mimetype || "application/octet-stream",
+            resourceType,
           });
-          return {
-            url: result.url,
-            publicId: result.publicId,
-            format: result.format,
-            width: result.width,
-            height: result.height,
-            bytes: result.bytes,
-          };
-        });
+        }),
+      );
 
-        const results = await Promise.all(uploadPromises);
-
-        return sendSuccess(reply, results, 201);
-      }
+      return sendSuccess(reply, results, 201);
     } catch (error: any) {
       logger.error({ error }, "Multiple upload failed");
+      if (error?.statusCode === 406 || error?.code === "FST_INVALID_MULTIPART_CONTENT_TYPE") {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "Upload request must be sent as multipart/form-data",
+          400,
+        );
+      }
+      if (error?.statusCode === 413) {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "File too large. Maximum file size is 500MB.",
+          413,
+        );
+      }
       return sendError(
         reply,
         ERROR_CODES.INTERNAL_ERROR,
-        "Failed to upload files",
+        error?.message || "Failed to upload files",
         500,
       );
     }
@@ -175,7 +278,7 @@ export const UploadsController = {
         );
       }
 
-      if (useR2() && key) {
+      if (getPreferredProvider() === "r2" && key) {
         await r2StorageService.delete(key);
       } else if (publicId) {
         await cloudinaryService.deleteImage(publicId);
@@ -211,7 +314,7 @@ export const UploadsController = {
         );
       }
 
-      if (useR2() && keys && keys.length > 0) {
+      if (getPreferredProvider() === "r2" && keys && keys.length > 0) {
         await r2StorageService.deleteMultiple(keys);
       } else if (publicIds && publicIds.length > 0) {
         await cloudinaryService.deleteMultiple(publicIds);

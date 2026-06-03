@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { getActiveCities } from '../../utils/cities.util';
 
-const cityEnum = z.enum(['VIJAYAWADA', 'NANDIYALA', 'VETLAPALEM', 'TIRUPATI']);
 const propertyStatusEnum = z.enum(['DRAFT', 'PENDING', 'ACTIVE', 'INACTIVE', 'REJECTED']);
 
 const mediaImageSchema = z.object({
@@ -69,6 +69,11 @@ export const vendorLoginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(100),
+});
+
 export const vendorIdSchema = z.object({
   id: z.string().uuid(),
 });
@@ -76,7 +81,7 @@ export const vendorIdSchema = z.object({
 export const vendorFilterSchema = z.object({
   isApproved: z.boolean().optional(),
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(50).default(10),
+  limit: z.coerce.number().int().positive().min(1).max(100).default(10),
 });
 
 export const adminCreateVendorOnboardingSchema = z.object({
@@ -89,7 +94,7 @@ export const adminCreateVendorOnboardingSchema = z.object({
   }),
   businessInfo: z.object({
     businessAddress: z.string().min(5).max(500),
-    city: cityEnum,
+    city: z.string().min(1),
     state: z.string().min(2).max(100),
     pincode: z.string().regex(/^\d{6}$/),
     gstNumber: z

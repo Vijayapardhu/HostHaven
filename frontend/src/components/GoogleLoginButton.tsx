@@ -13,9 +13,8 @@ const GoogleLoginButton = ({ mode = "login", onError }: GoogleLoginButtonProps) 
 
   const handleGoogleLogin = async () => {
     try {
-      // Get the Google auth URL from backend (includes proper state token)
-      const backendUrl = import.meta.env.VITE_API_URL?.replace("/v1", "") || "http://localhost:4000";
-      const response = await fetch(`${backendUrl}/v1/auth/google`);
+      const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+      const response = await fetch(`${BASE_URL}/v1/auth/google`);
       
       if (!response.ok) {
         throw new Error("Failed to get Google auth URL");

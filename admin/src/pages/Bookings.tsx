@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { RefreshCw, Download } from 'lucide-react'
+import { RefreshCw, Download, DollarSign } from 'lucide-react'
 import { bookingsService, type Booking } from '../lib/bookings'
 import { FiltersBar } from '../components/ui/FiltersBar'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { PageLoader } from '../components/ui/PageLoader'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { downloadCsvExport } from '../lib/export'
+import { getUserFriendlyError } from '../lib/errorUtils'
 
 type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled' | 'refunded'
 type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'failed'
@@ -60,7 +61,9 @@ export default function Bookings() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
-  const [confirmRefund, setConfirmRefund] = useState<{ bookingId: string } | null>(null)
+  const [confirmRefund, setConfirmRefund] = useState<{ bookingId: string; amount?: number; maxAmount?: number } | null>(null)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundReason, setRefundReason] = useState('')
 
   const fetchBookings = async () => {
     setIsLoading(true)
@@ -88,17 +91,24 @@ export default function Bookings() {
   const confirmRefundAction = async () => {
     if (!confirmRefund) return
     try {
-      await bookingsService.processRefund(confirmRefund.bookingId, 0)
+      const amount = refundAmount ? parseFloat(refundAmount) : undefined
+      if (!refundReason.trim() || refundReason.trim().length < 5) {
+        toast.error('Please provide a refund reason of at least 5 characters.')
+        return
+      }
+      await bookingsService.processRefund(confirmRefund.bookingId, amount, refundReason.trim())
       setBookings((prev) =>
         prev.map((booking) =>
           booking.id === confirmRefund.bookingId
-            ? { ...booking, paymentStatus: 'refunded', status: 'cancelled' }
+            ? { ...booking, paymentStatus: 'refunded', status: 'refunded', amountRefunded: amount ?? booking.amountPaid ?? booking.totalAmount }
             : booking
         )
       )
       toast.success('Refund processed successfully.')
+      setRefundAmount('')
+      setRefundReason('')
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Unable to process refund.')
+      toast.error(getUserFriendlyError(err))
     } finally {
       setConfirmRefund(null)
     }
@@ -108,8 +118,8 @@ export default function Bookings() {
     try {
       await downloadCsvExport('bookings')
       toast.success('Export started successfully')
-    } catch (err) {
-      toast.error('Failed to export bookings data')
+    } catch (err: any) {
+      toast.error(getUserFriendlyError(err))
     }
   }
 
@@ -191,6 +201,8 @@ export default function Bookings() {
               <TableHead>Property</TableHead>
               <TableHead>Dates</TableHead>
               <TableHead>Amount</TableHead>
+              <TableHead>Commission</TableHead>
+              <TableHead>Vendor Earns</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Payment</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -228,6 +240,13 @@ export default function Bookings() {
                   <p className="text-xs text-slate-500">Paid: ₹{(booking.amountPaid ?? 0).toLocaleString()}</p>
                 </TableCell>
                 <TableCell>
+                  <p className="text-sm font-semibold text-rose-600">₹{(booking.commissionAmount ?? 0).toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Rate: {booking.vendorCommissionRate || 0}%</p>
+                </TableCell>
+                <TableCell>
+                  <p className="text-sm font-semibold text-emerald-600">₹{(booking.vendorEarning ?? 0).toLocaleString()}</p>
+                </TableCell>
+                <TableCell>
                   <StatusBadge label={statusLabels[booking.status]} variant={statusVariants[booking.status]} />
                 </TableCell>
                 <TableCell>
@@ -248,7 +267,14 @@ export default function Bookings() {
                     {booking.paymentStatus === 'completed' && booking.status !== 'cancelled' ? (
                       <button
                         type="button"
-                        onClick={() => setConfirmRefund({ bookingId: booking.id })}
+                        onClick={() => {
+                            setConfirmRefund({ 
+                              bookingId: booking.id, 
+                              maxAmount: booking.amountPaid || booking.totalAmount 
+                            })
+                            setRefundAmount('')
+                            setRefundReason('')
+                          }}
                         className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                       >
                         <RefreshCw className="h-4 w-4" />
@@ -279,14 +305,50 @@ export default function Bookings() {
       <ConfirmDialog
         open={Boolean(confirmRefund)}
         onOpenChange={(open) => {
-          if (!open) setConfirmRefund(null)
+          if (!open) {
+            setConfirmRefund(null)
+            setRefundAmount('')
+            setRefundReason('')
+          }
         }}
         title="Process refund?"
-        description="The booking will be marked cancelled and the refund will be triggered through Razorpay."
         confirmText="Process refund"
         variant="danger"
         onConfirm={confirmRefundAction}
-      />
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">The booking will be marked cancelled and the refund will be triggered through Razorpay.</p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-rose-600">Refund Amount (₹)</label>
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-gray-400" />
+              <input
+                type="number"
+                placeholder={confirmRefund?.maxAmount?.toString() || 'Full amount'}
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+                min={0}
+                max={confirmRefund?.maxAmount || undefined}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+              />
+              <span className="text-xs text-gray-500">
+                Max: ₹{confirmRefund?.maxAmount?.toLocaleString() || 'N/A'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500">Leave empty to refund the full amount</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-rose-600">Refund Reason</label>
+            <textarea
+              value={refundReason}
+              onChange={(event) => setRefundReason(event.target.value)}
+              placeholder="Explain why the booking is being refunded"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+              rows={3}
+            />
+          </div>
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

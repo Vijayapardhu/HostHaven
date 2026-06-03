@@ -14,7 +14,6 @@ import {
   X,
   Bell,
   ChevronRight,
-  User,
   ShoppingCart,
   CheckCircle,
   AlertCircle,
@@ -22,9 +21,7 @@ import {
   BarChart3,
   Headphones,
   FileText,
-  Home,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import logo from "@/assets/logo.png";
 import { useVendor } from "@/contexts/VendorContext";

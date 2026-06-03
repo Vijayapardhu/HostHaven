@@ -9,6 +9,7 @@ import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import { getFriendlyAuthError } from "@/lib/errors";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -63,9 +64,10 @@ const Signup = () => {
       // Pass the redirect location to login page
       navigate("/login", { state: { from } });
     } catch (error: any) {
+      const friendlyError = getFriendlyAuthError(error);
       toast({
-        title: "Signup failed",
-        description: error.message || "Please try again.",
+        title: friendlyError.title,
+        description: friendlyError.description,
         variant: "destructive",
       });
     } finally {

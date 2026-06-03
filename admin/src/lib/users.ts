@@ -5,7 +5,7 @@ export interface User {
   phone: string
   name?: string
   email?: string
-  status: 'active' | 'suspended'
+  status: 'active' | 'suspended' | 'deleted'
   createdAt: string
   updatedAt: string
   bookingsCount?: number
@@ -20,6 +20,42 @@ export interface PaginatedResponse<T> {
     limit: number
     pages: number
   }
+}
+
+export interface UserDetail extends User {
+  address?: string
+  isDeleted?: boolean
+  deletedAt?: string
+  isVerified?: boolean
+  emailVerifiedAt?: string
+  lastLoginAt?: string
+  lastLoginIp?: string
+  role?: string
+  totalSpent?: number
+  bookings?: any[]
+  reviews?: any[]
+  serviceBookings?: any[]
+  wishlist?: any[]
+  _count?: {
+    bookings?: number
+    reviews?: number
+    serviceBookings?: number
+    wishlistItems?: number
+  }
+}
+
+export interface UserSession {
+  id: string
+  device?: string
+  deviceType?: string
+  ip?: string
+  ipAddress?: string
+  location?: string
+  userAgent?: string
+  isActive?: boolean
+  createdAt: string
+  lastActive?: string
+  expiresAt?: string
 }
 
 const mapUser = (user: any): User => {
@@ -57,8 +93,17 @@ export const usersService = {
     limit?: number
     search?: string
     status?: string
+    role?: string
   }) => {
-    const response = await api.get('/v1/admin/users', { params })
+    const response = await api.get('/v1/admin/users', { 
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search || undefined,
+        status: params?.status || undefined,
+        role: params?.role || undefined,
+      }
+    })
     return normalizeList(response.data)
   },
 

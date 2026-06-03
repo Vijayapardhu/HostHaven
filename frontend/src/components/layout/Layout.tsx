@@ -6,16 +6,17 @@ import MobileBottomNav from "./MobileBottomNav";
 
 interface LayoutProps {
   children: ReactNode;
+  hideBottomNav?: boolean;
 }
 
-const Layout = ({ children }: LayoutProps) => {
+const Layout = ({ children, hideBottomNav = false }: LayoutProps) => {
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
-      <FloatingSupportPill />
-      <main className="flex-1 pb-20 md:pb-0">{children}</main>
-      <Footer className="hidden md:block" />
-      <MobileBottomNav />
+      {!hideBottomNav && <Header />}
+      {!hideBottomNav && <FloatingSupportPill />}
+      <main className={`flex-1 ${hideBottomNav ? '' : 'pb-20 md:pb-0'}`}>{children}</main>
+      <Footer className={`hidden ${hideBottomNav ? '' : 'md'}:block`} />
+      {!hideBottomNav && <MobileBottomNav />}
     </div>
   );
 };

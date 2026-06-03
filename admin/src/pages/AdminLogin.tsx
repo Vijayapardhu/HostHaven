@@ -15,37 +15,20 @@ const features = [
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { login, isAuthenticated, isLoading } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [savedEmail] = useState(() => localStorage.getItem("admin_email_saved") || "");
+  const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      toast.error("Please enter email and password");
-      return;
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate("/dashboard", { replace: true });
     }
-    setLoading(true);
-    try {
-      await login({ email, password });
-      if (rememberMe) {
-        localStorage.setItem("admin_email_saved", email);
-      } else {
-        localStorage.removeItem("admin_email_saved");
-      }
-      toast.success("Welcome back!");
-      navigate("/dashboard");
-    } catch (error: any) {
-      const message = error.response?.data?.message || "Invalid credentials";
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isAuthenticated, isLoading, navigate]);
 
   useEffect(() => {
     if (savedEmail) {
@@ -53,6 +36,72 @@ export default function AdminLogin() {
       setRememberMe(true);
     }
   }, [savedEmail]);
+
+  const extractErrorMessage = (err: unknown): string => {
+    if (!err) return "An unexpected error occurred";
+    
+    if (typeof err === 'string') return err;
+    
+    const error = err as { response?: { data?: { message?: string; error?: string } }; message?: string };
+    
+    if (error.response?.data?.message) {
+      return error.response.data.message;
+    }
+    if (error.response?.data?.error) {
+      return error.response.data.error;
+    }
+    if (error.message) {
+      return error.message;
+    }
+    return "Invalid credentials";
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!email) {
+      setError("Please enter your email address");
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    if (!password) {
+      setError("Please enter your password");
+      toast.error("Please enter your password");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Please enter a valid email address");
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await login({ email, password });
+      
+      if (result.requiresMfa) {
+        toast.info("MFA verification required");
+        return;
+      }
+
+      if (rememberMe) {
+        localStorage.setItem("admin_email_saved", email);
+      } else {
+        localStorage.removeItem("admin_email_saved");
+      }
+
+      toast.success("Welcome back!");
+    } catch (err: unknown) {
+      const message = extractErrorMessage(err);
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex overflow-hidden bg-[#0a0a0f]">
@@ -173,6 +222,17 @@ export default function AdminLogin() {
           {/* Form card */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-xl space-y-5 shadow-2xl">
             <form onSubmit={handleLogin} className="space-y-5">
+              {/* Error message */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm"
+                >
+                  {error}
+                </motion.div>
+              )}
+
               {/* Email */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">Email</label>
@@ -181,7 +241,10 @@ export default function AdminLogin() {
                     type="email"
                     placeholder="admin@hosthaven.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError("");
+                    }}
                     autoComplete="email"
                     required
                     className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 text-sm outline-none focus:border-blue-500/60 focus:bg-white/8 focus:ring-2 focus:ring-blue-500/10 transition-all"
@@ -199,7 +262,10 @@ export default function AdminLogin() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
                     autoComplete="current-password"
                     required
                     className="w-full h-12 px-4 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 text-sm outline-none focus:border-blue-500/60 focus:bg-white/8 focus:ring-2 focus:ring-blue-500/10 transition-all"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { propertiesService, type Property } from '../lib/properties'
 import { FiltersBar } from '../components/ui/FiltersBar'
@@ -22,14 +23,15 @@ export default function PropertyApproval() {
     propertyId: string
     action: 'approve' | 'reject'
   } | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
 
   const fetchPendingProperties = async () => {
     setIsLoading(true)
     setError(null)
     try {
       const data = await propertiesService.getPendingProperties({ page, limit: pageSize })
-      setProperties(data.data ?? data.properties ?? [])
-      setTotal(data.pagination?.total ?? data.total ?? 0)
+      setProperties(data.data)
+      setTotal(data.pagination.total)
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to load pending properties.')
     } finally {
@@ -62,7 +64,11 @@ export default function PropertyApproval() {
         await propertiesService.approveProperty(confirmAction.propertyId)
         toast.success('Property approved successfully.')
       } else {
-        await propertiesService.rejectProperty(confirmAction.propertyId)
+        if (!rejectionReason.trim() || rejectionReason.trim().length < 10) {
+          toast.error('Please provide a detailed rejection reason.')
+          return
+        }
+        await propertiesService.rejectProperty(confirmAction.propertyId, rejectionReason.trim())
         toast.success('Property rejected successfully.')
       }
       setProperties((prev) => prev.filter((property) => property.id !== confirmAction.propertyId))
@@ -70,6 +76,7 @@ export default function PropertyApproval() {
       toast.error(err?.response?.data?.message || 'Unable to update property approval.')
     } finally {
       setConfirmAction(null)
+      setRejectionReason('')
     }
   }
 
@@ -151,6 +158,12 @@ export default function PropertyApproval() {
                     >
                       Reject
                     </button>
+                    <Link
+                      to={`/properties/${property.slug}`}
+                      className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                    >
+                      Review
+                    </Link>
                     <button
                       type="button"
                       onClick={() => handleApproval(property.id, 'approve')}
@@ -182,7 +195,10 @@ export default function PropertyApproval() {
       <ConfirmDialog
         open={Boolean(confirmAction)}
         onOpenChange={(open) => {
-          if (!open) setConfirmAction(null)
+          if (!open) {
+            setConfirmAction(null)
+            setRejectionReason('')
+          }
         }}
         title={confirmAction?.action === 'approve' ? 'Approve this property?' : 'Reject this property?'}
         description={
@@ -193,7 +209,20 @@ export default function PropertyApproval() {
         confirmText={confirmAction?.action === 'approve' ? 'Approve property' : 'Reject property'}
         variant={confirmAction?.action === 'approve' ? 'default' : 'danger'}
         onConfirm={confirmApproval}
-      />
+      >
+        {confirmAction?.action === 'reject' ? (
+          <div className="mt-4 space-y-2">
+            <label className="text-sm font-medium text-slate-700">Rejection Reason</label>
+            <textarea
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+              placeholder="Explain why this property is being rejected..."
+              rows={4}
+              className="w-full rounded-lg border border-slate-200 p-3 text-sm"
+            />
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </div>
   )
 }

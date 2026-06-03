@@ -4,8 +4,11 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
 import SEOHead from "@/components/SEOHead";
+import { usePublicPlatformSettings } from "@/hooks/usePublicPlatformSettings";
 
 const Terms = () => {
+  const settings = usePublicPlatformSettings();
+
   return (
     <>
     <SEOHead title="Terms & Conditions" description="Read HostHaven's terms and conditions for booking hotels, homes, and travel services in Andhra Pradesh." />
@@ -171,8 +174,8 @@ const Terms = () => {
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   If you have any questions about these Terms of Service, please contact us at{" "}
-                  <a href="mailto:support@hosthaven.com" className="text-primary hover:underline">
-                    support@hosthaven.com
+                  <a href={`mailto:${settings.contact.supportEmail}`} className="text-primary hover:underline">
+                    {settings.contact.supportEmail}
                   </a>
                 </p>
               </section>

@@ -30,7 +30,35 @@ export const reviewFilterSchema = z.object({
   propertyId: z.string().uuid().optional(),
   rating: z.coerce.number().int().min(1).max(5).optional(),
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(50).default(10),
+  limit: z.coerce.number().int().positive().min(1).max(100).default(10),
+});
+
+export const propertyReviewFilterSchema = z.object({
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().min(1).max(100).default(10),
+});
+
+export const vendorReviewFilterSchema = z.object({
+  propertyId: z.string().uuid().optional(),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  search: z.string().max(120).optional(),
+  responded: z.coerce.boolean().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().min(1).max(100).default(10),
+});
+
+export const adminReviewFilterSchema = z.object({
+  propertyId: z.string().uuid().optional(),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  search: z.string().max(120).optional(),
+  status: z.enum(['approved', 'pending', 'hidden']).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().min(1).max(100).default(10),
+});
+
+export const reviewResponseSchema = z.object({
+  responseText: z.string().trim().min(3).max(2000),
 });
 
 export const reviewIdSchema = z.object({

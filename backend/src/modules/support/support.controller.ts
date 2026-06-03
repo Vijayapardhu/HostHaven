@@ -14,9 +14,15 @@ export const SupportController = {
   async create(request: FastifyRequest, reply: FastifyReply) {
     try {
       const payload = createSupportTicketSchema.parse(request.body);
-      const userId = (request as any).user.id;
-
+      
+      // Check if user is authenticated
+      const userId = (request as any).user?.id;
+      
       const ticket = await supportService.create(userId, payload);
+      
+      // Send web push notification to admins
+      await supportService.notifyAdmins(ticket);
+      
       return sendSuccess(reply, ticket, 201);
     } catch (error: any) {
       logger.error({ error }, 'Create support ticket failed');
@@ -77,6 +83,21 @@ export const SupportController = {
       return sendSuccess(reply, ticket);
     } catch (error: any) {
       logger.error({ error }, 'Get support ticket by ID failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to get ticket', 500);
+    }
+  },
+
+  async getMyTicketById(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = supportTicketIdSchema.parse(request.params);
+      const userId = (request as any).user.id;
+      const ticket = await supportService.getMyTicketById(userId, id);
+      return sendSuccess(reply, ticket);
+    } catch (error: any) {
+      logger.error({ error }, 'Get my support ticket failed');
       if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
         return sendError(reply, error.code, error.message, 404);
       }

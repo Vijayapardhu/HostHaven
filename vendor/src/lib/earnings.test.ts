@@ -42,7 +42,7 @@ describe("earningsService", () => {
     });
 
     it("should fetch payout history with params", async () => {
-      const mockPayouts = [];
+      const mockPayouts: unknown[] = [];
       vi.mocked(api.get).mockResolvedValue({ data: mockPayouts });
 
       await earningsService.getPayoutHistory({ status: "PENDING" });

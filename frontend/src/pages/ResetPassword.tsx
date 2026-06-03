@@ -110,48 +110,54 @@ const ResetPassword = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              New Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Enter new password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10 h-12 bg-muted border-0 rounded-xl"
-                required
-                minLength={8}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
+        <div>
+          <label className="text-sm font-medium text-foreground mb-2 block">
+            New Password
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter new password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pl-10 pr-10 h-12 bg-muted border-0 rounded-xl"
+              required
+              minLength={8}
+            />
           </div>
+        </div>
 
-          <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                type="password"
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="pl-10 h-12 bg-muted border-0 rounded-xl"
-                required
-                minLength={8}
-              />
-            </div>
+        <div>
+          <label className="text-sm font-medium text-foreground mb-2 block">
+            Confirm Password
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Confirm new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="pl-10 h-12 bg-muted border-0 rounded-xl"
+              required
+              minLength={8}
+            />
           </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            {showPassword ? "Hide password" : "Show password"}
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Example: MySecurePass123!
+          </p>
+        </div>
 
           <Button
             type="submit"

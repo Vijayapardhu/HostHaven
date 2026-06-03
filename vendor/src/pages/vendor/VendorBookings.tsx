@@ -12,7 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -69,8 +69,8 @@ const VendorBookings = () => {
         params.status = statusFilter;
       }
       const response = await bookingsService.getBookings(params);
-      setBookings(response.data || response || []);
-      setTotalPages(response.meta?.totalPages || 1);
+      setBookings((response.data || response || []) as unknown as Booking[]);
+      setTotalPages(response.pagination?.totalPages || 1);
     } catch (error) {
       console.error("Failed to fetch bookings:", error);
       setErrorMessage("Failed to retrieve bookings. Please try again.");

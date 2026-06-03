@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import './lib/strictConsole'
 
 // ── Capture PWA install prompt BEFORE React mounts ──────────────────────────
 // The beforeinstallprompt event fires very early. If we only listen inside

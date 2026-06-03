@@ -1,13 +1,16 @@
-import { Shield, Lock, Eye, EyeOff, Trash2, Loader2 } from "lucide-react";
+import { Shield, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 
 const Security = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
@@ -37,6 +40,22 @@ const Security = () => {
       setIsChangingPassword(false);
     }
   };
+
+  if (!user) {
+    return (
+      <Layout>
+        <div className="py-16">
+          <div className="container mx-auto px-4 text-center">
+            <h1 className="text-2xl font-serif font-bold text-foreground mb-2">Please log in</h1>
+            <p className="text-muted-foreground mb-6">Log in to manage your security settings.</p>
+            <Link to="/login" state={{ from: "/profile/security" }}>
+              <Button variant="gold">Login</Button>
+            </Link>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -81,18 +100,6 @@ const Security = () => {
                 {isChangingPassword ? "Updating..." : "Update Password"}
               </Button>
             </div>
-          </div>
-
-          <div className="bg-card rounded-2xl shadow-card p-6">
-            <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-destructive">
-              <Trash2 className="w-4 h-4" /> Danger Zone
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Permanently delete your account and all associated data
-            </p>
-            <Button variant="destructive" className="w-full">
-              Delete Account
-            </Button>
           </div>
         </div>
       </div>

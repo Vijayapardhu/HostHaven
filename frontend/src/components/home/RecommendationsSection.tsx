@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 
 interface RecommendationItem {
   id: string;
+  slug?: string;
   name: string;
   rating: number;
   reviewCount?: number;
@@ -38,56 +39,75 @@ const RecommendationsSection = () => {
   if (recommendations.length === 0) return null;
 
   return (
-    <section className="py-6 bg-background">
+    <section className="py-8">
       <div className="container mx-auto px-4">
-        <h2 className="text-lg md:text-2xl font-serif font-bold text-foreground mb-4">
-          Recommendations For You
-        </h2>
-
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Recommendations For You</h2>
+            <p className="text-sm text-muted-foreground mt-1">Handpicked stays based on your preferences</p>
+          </div>
+        </div>
         <div className="grid grid-cols-3 gap-3 md:gap-6">
           {recommendations.map((item) => {
             const price = item.basePrice || item.price || 0;
+            const originalPrice = item.originalPrice || Math.round(price * 1.2);
             const reviews = item.reviewCount || item.reviews || 0;
+            const itemRating = Math.round(item.rating || 0);
             return (
               <Link
                 key={item.id}
-                to={`/hotels/${item.id}`}
-                className="group bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all"
+                to={`/hotels/${item.slug || item.id}`}
+                className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
               >
-                <div className="aspect-[4/3] overflow-hidden">
+                <div className="relative aspect-[4/3] overflow-hidden">
                   <img
                     src={getImage(item)}
                     alt={item.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                   />
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-2.5 py-1 flex items-center gap-1 shadow-sm">
+                    <Star className="w-3.5 h-3.5 text-primary fill-primary" />
+                    <span className="text-xs font-bold text-foreground">{item.rating?.toFixed(1)}</span>
+                  </div>
+                  {originalPrice > price && (
+                    <div className="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+                      {Math.round(((originalPrice - price) / originalPrice) * 100)}% OFF
+                    </div>
+                  )}
                 </div>
-                <div className="p-2 md:p-4">
-                  <h3 className="font-semibold text-sm md:text-base text-foreground truncate">
+                <div className="p-4 md:p-5">
+                  <h3 className="font-semibold text-sm md:text-base text-foreground truncate group-hover:text-primary transition-colors">
                     {item.name}
                   </h3>
-                  <div className="flex items-center gap-1 mt-1">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-3 h-3 ${
-                          i < Math.round(item.rating || 0)
-                            ? "text-primary fill-primary"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                    ))}
-                    <span className="text-xs text-muted-foreground">({reviews})</span>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <div className="flex items-center">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-3 h-3 ${
+                            i < itemRating
+                              ? "text-primary fill-primary"
+                              : "text-muted-foreground/30"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground">({reviews} reviews)</span>
                   </div>
-                  <div className="mt-2 flex items-baseline gap-1">
-                    <span className="font-bold text-sm md:text-base text-foreground">
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="font-bold text-base md:text-lg text-foreground">
                       ₹{price.toLocaleString()}
                     </span>
+                    {originalPrice > price && (
+                      <span className="text-xs text-muted-foreground line-through">
+                        ₹{originalPrice.toLocaleString()}
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground">/night</span>
                   </div>
                   <Button 
-                    variant="goldOutline" 
                     size="sm" 
-                    className="w-full mt-2 text-xs md:text-sm h-8"
+                    className="w-full mt-3 h-9 text-xs md:text-sm font-semibold rounded-xl"
                   >
                     View Details
                   </Button>

@@ -1,9 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { formatCity } from "@/lib/utils";
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Heart,
   Clock,
   Loader2,
   MapPin,
@@ -22,6 +24,9 @@ import {
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { useWishlist } from "@/contexts/WishlistContext";
+import { useToast } from "@/hooks/use-toast";
+import SEOHead from "@/components/SEOHead";
 
 interface TempleDetailsData {
   id: string;
@@ -42,6 +47,13 @@ interface TempleDetailsData {
   mythologicalSignificance?: string;
   historicalSignificance?: string;
   associatedLegends?: string;
+  // SEO fields from database
+  metaTitle?: string;
+  metaDescription?: string;
+  searchKeywords?: string;
+  canonicalUrl?: string;
+  openGraphImage?: string;
+  structuredDataJsonLd?: string;
   sacredNearby?: string;
   darshanTimings?: Array<{
     day?: string;
@@ -101,15 +113,6 @@ interface TempleDetailsData {
   images?: Array<string | { url?: string; isPrimary?: boolean }>;
 }
 
-const formatCity = (city?: string) => {
-  if (!city) return "";
-  return city
-    .toLowerCase()
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
-
 const parseList = (value?: string) =>
   value
     ?.split(",")
@@ -128,6 +131,8 @@ const normalizeDay = (day?: string) => (day || "").trim().toLowerCase();
 
 const TempleDetails = () => {
   const { id } = useParams();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const { toast } = useToast();
   const [temple, setTemple] = useState<TempleDetailsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +194,53 @@ const TempleDetails = () => {
   const mapQuery = temple?.fullAddress || temple?.landmark || `${formatCity(temple?.city || "")} temple`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
 
+  const liked = temple ? isInWishlist(temple.id, "temple") : false;
+
+  const handleToggleLike = () => {
+    if (!temple) return;
+
+    toggleWishlist({
+      id: temple.id,
+      type: "temple",
+      name: temple.name,
+      location: formatCity(temple.city),
+      image: templeImages[0] || "",
+    });
+
+    toast({
+      title: liked ? "Removed from wishlist" : "Added to wishlist",
+      description: liked ? "This temple is no longer in your wishlist." : "This temple was added to your wishlist.",
+    });
+  };
+
+  // Parse database JSON-LD if available
+  const parsedJsonLd = useMemo(() => {
+    if (temple?.structuredDataJsonLd) {
+      try {
+        return JSON.parse(temple.structuredDataJsonLd);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }, [temple?.structuredDataJsonLd]);
+
+  // Default JSON-LD schema for temple
+  const defaultJsonLd = useMemo(() => ({
+    "@context": "https://schema.org",
+    "@type": "Place",
+    name: temple?.name,
+    image: templeImages,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: formatCity(temple?.city || ""),
+      addressRegion: temple?.state || "Andhra Pradesh",
+      streetAddress: temple?.fullAddress || temple?.landmark || "",
+      addressCountry: "IN",
+    },
+    url: `https://hosthaven.in/temples/${id}`,
+  }), [temple, templeImages, id]);
+
   if (isLoading) {
     return (
       <Layout>
@@ -215,6 +267,14 @@ const TempleDetails = () => {
 
   return (
     <Layout>
+      <SEOHead
+        title={temple.metaTitle || `${temple.name} Temple - ${formatCity(temple.city)}`}
+        description={temple.metaDescription || `${temple.name} in ${formatCity(temple.city)}. Find darshan timings, location details, facilities, and visitor tips on HostHaven.`}
+        keywords={temple.searchKeywords || `${temple.name}, ${formatCity(temple.city).toLowerCase()} temple, darshan timings, HostHaven temples`}
+        canonical={temple.canonicalUrl || `https://hosthaven.in/temples/${temple.slug || id}`}
+        ogImage={temple.openGraphImage || templeImages[0] || "/logo.png"}
+        jsonLd={parsedJsonLd || defaultJsonLd}
+      />
       <div className="py-4 md:py-6">
         <div className="container mx-auto px-4 sm:px-6">
           <Link
@@ -283,7 +343,18 @@ const TempleDetails = () => {
                 </span>
               )}
             </div>
-            <h1 className="text-2xl md:text-4xl font-serif font-bold text-foreground">{temple.name}</h1>
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-2xl md:text-4xl font-serif font-bold text-foreground">{temple.name}</h1>
+              <button
+                type="button"
+                onClick={handleToggleLike}
+                title={liked ? "Remove from wishlist" : "Add to wishlist"}
+                aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
+                className="h-10 w-10 rounded-full bg-muted/70 hover:bg-muted flex items-center justify-center transition-colors"
+              >
+                <Heart className={`w-5 h-5 ${liked ? "text-primary fill-primary" : "text-foreground"}`} />
+              </button>
+            </div>
             <p className="text-muted-foreground mt-1">Deity: {temple.deityName || "Not specified"}</p>
           </div>
 

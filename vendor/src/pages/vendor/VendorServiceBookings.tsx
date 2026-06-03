@@ -1,21 +1,18 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import {
+import { 
   Calendar,
   Search,
   Download,
   CheckCircle,
   XCircle,
   Clock,
-  User,
   MapPin,
-  Phone,
-  Mail,
   Truck,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

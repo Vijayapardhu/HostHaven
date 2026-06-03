@@ -176,4 +176,19 @@ export const ServicesController = {
       );
     }
   },
+
+  async getCities(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const cities = await servicesService.getCities();
+      return sendSuccess(reply, cities);
+    } catch (error: any) {
+      logger.error({ error }, "Get service cities failed");
+      return sendError(
+        reply,
+        ERROR_CODES.INTERNAL_ERROR,
+        "Failed to fetch service cities",
+        500,
+      );
+    }
+  },
 };

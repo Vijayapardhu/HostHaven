@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Hotel, Home, Landmark, Wrench, LogIn, UserPlus, House, Heart, User, LogOut, Search, Bell, Check, Calendar, CreditCard, Star } from "lucide-react";
+import { Menu, X, Hotel, Home, Landmark, Wrench, LogIn, UserPlus, House, Heart, User, LogOut, Search, Bell, Check, Calendar, CreditCard, Star, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import logo from "@/assets/logo.png";
@@ -19,10 +19,10 @@ interface Notification {
 }
 
 const navLinks = [
-  { name: "Hotels", path: "/hotels", emoji: "🏨" },
-  { name: "Homes", path: "/homes", emoji: "🏡" },
-  { name: "Temples", path: "/temples", emoji: "🛕" },
-  { name: "Services", path: "/services", emoji: "🔧" },
+  { name: "Hotels", path: "/hotels", icon: Hotel },
+  { name: "Homestays", path: "/homes", icon: Home },
+  { name: "Temples", path: "/temples", icon: Landmark },
+  { name: "Services", path: "/services", icon: Wrench },
 ];
 
 const Header = () => {
@@ -85,15 +85,16 @@ const Header = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-md shadow-card">
+      <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-md shadow-card border-b border-border/50">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-24 md:h-20">
+          <div className="flex items-center justify-between h-16 md:h-24">
             <Link to="/" className="flex items-center flex-1">
-              <img src={logo} alt="HostHaven" className="h-16 md:h-14 w-auto" />
+              <img src={logo} alt="HostHaven" className="h-20 md:h-24 w-auto" />
             </Link>
 
-            <nav className="md:hidden flex items-center justify-center gap-3 flex-1">
+            <nav className="md:hidden flex items-center justify-center gap-2 flex-1">
               {navLinks.map((link, index) => {
+                const Icon = link.icon;
                 const isActive = location.pathname === link.path;
                 return (
                   <motion.div
@@ -104,19 +105,25 @@ const Header = () => {
                   >
                     <Link
                       to={link.path}
-                      className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-all ${isActive
-                          ? "text-primary"
-                          : "text-muted-foreground"
+                      className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all relative ${isActive
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
                       <motion.div
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
-                        className="text-2xl"
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isActive ? "bg-primary/10" : ""}`}
                       >
-                        {link.emoji}
+                        <Icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
                       </motion.div>
-                      <span className="text-[11px] font-medium">{link.name}</span>
+                      <span className={`text-[10px] font-medium ${isActive ? "font-semibold" : ""}`}>{link.name}</span>
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeNavMobile"
+                          className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-full"
+                        />
+                      )}
                     </Link>
                   </motion.div>
                 );
@@ -125,6 +132,7 @@ const Header = () => {
 
             <nav className="hidden md:flex items-center justify-center gap-1 flex-1">
               {navLinks.map((link, index) => {
+                const Icon = link.icon;
                 const isActive = location.pathname === link.path;
                 return (
                   <motion.div
@@ -132,200 +140,61 @@ const Header = () => {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
+                    className="relative"
                   >
                     <Link
                       to={link.path}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${isActive
-                          ? "text-primary bg-primary/10"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
+                        ? "text-primary bg-primary/10 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                         }`}
                     >
-                      <motion.div
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="text-lg"
-                      >
-                        {link.emoji}
-                      </motion.div>
+                      <Icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
                       {link.name}
                     </Link>
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeNav"
+                        className="absolute -bottom-0.5 left-3 right-3 h-0.5 bg-primary rounded-full"
+                      />
+                    )}
                   </motion.div>
                 );
               })}
-            </nav>
-
-            <div className="hidden md:flex items-center gap-3 flex-1 justify-end">
-              <Link to="/wishlist" className="relative">
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Button variant="ghost" size="icon">
-                    <Heart className="w-5 h-5" />
-                    {items.length > 0 && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center"
-                      >
-                        {items.length > 99 ? "99+" : items.length}
-                      </motion.span>
-                    )}
-                  </Button>
-                </motion.div>
+              <div className="w-px h-6 bg-border/50 mx-2" />
+              <Link
+                to="/wishlist"
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 relative"
+              >
+                <Heart className="w-4 h-4" />
+                {items.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {items.length}
+                  </span>
+                )}
               </Link>
-              {isAuthenticated && (
-                <div className="relative">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                      className="relative"
-                    >
-                      <Bell className="w-5 h-5" />
-                      {unreadCount > 0 && (
-                        <motion.span
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </motion.span>
-                      )}
-                    </Button>
-                  </motion.div>
-
-                  {/* Notifications Dropdown */}
-                  <AnimatePresence>
-                    {isNotificationsOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute right-0 mt-2 w-80 bg-card rounded-xl shadow-lg border border-border overflow-hidden z-50"
-                      >
-                        <div className="p-3 border-b border-border flex items-center justify-between">
-                          <h3 className="font-semibold">Notifications</h3>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsNotificationsOpen(false)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <div className="max-h-80 overflow-y-auto">
-                          {notifications.length > 0 ? (
-                            notifications.map((notification) => (
-                              <div
-                                key={notification.id}
-                                className={`p-3 border-b border-border/50 hover:bg-muted/50 transition-colors ${!notification.isRead ? "bg-blue-50/50" : ""
-                                  }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="mt-1">
-                                    {getNotificationIcon(notification.type)}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-medium ${!notification.isRead ? "text-foreground" : "text-muted-foreground"}`}>
-                                      {notification.title}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {notification.message}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {getTimeAgo(notification.createdAt)}
-                                    </p>
-                                  </div>
-                                  {!notification.isRead && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleMarkAsRead(notification.id)}
-                                    >
-                                      <Check className="w-3 h-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="p-6 text-center">
-                              <Bell className="w-8 h-8 text-muted mx-auto mb-2" />
-                              <p className="text-sm text-muted-foreground">No notifications</p>
-                            </div>
-                          )}
-                        </div>
-                        {notifications.length > 0 && (
-                          <div className="p-2 border-t border-border">
-                            <Button
-                              variant="ghost"
-                              className="w-full text-sm"
-                              onClick={() => {
-                                setIsNotificationsOpen(false);
-                                navigate("/profile");
-                              }}
-                            >
-                              View all notifications
-                            </Button>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
               {isAuthenticated ? (
-                <div className="flex items-center gap-2">
-                  <Link to="/profile">
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Avatar className="w-8 h-8 border-2 border-primary/20">
-                        <AvatarImage src={user?.avatar} alt={user?.name} />
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                          {user?.name?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                    </motion.div>
-                  </Link>
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Button variant="ghost" size="sm" onClick={logout}>
-                      <LogOut className="w-4 h-4 mr-1" />
-                      Logout
-                    </Button>
-                  </motion.div>
-                </div>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
+                >
+                  <User className="w-4 h-4" />
+                </Link>
               ) : (
-                <>
-                  <Link to="/login">
-                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button variant="ghost" size="sm">
-                        Login
-                      </Button>
-                    </motion.div>
-                  </Link>
-                  <Link to="/signup">
-                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button variant="gold" size="sm">
-                        Sign Up
-                      </Button>
-                    </motion.div>
-                  </Link>
-                </>
+                <Link
+                  to="/login"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In
+                </Link>
               )}
-            </div>
+            </nav>
           </div>
         </div>
       </header>
+      
+      {/* Search Bar Section */}
 
       <AnimatePresence>
         {isMenuOpen && (
@@ -401,8 +270,9 @@ const Header = () => {
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
                 Browse Categories
               </h3>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {navLinks.map((link, index) => {
+                  const Icon = link.icon;
                   const isActive = location.pathname === link.path;
                   return (
                     <motion.div
@@ -419,14 +289,14 @@ const Header = () => {
                         <motion.div
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center mb-1 transition-all text-2xl ${isActive
-                              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                          className={`w-14 h-14 rounded-xl flex items-center justify-center mb-1.5 transition-all ${isActive
+                            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
                             }`}
                         >
-                          {link.emoji}
+                          <Icon className="w-6 h-6" />
                         </motion.div>
-                        <span className={`text-[10px] font-medium ${isActive ? "text-primary" : "text-foreground"
+                        <span className={`text-xs font-medium ${isActive ? "text-primary font-semibold" : "text-foreground"
                           }`}>
                           {link.name}
                         </span>
@@ -498,13 +368,14 @@ const Header = () => {
               <div className="bg-gradient-to-r from-gold/10 to-primary/10 rounded-xl p-4 border border-gold/20">
                 <h3 className="font-semibold text-foreground mb-1">Are you a property owner?</h3>
                 <p className="text-xs text-muted-foreground mb-3">List your property and start earning</p>
-                <Link
-                  to="/vendor/signup"
-                  onClick={() => setIsMenuOpen(false)}
+                <a
+                  href="https://vendor.hosthaven.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-sm font-medium text-primary"
                 >
                   Become a Partner →
-                </Link>
+                </a>
               </div>
             </div>
           </motion.div>

@@ -9,7 +9,7 @@ export const createRoomSchema = z.object({
   extraBedCapacity: z.coerce.number().int().min(0).max(10).default(0),
   sizeSqm: z.coerce.number().positive().optional(),
   pricePerNight: z.coerce.number().positive(),
-  weekendPrice: z.coerce.number().positive().optional(),
+  weekendPrice: z.coerce.number().min(0).optional(),
   seasonalPricing: z.array(z.object({
     startDate: z.string(),
     endDate: z.string(),
@@ -21,18 +21,31 @@ export const createRoomSchema = z.object({
     alt: z.string().optional(),
     isPrimary: z.boolean().optional(),
   })).default([]),
+  video: z.string().url().optional(),
   totalRooms: z.coerce.number().int().min(1).default(1),
   availableRooms: z.coerce.number().int().min(0).default(1),
 });
 
-export const updateRoomSchema = createRoomSchema.partial();
+export const updateRoomSchema = createRoomSchema.partial().refine(
+  (data) => {
+    // Allow weekendPrice to be 0 or greater, but not negative
+    if (data.weekendPrice !== undefined && data.weekendPrice < 0) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "Weekend price must be greater than or equal to 0",
+    path: ["weekendPrice"],
+  }
+);
 
 export const roomIdSchema = z.object({
   id: z.string().uuid(),
 });
 
 export const roomFilterSchema = z.object({
-  propertyId: z.string().uuid(),
+  propertyId: z.string().uuid().optional(),
   type: z.string().optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().positive().optional(),

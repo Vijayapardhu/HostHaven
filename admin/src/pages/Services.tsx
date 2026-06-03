@@ -9,6 +9,7 @@ import { SearchInput } from "../components/ui/SearchInput";
 import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
 import { StatusBadge } from "../components/ui/StatusBadge";
+import { Card, CardContent } from "../components/ui/Card";
 import {
   Table,
   TableBody,
@@ -19,6 +20,7 @@ import {
 } from "../components/ui/Table";
 import { PageLoader } from "../components/ui/PageLoader";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { ImportExportButtons } from "../components/ui/ImportExportButtons";
 
 type ServiceCategory = "transport" | "guide" | "photography" | "food" | "other";
 
@@ -65,8 +67,8 @@ export default function Services() {
         search: searchTerm || undefined,
         category: categoryFilter === "all" ? undefined : categoryFilter,
       });
-      setServices(data.data ?? data.services ?? []);
-      setTotal(data.pagination?.total ?? data.total ?? 0);
+      setServices(data.data ?? []);
+      setTotal(data.pagination?.total ?? 0);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Unable to load services.");
     } finally {
@@ -120,18 +122,44 @@ export default function Services() {
     [searchTerm, categoryFilter],
   );
 
+  const metrics = useMemo(() => {
+    const totalServices = services.length;
+    const activeServices = services.filter((service) => service.active).length;
+    const inactiveServices = totalServices - activeServices;
+    const averagePrice =
+      totalServices === 0
+        ? 0
+        : Math.round(
+            services.reduce((sum, service) => sum + (service.basePrice ?? 0), 0) /
+              totalServices,
+          );
+
+    return {
+      totalServices,
+      activeServices,
+      inactiveServices,
+      averagePrice,
+    };
+  }, [services]);
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Services"
         description="Manage service offerings and advance payment rules."
         actions={
-          <Link
-            to="/services/add"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-          >
-            Add service
-          </Link>
+          <div className="flex items-center gap-3">
+            <ImportExportButtons 
+              entity="services" 
+              onImportComplete={() => fetchServices()}
+            />
+            <Link
+              to="/services/add"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              Add service
+            </Link>
+          </div>
         }
       />
 
@@ -148,6 +176,8 @@ export default function Services() {
             />
           </div>
           <select
+            title="Filter by category"
+            aria-label="Filter services by category"
             value={categoryFilter}
             onChange={(event) => {
               setPage(1);
@@ -163,6 +193,41 @@ export default function Services() {
           </select>
         </div>
       </FiltersBar>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs font-medium text-slate-500">Total services</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">
+              {metrics.totalServices}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs font-medium text-slate-500">Active</p>
+            <p className="mt-1 text-2xl font-semibold text-emerald-600">
+              {metrics.activeServices}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs font-medium text-slate-500">Inactive</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-700">
+              {metrics.inactiveServices}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-xs font-medium text-slate-500">Average base price</p>
+            <p className="mt-1 text-2xl font-semibold text-indigo-600">
+              ₹{metrics.averagePrice.toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {isLoading ? (
         <PageLoader rows={6} />
@@ -205,17 +270,14 @@ export default function Services() {
           </TableHeader>
           <TableBody>
             {services.map((service) => (
-              <TableRow key={service.id}>
-                <TableCell>
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      {service.name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {service.description}
-                    </p>
-                  </div>
-                </TableCell>
+                <TableRow key={service.id}>
+                  <TableCell>
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        {service.name}
+                      </p>
+                    </div>
+                  </TableCell>
                 <TableCell>
                   <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
                     {categoryLabels[service.category as ServiceCategory] ||

@@ -3,9 +3,22 @@ import { Drawer as DrawerPrimitive } from "vaul";
 
 import { cn } from "@/lib/utils";
 
-const Drawer = ({ shouldScaleBackground = true, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
-);
+const Drawer = ({ shouldScaleBackground = true, open, onOpenChange, ...props }: React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Root>) => {
+  React.useEffect(() => {
+    if (open) {
+      document.body.classList.add("modal-open");
+    } else {
+      document.body.classList.remove("modal-open");
+    }
+    return () => {
+      document.body.classList.remove("modal-open");
+    };
+  }, [open]);
+
+  return (
+    <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} open={open} onOpenChange={onOpenChange} {...props} />
+  );
+};
 Drawer.displayName = "Drawer";
 
 const DrawerTrigger = DrawerPrimitive.Trigger;

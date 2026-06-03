@@ -1,14 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Building2,
   MapPin,
   Star,
   Edit,
-  Trash2,
-  Plus,
   X,
   Upload,
   Image,
@@ -24,6 +21,8 @@ import {
   Home,
   Coffee,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,15 +36,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { vendorService } from "@/lib/vendor";
 import { useToast } from "@/hooks/use-toast";
 
@@ -98,6 +89,8 @@ const VendorPropertyDetail = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -115,20 +108,32 @@ const VendorPropertyDetail = () => {
     if (id) fetchProperty();
   }, [id]);
 
+  // Keyboard navigation for gallery
+  useEffect(() => {
+    if (!showGallery) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowGallery(false);
+      if (e.key === "ArrowLeft") setCurrentImageIndex((prev) => (prev - 1 + property!.images.length) % property!.images.length);
+      if (e.key === "ArrowRight") setCurrentImageIndex((prev) => (prev + 1) % property!.images.length);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showGallery, property]);
+
   const fetchProperty = async () => {
     try {
       const response = await vendorService.getPropertyById(id!);
-      setProperty(response.property);
+      setProperty(response);
       setFormData({
-        name: response.property.name,
-        description: response.property.description,
-        shortDesc: response.property.shortDesc || "",
-        address: response.property.address,
-        city: response.property.city,
-        state: response.property.state,
-        pincode: response.property.pincode,
-        basePrice: response.property.basePrice.toString(),
-        amenities: response.property.amenities || [],
+        name: response.name,
+        description: response.description,
+        shortDesc: response.shortDesc || "",
+        address: response.address,
+        city: response.city,
+        state: response.state,
+        pincode: response.pincode,
+        basePrice: response.basePrice.toString(),
+        amenities: response.amenities || [],
       });
     } catch (error) {
       console.error("Failed to fetch property:", error);
@@ -214,7 +219,7 @@ const VendorPropertyDetail = () => {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Property not found</p>
-        <Button variant="link" onClick={() => navigate("/vendor/properties")}>Back to Properties</Button>
+        <Button variant="link" onClick={() => navigate("/properties")}>Back to Properties</Button>
       </div>
     );
   }
@@ -222,7 +227,7 @@ const VendorPropertyDetail = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/vendor/properties")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/properties")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1">
@@ -237,7 +242,7 @@ const VendorPropertyDetail = () => {
             <Edit className="w-4 h-4" />Edit Details
           </Button>
           <Button variant="outline" asChild>
-            <a href={`/vendor/properties/${property.id}/rooms`}>
+            <a href={`/properties/${property.id}/rooms`}>
               <Building2 className="w-4 h-4 mr-2" />Manage Rooms
             </a>
           </Button>
@@ -279,14 +284,19 @@ const VendorPropertyDetail = () => {
               {property.images.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {property.images.map((img, index) => (
-                    <div key={index} className="relative group rounded-lg overflow-hidden aspect-video">
+                    <div 
+                      key={index} 
+                      className="relative group rounded-lg overflow-hidden aspect-video cursor-pointer"
+                      onClick={() => { setCurrentImageIndex(index); setShowGallery(true); }}
+                    >
                       <img src={img.url} alt={img.alt} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                       <button
                         type="button"
-                        onClick={() => handleRemoveImage(index)}
+                        onClick={(e) => { e.stopPropagation(); handleRemoveImage(index); }}
                         aria-label="Remove image"
                         title="Remove image"
-                        className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -447,6 +457,48 @@ const VendorPropertyDetail = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Image Gallery Modal */}
+      {showGallery && property && (
+        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setShowGallery(false)}>
+          <button
+            onClick={() => setShowGallery(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length); }}
+            className="absolute left-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+          >
+            <ChevronLeft className="w-8 h-8" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setCurrentImageIndex((prev) => (prev + 1) % property.images.length); }}
+            className="absolute right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+          >
+            <ChevronRight className="w-8 h-8" />
+          </button>
+          <img 
+            src={property.images[currentImageIndex]?.url} 
+            alt={property.images[currentImageIndex]?.alt} 
+            className="max-w-full max-h-full object-contain" 
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            {property.images.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }}
+                className={`w-2 h-2 rounded-full transition-all ${idx === currentImageIndex ? "w-8 bg-white" : "bg-white/50"}`}
+              />
+            ))}
+          </div>
+          <div className="absolute top-4 left-4 text-white text-sm bg-black/30 px-3 py-1 rounded-full">
+            {currentImageIndex + 1} / {property.images.length}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { handleError } from "@/lib/errorHandler";
 
 interface UserAddress {
   id: string;
@@ -57,9 +58,18 @@ const EditProfile = () => {
   const loadAddresses = async () => {
     try {
       const data = await api.auth.getAddresses();
-      setAddresses(data || []);
+      if (Array.isArray(data)) {
+        setAddresses(data);
+      } else if (data && Array.isArray((data as any).data)) {
+        setAddresses((data as any).data);
+      } else if (data && Array.isArray((data as any).addresses)) {
+        setAddresses((data as any).addresses);
+      } else {
+        setAddresses([]);
+      }
     } catch (error) {
-      console.error("Failed to load addresses:", error);
+      handleError(error, 'api');
+      setAddresses([]);
     }
   };
 
@@ -259,8 +269,10 @@ const EditProfile = () => {
                 </label>
                 <Input
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="+91 98765 43210"
+                  onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                  placeholder="9876543210"
+                  inputMode="numeric"
+                  maxLength={10}
                 />
               </div>
               <Button
@@ -292,14 +304,14 @@ const EditProfile = () => {
               </Button>
             </div>
 
-            {addresses.length === 0 && !showAddressForm ? (
+            {(!Array.isArray(addresses) || addresses.length === 0) && !showAddressForm ? (
               <div className="text-center py-6 text-muted-foreground">
                 <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p>No addresses saved yet</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {addresses.map((addr) => (
+                {Array.isArray(addresses) && addresses.map((addr) => (
                   <div key={addr.id} className="flex items-start justify-between p-4 rounded-xl bg-muted/50">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">

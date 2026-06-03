@@ -23,6 +23,9 @@ interface BookingRecord {
   status: string;
   paymentStatus?: string;
   createdAt?: string;
+  commissionAmount?: number;
+  vendorEarning?: number;
+  commissionRate?: number;
 }
 
 const VendorBookingsIndex = () => {
@@ -47,10 +50,10 @@ const VendorBookingsIndex = () => {
         params.status = statusFilter;
       }
 
-      const response = await bookingsService.getBookings(params);
-      const bookingList = Array.isArray(response) ? response : response?.data || [];
+const response = await bookingsService.getBookings(params);
+      const bookingList = (Array.isArray(response.data) ? response.data : []) as BookingRecord[];
       setBookings(bookingList);
-      setTotalPages(response?.meta?.totalPages || 1);
+      setTotalPages(response.pagination?.totalPages || 1);
     } catch (error: any) {
       setErrorMessage(error?.message || "Failed to load bookings.");
     } finally {
@@ -145,7 +148,8 @@ const VendorBookingsIndex = () => {
                     <th className="text-left p-4 font-semibold">Guest</th>
                     <th className="text-left p-4 font-semibold">Hotel</th>
                     <th className="text-left p-4 font-semibold">Dates</th>
-                    <th className="text-left p-4 font-semibold">Amount</th>
+                    <th className="text-left p-4 font-semibold">Total Amount</th>
+                    <th className="text-left p-4 font-semibold">Your Earnings</th>
                     <th className="text-left p-4 font-semibold">Status</th>
                   </tr>
                 </thead>
@@ -172,6 +176,13 @@ const VendorBookingsIndex = () => {
                       </td>
                       <td className="p-4">
                         <p className="font-bold">₹{(booking.totalAmount || 0).toLocaleString()}</p>
+                      </td>
+                      <td className="p-4">
+                        {(booking.vendorEarning ?? 0) > 0 ? (
+                          <p className="font-bold text-emerald-600">₹{(booking.vendorEarning || 0).toLocaleString()}</p>
+                        ) : (
+                          <p className="text-muted-foreground">—</p>
+                        )}
                       </td>
                       <td className="p-4">{getStatusBadge(booking.status)}</td>
                     </tr>

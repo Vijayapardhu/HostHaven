@@ -28,13 +28,20 @@ const VendorLogin = () => {
     try {
       await login(email, password);
       toast({ title: "Welcome back!", description: "Successfully logged in to vendor dashboard" });
-      navigate("/vendor/dashboard");
+      navigate("/dashboard");
     } catch (error: any) {
+      const message = error?.message || "Invalid email or password";
+      const nextRoute = /pending|review|rejected/i.test(message) ? "/pending-verification" : null;
+
       toast({
         title: "Login failed",
-        description: error.message || "Invalid email or password",
+        description: message,
         variant: "destructive",
       });
+
+      if (nextRoute) {
+        navigate(nextRoute);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -172,7 +179,7 @@ const VendorLogin = () => {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">Password</label>
-                  <Link to="/vendor/forgot-password" className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
+                  <Link to="/forgot-password" className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
                     Forgot password?
                   </Link>
                 </div>
@@ -230,7 +237,7 @@ const VendorLogin = () => {
           <div className="text-center space-y-3">
             <p className="text-white/30 text-sm">New to HostHaven?</p>
             <Link
-              to="/vendor/signup"
+              to="/signup"
               className="inline-flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 font-medium border border-orange-500/20 hover:border-orange-500/40 px-6 py-2.5 rounded-xl bg-orange-500/5 hover:bg-orange-500/10 transition-all"
             >
               <Building2 className="w-4 h-4" />

@@ -8,10 +8,14 @@ import { toast } from 'sonner'
 import { IndianRupee, History, ArrowRight } from 'lucide-react'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { Link } from 'react-router-dom'
+import { SearchInput } from '../components/ui/SearchInput'
 
 interface VendorEarning {
     id: string
     businessName: string
+    commissionRate: number
+    grossAmount: number
+    totalCommission: number
     unpaidEarnings: number
     pendingEntriesCount: number
 }
@@ -21,11 +25,13 @@ const VendorEarnings = () => {
     const [isLoading, setIsLoading] = useState(true)
     const [confirmPayout, setConfirmPayout] = useState<VendorEarning | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
+    const [isBulkProcessing, setIsBulkProcessing] = useState(false)
+    const [searchTerm, setSearchTerm] = useState('')
 
     const fetchEarnings = async () => {
         try {
             setIsLoading(true)
-            const data = await paymentsService.getVendorEarnings()
+            const data = await paymentsService.getVendorEarnings({ search: searchTerm || undefined })
             setEarnings(data)
         } catch (err) {
             toast.error('Failed to load vendor earnings')
@@ -36,7 +42,33 @@ const VendorEarnings = () => {
 
     useEffect(() => {
         fetchEarnings()
-    }, [])
+    }, [searchTerm])
+
+    const handleGenerateAllPayouts = async () => {
+        const payableVendors = earnings.filter((earning) => earning.unpaidEarnings > 0)
+        if (payableVendors.length === 0) {
+            toast.info('No pending earnings available for payout generation')
+            return
+        }
+
+        try {
+            setIsBulkProcessing(true)
+            const results = await Promise.allSettled(
+                payableVendors.map((earning) => paymentsService.createPayout(earning.id))
+            )
+            const successCount = results.filter((result) => result.status === 'fulfilled').length
+            const failureCount = results.length - successCount
+
+            if (failureCount === 0) {
+                toast.success(`Created payout records for ${successCount} vendors`)
+            } else {
+                toast.warning(`Created ${successCount} payouts, ${failureCount} failed`)
+            }
+            fetchEarnings()
+        } finally {
+            setIsBulkProcessing(false)
+        }
+    }
 
     const handleCreatePayout = async () => {
         if (!confirmPayout) return
@@ -60,15 +92,32 @@ const VendorEarnings = () => {
         <div className="space-y-6">
             <PageHeader
                 title="Vendor Payout Management"
-                description="Track accumulated earnings and generate payout records for vendors."
+                description="Net payable earnings are auto-calculated after booking confirmation using each vendor's commission rate."
                 actions={
-                    <Link
-                        to="/payments?tab=payouts"
-                        className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
-                    >
-                        <History className="h-4 w-4" /> View Payout History
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleGenerateAllPayouts}
+                            disabled={isBulkProcessing}
+                            className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                        >
+                            <IndianRupee className="h-4 w-4" />
+                            {isBulkProcessing ? 'Generating...' : 'Generate All Payouts'}
+                        </button>
+                        <Link
+                            to="/payments?tab=payouts"
+                            className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+                        >
+                            <History className="h-4 w-4" /> View Payout History
+                        </Link>
+                    </div>
                 }
+            />
+
+            <SearchInput
+                placeholder="Search vendors"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
             />
 
             {earnings.length === 0 ? (
@@ -82,7 +131,9 @@ const VendorEarnings = () => {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Vendor</TableHead>
-                                <TableHead>Unpaid Commission</TableHead>
+                                <TableHead>Gross Amount</TableHead>
+                                <TableHead>Commission</TableHead>
+                                <TableHead>Net Payable</TableHead>
                                 <TableHead>Pending Bookings</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -94,7 +145,24 @@ const VendorEarnings = () => {
                                         <span className="font-semibold text-slate-900">{earning.businessName}</span>
                                     </TableCell>
                                     <TableCell>
-                                        <span className="text-lg font-bold text-slate-900">₹{earning.unpaidEarnings.toLocaleString()}</span>
+                                        <div className="space-y-0.5">
+                                            <span className="text-lg font-bold text-slate-900">
+                                                ₹{earning.grossAmount.toLocaleString()}
+                                            </span>
+                                            <p className="text-xs text-slate-500">
+                                                Rate: {earning.commissionRate}%
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className="text-sm font-semibold text-rose-600">
+                                            -₹{earning.totalCommission.toLocaleString()}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className="text-lg font-bold text-emerald-600">
+                                            ₹{earning.unpaidEarnings.toLocaleString()}
+                                        </span>
                                     </TableCell>
                                     <TableCell>
                                         <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800">

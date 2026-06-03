@@ -1,10 +1,42 @@
-import prisma from '../../config/database';
-import { cacheService } from '../../services/cache.service';
-import { logger } from '../../utils/logger.util';
-import { ERROR_CODES } from '../../constants/error-codes';
-import { Prisma } from '@prisma/client';
+import prisma from "../../config/database";
+import { cacheService } from "../../services/cache.service";
+import { logger } from "../../utils/logger.util";
+import { ERROR_CODES } from "../../constants/error-codes";
+import { Prisma } from "@prisma/client";
 
 export class ReviewsService {
+  private async getReviewWithRelations(id: string) {
+    return await prisma.review.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            email: true,
+          },
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            city: true,
+            images: true,
+          },
+        },
+        booking: {
+          select: {
+            id: true,
+            checkInDate: true,
+            checkOutDate: true,
+          },
+        },
+      },
+    });
+  }
+
   async getAll(filters: {
     page?: number;
     limit?: number;
@@ -32,7 +64,7 @@ export class ReviewsService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           user: {
             select: {
@@ -95,7 +127,7 @@ export class ReviewsService {
     });
 
     if (!review) {
-      const error = new Error('Review not found');
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -122,7 +154,7 @@ export class ReviewsService {
     });
 
     if (!property) {
-      const error = new Error('Property not found');
+      const error = new Error("Property not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -130,7 +162,7 @@ export class ReviewsService {
     const eligibleBookingWhere: Prisma.BookingWhereInput = {
       userId: data.userId,
       propertyId: data.propertyId,
-      status: 'CHECKED_OUT',
+      status: "CHECKED_OUT",
     };
 
     if (data.bookingId) {
@@ -139,11 +171,13 @@ export class ReviewsService {
 
     const eligibleBooking = await prisma.booking.findFirst({
       where: eligibleBookingWhere,
-      orderBy: { checkOutDate: 'desc' },
+      orderBy: { checkOutDate: "desc" },
     });
 
     if (!eligibleBooking) {
-      const error = new Error('Only users with completed bookings can review this property');
+      const error = new Error(
+        "Only users with completed bookings can review this property",
+      );
       (error as any).code = ERROR_CODES.FORBIDDEN;
       throw error;
     }
@@ -158,7 +192,7 @@ export class ReviewsService {
     });
 
     if (existingReview) {
-      const error = new Error('You have already reviewed this property');
+      const error = new Error("You have already reviewed this property");
       (error as any).code = ERROR_CODES.RESOURCE_CONFLICT;
       throw error;
     }
@@ -192,27 +226,31 @@ export class ReviewsService {
 
     await this.updatePropertyRating(data.propertyId);
 
-    logger.info({ reviewId: review.id }, 'Review created');
+    logger.info({ reviewId: review.id }, "Review created");
 
     return this.sanitizeReview(review);
   }
 
-  async update(id: string, userId: string, data: Partial<{
-    rating: number;
-    title: string;
-    comment: string;
-    cleanliness: number;
-    service: number;
-    location: number;
-    value: number;
-    images: string[];
-  }>) {
+  async update(
+    id: string,
+    userId: string,
+    data: Partial<{
+      rating: number;
+      title: string;
+      comment: string;
+      cleanliness: number;
+      service: number;
+      location: number;
+      value: number;
+      images: string[];
+    }>,
+  ) {
     const review = await prisma.review.findFirst({
       where: { id, userId, isDeleted: false },
     });
 
     if (!review) {
-      const error = new Error('Review not found');
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -227,20 +265,20 @@ export class ReviewsService {
 
     await this.updatePropertyRating(review.propertyId);
 
-    logger.info({ reviewId: id }, 'Review updated');
+    logger.info({ reviewId: id }, "Review updated");
 
     return this.sanitizeReview(updated);
   }
 
   async delete(id: string, userId: string, role: string) {
-    const where = role === 'ADMIN'
-      ? { id }
-      : { id, userId };
+    const where = role === "ADMIN" ? { id } : { id, userId };
 
-    const review = await prisma.review.findFirst({ where: { ...where, isDeleted: false } });
+    const review = await prisma.review.findFirst({
+      where: { ...where, isDeleted: false },
+    });
 
     if (!review) {
-      const error = new Error('Review not found');
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -252,24 +290,35 @@ export class ReviewsService {
 
     await this.updatePropertyRating(review.propertyId);
 
-    logger.info({ reviewId: id }, 'Review deleted');
+    logger.info({ reviewId: id }, "Review deleted");
 
-    return { message: 'Review deleted successfully' };
+    return { message: "Review deleted successfully" };
   }
 
-  async getPropertyReviews(propertyId: string, page: number = 1, limit: number = 10) {
+  async getPropertyReviews(
+    propertyId: string,
+    page: number = 1,
+    limit: number = 10,
+    rating?: number,
+  ) {
     const skip = (page - 1) * limit;
 
-    const [reviews, total, stats] = await Promise.all([
+    const where: Prisma.ReviewWhereInput = {
+      propertyId,
+      isVisible: true,
+      isDeleted: false,
+    };
+
+    if (rating) {
+      where.rating = rating;
+    }
+
+    const [reviews, total, stats, ratingBreakdown] = await Promise.all([
       prisma.review.findMany({
-        where: {
-          propertyId,
-          isVisible: true,
-          isDeleted: false,
-        },
+        where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           user: {
             select: {
@@ -294,7 +343,17 @@ export class ReviewsService {
         },
         _count: { id: true },
       }),
+      prisma.review.groupBy({
+        by: ['rating'],
+        where: { propertyId, isVisible: true, isDeleted: false },
+        _count: { rating: true },
+      }),
     ]);
+
+    const breakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<number, number>;
+    for (const bucket of ratingBreakdown) {
+      breakdown[bucket.rating] = bucket._count.rating;
+    }
 
     return {
       reviews: reviews.map(this.sanitizeReview),
@@ -307,6 +366,7 @@ export class ReviewsService {
           location: stats._avg.location || 0,
           value: stats._avg.value || 0,
         },
+        ratings: breakdown,
       },
       meta: {
         page,
@@ -339,6 +399,12 @@ export class ReviewsService {
   }
 
   private sanitizeReview(review: any) {
+    const status = review.isVisible === false
+      ? 'hidden'
+      : review.isVerified
+        ? 'approved'
+        : 'pending'
+
     return {
       id: review.id,
       user: review.user,
@@ -353,6 +419,7 @@ export class ReviewsService {
       value: review.value,
       isVerified: review.isVerified,
       isVisible: review.isVisible,
+      status,
       vendorResponse: review.vendorResponse,
       respondedAt: review.respondedAt,
       images: review.images,
@@ -362,30 +429,64 @@ export class ReviewsService {
     };
   }
 
-  async getVendorReviews(vendorId: string, page: number = 1, limit: number = 10) {
+  async getVendorReviews(
+    vendorId: string,
+    filters: {
+      propertyId?: string;
+      rating?: number;
+      search?: string;
+      responded?: boolean;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
     const skip = (page - 1) * limit;
+
+    const where: Prisma.ReviewWhereInput = {
+      property: { vendorId },
+      isVisible: true,
+      isDeleted: false,
+    };
+
+    if (filters.propertyId) where.propertyId = filters.propertyId;
+    if (filters.rating) where.rating = filters.rating;
+    if (filters.responded !== undefined) {
+      where.vendorResponse = filters.responded ? { not: null } : null;
+    }
+    if (filters.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { comment: { contains: filters.search, mode: 'insensitive' } },
+        { user: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { property: { name: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+    }
 
     const [reviews, total] = await Promise.all([
       prisma.review.findMany({
-        where: {
-          property: { vendorId },
-          isVisible: true,
-          isDeleted: false,
-        },
+        where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           user: {
             select: { id: true, name: true, avatarUrl: true },
           },
           property: {
-            select: { id: true, name: true, type: true, city: true, images: true },
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              city: true,
+              images: true,
+            },
           },
         },
       }),
       prisma.review.count({
-        where: { property: { vendorId }, isVisible: true, isDeleted: false },
+        where,
       }),
     ]);
 
@@ -407,7 +508,7 @@ export class ReviewsService {
     });
 
     if (!review || review.property.vendorId !== vendorId) {
-      const error = new Error('Review not found or unauthorized');
+      const error = new Error("Review not found or unauthorized");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -420,9 +521,10 @@ export class ReviewsService {
       },
     });
 
-    logger.info({ reviewId: id, vendorId }, 'Vendor responded to review');
+    logger.info({ reviewId: id, vendorId }, "Vendor responded to review");
 
-    return this.sanitizeReview(updated);
+    const hydrated = await this.getReviewWithRelations(updated.id);
+    return this.sanitizeReview(hydrated || updated);
   }
 
   // ─── Admin Methods ───
@@ -432,8 +534,8 @@ export class ReviewsService {
     limit?: number;
     propertyId?: string;
     rating?: number;
-    isVisible?: boolean;
-    isVerified?: boolean;
+    search?: string;
+    status?: 'approved' | 'pending' | 'hidden';
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 10;
@@ -442,16 +544,38 @@ export class ReviewsService {
     const where: Prisma.ReviewWhereInput = { isDeleted: false };
     if (filters.propertyId) where.propertyId = filters.propertyId;
     if (filters.rating) where.rating = filters.rating;
-    if (filters.isVisible !== undefined) where.isVisible = filters.isVisible;
-    if (filters.isVerified !== undefined) where.isVerified = filters.isVerified;
+    if (filters.status === 'hidden') where.isVisible = false;
+    if (filters.status === 'pending') {
+      where.isVisible = true;
+      where.isVerified = false;
+    }
+    if (filters.status === 'approved') {
+      where.isVisible = true;
+      where.isVerified = true;
+    }
+    if (filters.search) {
+      where.OR = [
+        { title: { contains: filters.search, mode: 'insensitive' } },
+        { comment: { contains: filters.search, mode: 'insensitive' } },
+        { user: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { user: { email: { contains: filters.search, mode: 'insensitive' } } },
+        { property: { name: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+    }
 
     const [reviews, total] = await Promise.all([
       prisma.review.findMany({
-        where, skip, take: limit,
-        orderBy: { createdAt: 'desc' },
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
         include: {
-          user: { select: { id: true, name: true, avatarUrl: true, email: true } },
-          property: { select: { id: true, name: true, type: true, city: true } },
+          user: {
+            select: { id: true, name: true, avatarUrl: true, email: true },
+          },
+          property: {
+            select: { id: true, name: true, type: true, city: true },
+          },
         },
       }),
       prisma.review.count({ where }),
@@ -466,7 +590,7 @@ export class ReviewsService {
   async hideReview(id: string) {
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
-      const error = new Error('Review not found');
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -475,14 +599,15 @@ export class ReviewsService {
       data: { isVisible: false },
     });
     await this.updatePropertyRating(review.propertyId);
-    logger.info({ reviewId: id }, 'Review hidden by admin');
-    return this.sanitizeReview(updated);
+    logger.info({ reviewId: id }, "Review hidden by admin");
+    const hydrated = await this.getReviewWithRelations(updated.id);
+    return this.sanitizeReview(hydrated || updated);
   }
 
   async unhideReview(id: string) {
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
-      const error = new Error('Review not found');
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -491,14 +616,15 @@ export class ReviewsService {
       data: { isVisible: true },
     });
     await this.updatePropertyRating(review.propertyId);
-    logger.info({ reviewId: id }, 'Review unhidden by admin');
-    return this.sanitizeReview(updated);
+    logger.info({ reviewId: id }, "Review unhidden by admin");
+    const hydrated = await this.getReviewWithRelations(updated.id);
+    return this.sanitizeReview(hydrated || updated);
   }
 
   async verifyReview(id: string) {
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
-      const error = new Error('Review not found');
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -506,14 +632,38 @@ export class ReviewsService {
       where: { id },
       data: { isVerified: true },
     });
-    logger.info({ reviewId: id }, 'Review verified by admin');
-    return this.sanitizeReview(updated);
+    logger.info({ reviewId: id }, "Review verified by admin");
+    const hydrated = await this.getReviewWithRelations(updated.id);
+    return this.sanitizeReview(hydrated || updated);
   }
 
-  async adminUpdateReviewContent(id: string, data: { title?: string; comment?: string }) {
-    const review = await prisma.review.findFirst({ where: { id, isDeleted: false } });
+  async approveReview(id: string) {
+    const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
       const error = new Error('Review not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updated = await prisma.review.update({
+      where: { id },
+      data: { isVisible: true, isVerified: true },
+    });
+
+    await this.updatePropertyRating(review.propertyId);
+    const hydrated = await this.getReviewWithRelations(updated.id);
+    return this.sanitizeReview(hydrated || updated);
+  }
+
+  async adminUpdateReviewContent(
+    id: string,
+    data: { title?: string; comment?: string },
+  ) {
+    const review = await prisma.review.findFirst({
+      where: { id, isDeleted: false },
+    });
+    if (!review) {
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -524,14 +674,54 @@ export class ReviewsService {
         ...(data.comment !== undefined && { comment: data.comment }),
       },
     });
-    logger.info({ reviewId: id }, 'Review content updated by admin');
-    return this.sanitizeReview(updated);
+    logger.info({ reviewId: id }, "Review content updated by admin");
+    const hydrated = await this.getReviewWithRelations(updated.id);
+    return this.sanitizeReview(hydrated || updated);
+  }
+
+  async checkEligibility(userId: string, propertyId: string) {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+    });
+
+    if (!property) {
+      const error = new Error("Property not found");
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const eligibleBooking = await prisma.booking.findFirst({
+      where: {
+        userId,
+        propertyId,
+        status: "CHECKED_OUT",
+      },
+      orderBy: { checkOutDate: "desc" },
+    });
+
+    const existingReview = await prisma.review.findUnique({
+      where: {
+        userId_propertyId: {
+          userId,
+          propertyId,
+        },
+      },
+    });
+
+    return {
+      eligible: !!eligibleBooking && !existingReview,
+      hasBooked: !!eligibleBooking,
+      hasReviewed: !!existingReview,
+      bookingId: eligibleBooking?.id,
+    };
   }
 
   async adminDeleteReview(id: string) {
-    const review = await prisma.review.findFirst({ where: { id, isDeleted: false } });
+    const review = await prisma.review.findFirst({
+      where: { id, isDeleted: false },
+    });
     if (!review) {
-      const error = new Error('Review not found');
+      const error = new Error("Review not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -540,8 +730,8 @@ export class ReviewsService {
       data: { isVisible: false, isDeleted: true, deletedAt: new Date() },
     });
     await this.updatePropertyRating(review.propertyId);
-    logger.info({ reviewId: id }, 'Review deleted by admin');
-    return { message: 'Review deleted successfully' };
+    logger.info({ reviewId: id }, "Review deleted by admin");
+    return { message: "Review deleted successfully" };
   }
 }
 

@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import prisma from '../../config/database';
 import propertiesService from './properties.service';
 import { sendSuccess, sendError } from '../../utils/response.util';
 import { ERROR_CODES } from '../../constants/error-codes';
@@ -9,6 +10,7 @@ import {
   propertyFilterSchema,
   propertyIdSchema,
   availabilitySchema,
+  amenityNameSchema,
 } from './properties.schema';
 
 export const PropertiesController = {
@@ -87,7 +89,15 @@ export const PropertiesController = {
     } catch (error: any) {
       logger.error({ error }, 'Create property failed');
       if (error.name === 'ZodError') {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+        const details: Record<string, string[]> = {};
+        for (const issue of error.issues) {
+          const path = issue.path.join('.');
+          if (!details[path]) {
+            details[path] = [];
+          }
+          details[path].push(issue.message);
+        }
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400, details);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to create property', 500);
     }
@@ -98,7 +108,7 @@ export const PropertiesController = {
       const { id } = propertyIdSchema.parse(request.params);
       const data = updatePropertySchema.parse(request.body);
       const user = (request as any).user;
-      const vendorId = user.role === 'VENDOR' ? user.id : undefined;
+      const vendorId = user.role === 'VENDOR' ? user.vendorId : undefined;
 
       const property = await propertiesService.update(id, data, vendorId);
       return sendSuccess(reply, property);
@@ -111,7 +121,15 @@ export const PropertiesController = {
         return sendError(reply, error.code, error.message, 403);
       }
       if (error.name === 'ZodError') {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+        const details: Record<string, string[]> = {};
+        for (const issue of error.issues) {
+          const path = issue.path.join('.');
+          if (!details[path]) {
+            details[path] = [];
+          }
+          details[path].push(issue.message);
+        }
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400, details);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update property', 500);
     }
@@ -174,6 +192,76 @@ export const PropertiesController = {
     }
   },
 
+  async getAmenities(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const amenities = await propertiesService.getAmenities();
+      return sendSuccess(reply, amenities);
+    } catch (error: any) {
+      logger.error({ error }, 'Get amenities failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch amenities', 500);
+    }
+  },
+
+  async createAmenity(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { name } = amenityNameSchema.parse(request.body);
+      const amenity = await propertiesService.createAmenity(name);
+      return sendSuccess(reply, amenity, 201);
+    } catch (error: any) {
+      logger.error({ error }, 'Create amenity failed');
+      if (error.name === 'ZodError') {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+      }
+      if (error.code === ERROR_CODES.RESOURCE_CONFLICT) {
+        return sendError(reply, error.code, error.message, 409);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to create amenity', 500);
+    }
+  },
+
+  async getCityNames(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const cities = await propertiesService.getCityNames();
+      return sendSuccess(reply, cities);
+    } catch (error: any) {
+      logger.error({ error }, 'Get city names failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch city names', 500);
+    }
+  },
+
+  async toggleAmenity(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { name, isActive } = request.body as any;
+      const result = await propertiesService.toggleAmenity(name, isActive);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Toggle amenity failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to toggle amenity', 500);
+    }
+  },
+
+  async createCity(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { name } = request.body as any;
+      const result = await propertiesService.createCity(name);
+      return sendSuccess(reply, result, 201);
+    } catch (error: any) {
+      logger.error({ error }, 'Create city failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to create city', 500);
+    }
+  },
+
+  async toggleCity(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { name, isActive } = request.body as any;
+      const result = await propertiesService.toggleCity(name, isActive);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Toggle city failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to toggle city', 500);
+    }
+  },
+
   async search(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { q, limit } = request.query as { q?: string; limit?: string };
@@ -193,14 +281,20 @@ export const PropertiesController = {
   async getVendorProperties(request: FastifyRequest, reply: FastifyReply) {
     try {
       const user = (request as any).user;
-      const query = propertyFilterSchema.parse(request.query);
+      const vendorId = user.vendorId;
+      
+      if (!vendorId) {
+        return sendSuccess(reply, [], 200, { page: 1, limit: 10, total: 0, totalPages: 0 });
+      }
+      
+      const query = propertyFilterSchema.parse(request.query || {});
       
       const amenities = query.amenities ? query.amenities.split(',') : undefined;
 
       const result = await propertiesService.getAll({
         page: query.page,
         limit: query.limit,
-        vendorId: user.id,
+        vendorId,
         type: 'HOTEL',
         city: query.city,
         state: query.state,

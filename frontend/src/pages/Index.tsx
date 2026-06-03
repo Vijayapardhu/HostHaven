@@ -1,25 +1,31 @@
 import Layout from "@/components/layout/Layout";
 import HeroSection from "@/components/home/HeroSection";
+import SearchBarSection from "@/components/home/SearchBarSection";
 import FeatureCards from "@/components/home/FeatureCards";
 import WeekendDeviationBanner from "@/components/home/WeekendDeviationBanner";
 import DestinationsSection from "@/components/home/DestinationsSection";
 import RecommendationsSection from "@/components/home/RecommendationsSection";
-import React, { useMemo } from "react";
+import React from "react";
 import TemplesPreview from "@/components/home/TemplesPreview";
 import ServicesPreview from "@/components/home/ServicesPreview";
 import BecomePartner from "@/components/home/BecomePartner";
 import PromoBanner from "@/components/home/PromoBanner";
+import OffersSection from "@/components/home/OffersSection";
 import { useHomepageConfig } from "@/hooks/useHomepageConfig";
 import SEOHead from "@/components/SEOHead";
+import { usePublicPlatformSettings } from "@/hooks/usePublicPlatformSettings";
 
 const Index = () => {
   const { config, isSectionVisible } = useHomepageConfig();
+  const settings = usePublicPlatformSettings();
+  const pageBackground = config?.pageBackground?.trim() || "hsl(var(--background))";
 
-  const sortedSections = useMemo(() => {
-    // Define all available sections with a render function for lazy evaluation
+  const sortedSections = React.useMemo(() => {
     const availableSections = [
       { key: "banner", render: () => <WeekendDeviationBanner slides={config?.bannerSlides || []} /> },
       { key: "hero", render: () => <HeroSection /> },
+      { key: "search", render: () => <SearchBarSection /> },
+      { key: "offers", render: () => <OffersSection /> },
       { key: "promoBanner", render: () => <PromoBanner config={config} /> },
       { key: "features", render: () => <FeatureCards items={config?.featureCards || []} /> },
       { key: "destinations", render: () => <DestinationsSection items={config?.destinations || []} /> },
@@ -30,9 +36,7 @@ const Index = () => {
     ];
 
     return availableSections
-      // 1. Filter out hidden sections
       .filter((section) => isSectionVisible(section.key))
-      // 2. Sort by the order defined in the admin panel
       .sort((a, b) => {
         const orderA = config?.sections?.[a.key]?.order ?? 99;
         const orderB = config?.sections?.[b.key]?.order ?? 99;
@@ -43,8 +47,8 @@ const Index = () => {
   return (
     <>
       <SEOHead
-        description="Discover and book the best hotels, rental homes, and unique stays across Andhra Pradesh. Explore sacred temples, travel services, and heritage destinations with HostHaven."
-        keywords="hotels Andhra Pradesh, homestays AP, book hotels Vijayawada, rental homes Nandyala, temples Andhra Pradesh, travel services AP, HostHaven"
+        description="Discover and book the best hotels, homestays, and unique stays across Andhra Pradesh. Explore sacred temples, travel services, and heritage destinations with HostHaven."
+        keywords="hotels Andhra Pradesh, homestays AP, book hotels Vijayawada, rental homes Nandyal, temples Andhra Pradesh, travel services AP, HostHaven"
         jsonLd={{
           "@context": "https://schema.org",
           "@type": "Organization",
@@ -62,16 +66,24 @@ const Index = () => {
           contactPoint: {
             "@type": "ContactPoint",
             contactType: "customer service",
+            email: settings.contact.supportEmail,
+            telephone: settings.contact.supportPhone,
             availableLanguage: ["English", "Telugu"],
           },
         }}
       />
       <Layout>
-        {sortedSections.map(({ key, render }) => (
-          <React.Fragment key={key}>
-            {render()}
-          </React.Fragment>
-        ))}
+        <div style={{ background: pageBackground }}>
+          {sortedSections.length === 0 ? (
+            <HeroSection />
+          ) : (
+            sortedSections.map(({ key, render }) => (
+              <React.Fragment key={key}>
+                {render()}
+              </React.Fragment>
+            ))
+          )}
+        </div>
       </Layout>
     </>
   );

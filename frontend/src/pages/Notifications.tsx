@@ -1,4 +1,4 @@
-import { Bell, Mail, Smartphone, Check, CheckCheck, Trash2, Package, Calendar, Heart, CreditCard, AlertCircle } from "lucide-react";
+import { Bell, Mail, Smartphone, Check, CheckCheck, Package, Calendar, Heart, CreditCard } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -6,13 +6,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { Link } from "react-router-dom";
+import { handleError } from "@/lib/errorHandler";
+import usePushNotifications from "@/hooks/usePushNotifications";
 
 interface Notification {
   id: string;
   type: string;
   title: string;
   message: string;
-  read: boolean;
+  read?: boolean;
+  isRead?: boolean;
   createdAt: string;
   data?: Record<string, any>;
 }
@@ -30,16 +33,30 @@ const Notifications = () => {
     wishlist: true,
   });
 
+  const { isSupported, subscription, subscribe, unsubscribe, requestPermission } = usePushNotifications();
+
   useEffect(() => {
     loadNotifications();
   }, []);
 
+  useEffect(() => {
+    if (isSupported && subscription) {
+      setPreferences(prev => ({ ...prev, sms: true }));
+    }
+  }, [isSupported, subscription]);
+
   const loadNotifications = async () => {
     try {
       const response = await api.auth.getNotifications({ limit: "50" });
-      setNotifications(response?.data || []);
+      const list = Array.isArray(response?.data) ? response.data : [];
+      setNotifications(
+        list.map((notification: Notification) => ({
+          ...notification,
+          read: notification.read ?? notification.isRead ?? false,
+        })),
+      );
     } catch (error) {
-      console.error("Failed to load notifications:", error);
+      handleError(error, 'api');
     } finally {
       setLoading(false);
     }
@@ -61,6 +78,39 @@ const Notifications = () => {
       toast({ title: "All notifications marked as read" });
     } catch (error) {
       toast({ title: "Failed to mark all as read", variant: "destructive" });
+    }
+  };
+
+  const handlePushToggle = async (enabled: boolean) => {
+    if (!isSupported) {
+      toast({ title: "Push notifications not supported", description: "Your browser does not support push notifications.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      if (enabled) {
+        const permission = await requestPermission();
+        if (permission !== "granted") {
+          toast({ title: "Permission denied", description: "Please enable notifications in your browser settings.", variant: "destructive" });
+          setPreferences(prev => ({ ...prev, sms: false }));
+          return;
+        }
+        const success = await subscribe();
+        if (success) {
+          setPreferences(prev => ({ ...prev, sms: true }));
+          toast({ title: "Push notifications enabled" });
+        } else {
+          toast({ title: "Failed to enable push notifications", variant: "destructive" });
+          setPreferences(prev => ({ ...prev, sms: false }));
+        }
+      } else {
+        await unsubscribe();
+        setPreferences(prev => ({ ...prev, sms: false }));
+        toast({ title: "Push notifications disabled" });
+      }
+    } catch (error) {
+      console.error("Push toggle error:", error);
+      toast({ title: "Something went wrong", variant: "destructive" });
     }
   };
 
@@ -143,6 +193,15 @@ const Notifications = () => {
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground line-clamp-2">{notification.message}</p>
+                    {typeof notification.data?.imageUrl === "string" && notification.data.imageUrl && (
+                      <div className="mt-2">
+                        <img
+                          src={notification.data.imageUrl}
+                          alt="Notification"
+                          className="max-h-40 rounded-lg border object-cover"
+                        />
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-1">
                       {new Date(notification.createdAt).toLocaleString()}
                     </p>
@@ -150,6 +209,8 @@ const Notifications = () => {
                   {!notification.read && (
                     <button
                       onClick={() => handleMarkAsRead(notification.id)}
+                      title="Mark notification as read"
+                      aria-label="Mark notification as read"
                       className="p-2 hover:bg-muted rounded-full transition-colors"
                     >
                       <Check className="w-4 h-4 text-muted-foreground" />
@@ -204,15 +265,19 @@ const Notifications = () => {
               <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                 <Smartphone className="w-4 h-4" /> Push Notifications
               </h4>
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-muted-foreground">Enable push notifications</span>
-                <input 
-                  type="checkbox" 
-                  checked={preferences.sms}
-                  onChange={(e) => setPreferences({...preferences, sms: e.target.checked})}
-                  className="w-5 h-5 text-primary rounded" 
-                />
-              </label>
+              {!isSupported ? (
+                <p className="text-sm text-muted-foreground">Push notifications are not supported in your browser.</p>
+              ) : (
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-muted-foreground">Enable push notifications</span>
+                  <input 
+                    type="checkbox" 
+                    checked={preferences.sms}
+                    onChange={(e) => handlePushToggle(e.target.checked)}
+                    className="w-5 h-5 text-primary rounded" 
+                  />
+                </label>
+              )}
             </div>
 
             <Button onClick={() => toast({ title: "Preferences saved" })} className="w-full">

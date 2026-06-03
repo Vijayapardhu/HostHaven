@@ -12,8 +12,14 @@ export interface Booking {
   propertyId: string
   property?: {
     id: string
+    slug?: string
     name: string
     type: 'hotel' | 'home' | 'temple'
+    vendor?: {
+      id: string
+      businessName: string
+      commissionRate?: number
+    }
   }
   roomTypeId?: string
   checkInDate: string
@@ -27,13 +33,18 @@ export interface Booking {
   paymentStatus: 'pending' | 'completed' | 'refunded' | 'failed'
   refundStatus?: 'none' | 'requested' | 'processing' | 'completed'
   specialRequests?: string
+  cancellationNotes?: string
   createdAt: string
   updatedAt: string
+  vendorCommissionRate?: number
+  commissionAmount?: number
+  vendorEarning?: number
+  commissionStatus?: string
 }
 
 const normalizeStatus = (status?: string) => {
   if (!status) return 'pending'
-  const value = status.toLowerCase()
+  const value = status.toLowerCase().replace('-', '_')
   if (value === 'checked_in' || value === 'checked_out') return value
   if (value === 'confirmed' || value === 'cancelled' || value === 'refunded') return value
   return 'pending'
@@ -60,8 +71,10 @@ const mapBooking = (booking: any): Booking => ({
   property: booking.property
     ? {
         id: booking.property.id,
+        slug: booking.property.slug,
         name: booking.property.name,
         type: booking.property.type?.toLowerCase() ?? 'hotel',
+        vendor: booking.property.vendor,
       }
     : undefined,
   roomTypeId: booking.roomTypeId ?? booking.room?.id,
@@ -78,6 +91,10 @@ const mapBooking = (booking: any): Booking => ({
   specialRequests: booking.specialRequests,
   createdAt: booking.createdAt,
   updatedAt: booking.updatedAt ?? booking.createdAt,
+  vendorCommissionRate: booking.vendorCommissionRate,
+  commissionAmount: booking.commissionAmount,
+  vendorEarning: booking.vendorEarning,
+  commissionStatus: booking.commissionStatus,
 })
 
 const normalizeList = (payload: any) => {
@@ -104,12 +121,17 @@ export const bookingsService = {
     status?: string
     userId?: string
     propertyId?: string
+    vendorId?: string
   }) => {
     const response = await api.get('/v1/admin/bookings', {
       params: {
         page: params?.page,
         limit: params?.limit,
-        status: mapStatusToApi(params?.status),
+        search: params?.search || undefined,
+        status: mapStatusToApi(params?.status) || undefined,
+        userId: params?.userId || undefined,
+        propertyId: params?.propertyId || undefined,
+        vendorId: params?.vendorId || undefined,
       },
     })
     const normalized = normalizeList(response.data)
@@ -153,9 +175,9 @@ export const bookingsService = {
     return response.data?.data ?? response.data
   },
 
-  processRefund: async (bookingId: string, amount: number, reason?: string) => {
+  processRefund: async (bookingId: string, amount?: number, reason?: string) => {
     const response = await api.put(`/v1/admin/bookings/${bookingId}/refund`, {
-      amount,
+      ...(amount !== undefined && amount > 0 && { amount }),
       reason,
     })
     return response.data?.data ?? response.data
@@ -196,8 +218,8 @@ export const bookingsService = {
     return response.data?.data ?? response.data
   },
 
-  updateBookingStatus: async (bookingId: string, status: string) => {
-    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, { status })
+  updateBookingStatus: async (bookingId: string, status: string, reason?: string) => {
+    const response = await api.put(`/v1/admin/bookings/${bookingId}/status`, { status, ...(reason ? { reason } : {}) })
     return response.data?.data ?? response.data
   },
 }

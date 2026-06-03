@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   ArrowLeft,
   CalendarDays,
@@ -13,7 +12,6 @@ import {
   XCircle,
   Clock,
   Download,
-  Printer,
   FileText,
   Building2,
   BedDouble,
@@ -22,7 +20,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { bookingsService } from "@/lib/bookings";
 import { useToast } from "@/hooks/use-toast";
 
@@ -42,6 +39,9 @@ interface BookingDetail {
   user: { id: string; name: string; email: string; phone?: string; avatar?: string };
   property: { id: string; name: string; address: string; city: string; state: string; images: { url: string }[] };
   room?: { id: string; name: string; type: string; basePrice: number };
+  commissionAmount?: number;
+  vendorEarning?: number;
+  commissionRate?: number;
 }
 
 const VendorBookingDetail = () => {
@@ -59,7 +59,7 @@ const VendorBookingDetail = () => {
   const fetchBooking = async () => {
     try {
       const response = await bookingsService.getBookingById(id!);
-      setBooking(response);
+      setBooking(response as unknown as BookingDetail);
     } catch (error) {
       console.error("Failed to fetch booking:", error);
       toast({ title: "Error", description: "Failed to load booking details", variant: "destructive" });
@@ -112,8 +112,7 @@ const VendorBookingDetail = () => {
 
   const handleViewInvoice = async () => {
     try {
-      const invoice = await bookingsService.getInvoice(id!);
-      window.open(`/vendor/invoice/${id}`, "_blank");
+      window.open(`/invoice/${id}`, "_blank");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -161,7 +160,7 @@ const VendorBookingDetail = () => {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">Booking not found</p>
-        <Button variant="link" onClick={() => navigate("/vendor/bookings")}>Back to Bookings</Button>
+        <Button variant="link" onClick={() => navigate("/bookings")}>Back to Bookings</Button>
       </div>
     );
   }
@@ -171,7 +170,7 @@ const VendorBookingDetail = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/vendor/bookings")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/bookings")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1">
@@ -341,6 +340,24 @@ const VendorBookingDetail = () => {
                 <span className="text-muted-foreground">Balance</span>
                 <span>₹{(booking.totalAmount - booking.advancePaid).toLocaleString()}</span>
               </div>
+              
+              {(booking.vendorEarning ?? 0) > 0 && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="font-semibold text-sm mb-2">Your Earnings</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Booking Amount</span>
+                    <span>₹{booking.totalAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Platform Deduction</span>
+                    <span className="text-rose-600">-₹{(booking.commissionAmount ?? 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t font-semibold">
+                    <span>You Receive</span>
+                    <span className="text-emerald-600">₹{(booking.vendorEarning ?? 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

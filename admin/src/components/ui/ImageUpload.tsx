@@ -23,7 +23,7 @@ type ImageUploadProps = {
 export function ImageUpload({
   images,
   onChange,
-  maxImages = 10,
+  maxImages = 50,
   folder = "hosthaven/general",
   resourceType = "image",
   minImages = 0,
@@ -66,8 +66,8 @@ export function ImageUpload({
     } catch (err: any) {
       toast.error(
         err?.response?.data?.error?.message ||
-          err?.message ||
-          "Failed to upload image.",
+        err?.message ||
+        "Failed to upload image.",
       );
     } finally {
       setUploadingIndex(null);
@@ -127,8 +127,8 @@ export function ImageUpload({
     } catch (err: any) {
       toast.error(
         err?.response?.data?.error?.message ||
-          err?.message ||
-          "Failed to upload images.",
+        err?.message ||
+        "Failed to upload images.",
       );
     } finally {
       setIsBulkUploading(false);
@@ -191,24 +191,24 @@ export function ImageUpload({
           <div>
             <p className="text-sm font-semibold text-slate-700">{label}</p>
             <p className="text-xs text-slate-500">
-              {resourceType === "image" ? "Upload images" : "Upload videos"} to
-              cloud storage
+              {resourceType === "image" ? "Upload property images" : "Upload property videos"} (max {maxImages} {resourceType === "image" ? "images" : "videos"})
             </p>
           </div>
           <div className="flex gap-2">
-            <label className="inline-flex cursor-pointer items-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-              {isBulkUploading
-                ? "Uploading..."
+            <label className={`inline-flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-semibold text-white ${isBulkUploading || uploadingIndex !== null ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}>
+              {isBulkUploading || uploadingIndex !== null
+                ? (uploadingIndex !== null ? `Uploading slot ${uploadingIndex + 1}...` : "Uploading...")
                 : `Upload ${resourceType === "image" ? "Images" : "Videos"}`}
               <input
                 type="file"
                 accept={resourceType === "image" ? "image/*" : "video/*"}
                 multiple
                 className="hidden"
-                onChange={(e) =>
-                  handleBulkImageUpload(Array.from(e.target.files || []))
-                }
-                disabled={isBulkUploading}
+                onChange={(e) => {
+                  const files = e.target.files ? Array.from(e.target.files) : [];
+                  handleBulkImageUpload(files);
+                }}
+                disabled={isBulkUploading || uploadingIndex !== null}
                 ref={bulkFileInputRef}
               />
             </label>
@@ -216,11 +216,16 @@ export function ImageUpload({
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-            {resourceType === "image" ? "Images" : "Videos"}: {uploadedCount}
+            {resourceType === "image" ? "Images" : "Videos"}: {uploadedCount} / {maxImages}
           </span>
           {resourceType === "image" && (
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
-              Primary: {hasPrimaryImage ? "Set" : "Missing"}
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${hasPrimaryImage ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+              {hasPrimaryImage ? "✓ Primary set" : "⚠ Set primary image"}
+            </span>
+          )}
+          {uploadedCount === 0 && (
+            <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-700">
+              Required
             </span>
           )}
         </div>

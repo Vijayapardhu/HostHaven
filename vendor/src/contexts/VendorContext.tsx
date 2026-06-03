@@ -5,12 +5,14 @@ import {
   clearTokens,
   hasValidAccessToken,
   setTokens,
+  checkAndClearExpiredToken,
 } from "@/services/tokenService";
 
 interface VendorUser {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   avatar?: string;
   role: string;
 }
@@ -64,6 +66,7 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    checkAndClearExpiredToken();
     refreshVendor();
   }, [refreshVendor]);
 
@@ -71,6 +74,7 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
     const handleUnauthorized = () => {
       clearTokens();
       setVendor(null);
+      window.location.href = "/login";
     };
 
     window.addEventListener("vendor:unauthorized", handleUnauthorized);
@@ -79,10 +83,31 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+const login = async (email: string, password: string) => {
     const response = await vendorService.login(email, password);
-    setTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
-    setVendor(response.vendor);
+    let accessToken: string | undefined;
+    let refreshToken: string | undefined;
+    let vendorData: Record<string, unknown> | undefined;
+    
+    const responseData = response.data ?? response;
+    
+    if (responseData?.accessToken) {
+      accessToken = responseData.accessToken;
+      refreshToken = responseData.refreshToken;
+      vendorData = responseData.vendor;
+    } else if (responseData?.vendor) {
+      vendorData = { ...(responseData.vendor as Record<string, unknown>), user: responseData.user };
+    }
+    
+    if (!accessToken && !vendorData) {
+      console.error('Login response:', response);
+      throw new Error('Invalid login response');
+    }
+    
+    if (accessToken) {
+      setTokens({ accessToken, refreshToken });
+    }
+    setVendor(vendorData as any);
   };
 
   const logout = async () => {

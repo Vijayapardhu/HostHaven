@@ -7,12 +7,9 @@ import {
   Search,
   Edit,
   Trash2,
-  DollarSign,
   Users,
-  Upload,
-  X,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -213,7 +210,7 @@ const VendorRooms = () => {
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => navigate("/vendor/rooms/add")}>
+            <Button className="gap-2" onClick={() => navigate("/rooms/add")}>
               <Plus className="w-4 h-4" />
               Add Room
             </Button>
@@ -362,13 +359,13 @@ const VendorRooms = () => {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <button type="button" className="font-semibold text-lg text-left hover:underline" onClick={() => navigate(`/vendor/rooms/${room.id}`)}>
+                      <button type="button" className="font-semibold text-lg text-left hover:underline" onClick={() => navigate(`/rooms/${room.id}`)}>
                         {room.name}
                       </button>
                       <p className="text-sm text-muted-foreground capitalize">{room.type}</p>
                     </div>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/vendor/rooms/${room.id}/edit`)}>
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/rooms/${room.id}/edit`)}>
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => handleDeleteRoom(room.id)}>

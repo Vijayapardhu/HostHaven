@@ -14,6 +14,11 @@ export interface Service {
   updatedAt: string
 }
 
+type RawService = Service & {
+  isActive?: boolean
+  price?: number
+}
+
 export interface CreateServiceRequest {
   name: string
   category: string
@@ -30,6 +35,21 @@ const emptyServiceResponse = {
   pagination: { total: 0, page: 1, limit: 10, totalPages: 1 },
 }
 
+const normalizeService = (service: RawService): Service => {
+  const normalizedBasePrice =
+    typeof service.basePrice === 'number'
+      ? service.basePrice
+      : typeof service.price === 'number'
+      ? service.price
+      : 0
+
+  return {
+    ...service,
+    basePrice: normalizedBasePrice,
+    active: service.active ?? service.isActive ?? false,
+  }
+}
+
 export const servicesService = {
   getServices: async (params?: {
     page?: number
@@ -38,8 +58,22 @@ export const servicesService = {
     category?: string
   }) => {
     try {
-      const response = await api.get('/v1/services', { params })
-      return response.data
+      const response = await api.get('/v1/services', { 
+        params: {
+          page: params?.page,
+          limit: params?.limit,
+          search: params?.search || undefined,
+          category: params?.category || undefined,
+        }
+      })
+      const payload = response.data
+      const rawData = payload?.data ?? payload?.services ?? []
+      return {
+        data: Array.isArray(rawData)
+          ? rawData.map((service: RawService) => normalizeService(service))
+          : [],
+        pagination: payload?.meta ?? { total: payload?.data?.length ?? 0 }
+      }
     } catch (error) {
       console.error('Error fetching services:', error)
       return emptyServiceResponse
@@ -48,17 +82,17 @@ export const servicesService = {
 
   getServiceById: async (id: string) => {
     const response = await api.get(`/v1/services/${id}`)
-    return response.data.data
+    return normalizeService(response.data.data as RawService)
   },
 
   createService: async (data: CreateServiceRequest) => {
     const response = await api.post('/v1/services', data)
-    return response.data.data
+    return normalizeService(response.data.data as RawService)
   },
 
   updateService: async (id: string, data: Partial<CreateServiceRequest>) => {
     const response = await api.put(`/v1/services/${id}`, data)
-    return response.data.data
+    return normalizeService(response.data.data as RawService)
   },
 
   deleteService: async (id: string) => {
@@ -68,12 +102,12 @@ export const servicesService = {
 
   activateService: async (id: string) => {
     const response = await api.post(`/v1/services/${id}/activate`)
-    return response.data.data
+    return normalizeService(response.data.data as RawService)
   },
 
   deactivateService: async (id: string) => {
     const response = await api.post(`/v1/services/${id}/deactivate`)
-    return response.data.data
+    return normalizeService(response.data.data as RawService)
   },
 
   getCategories: async () => {

@@ -1,26 +1,51 @@
-import prisma from '../../config/database';
-import { ERROR_CODES } from '../../constants/error-codes';
-import { logger } from '../../utils/logger.util';
-import { generateBookingNumber } from '../../utils/crypto.util';
+import prisma from "../../config/database";
+import { ERROR_CODES } from "../../constants/error-codes";
+import { logger } from "../../utils/logger.util";
+import { generateBookingNumber, generateInvoiceId } from "../../utils/crypto.util";
 
 export class ServiceBookingsService {
-  async create(userId: string, data: {
-    serviceId?: string;
-    serviceName: string;
-    serviceCategory?: string;
-    serviceDate: Date;
-    serviceTime: string;
-    location: string;
-    notes?: string;
-    advanceAmount: number;
-    totalAmount?: number;
-    razorpayPaymentId: string;
-    razorpayOrderId?: string;
-  }) {
+  async syncServiceBookingStatuses() {
+    const now = new Date();
+    
+    const result = await prisma.serviceBooking.updateMany({
+      where: {
+        status: { in: ["ADVANCE_PAID", "CONFIRMED"] },
+        serviceDate: { lt: now },
+      },
+      data: {
+        status: "COMPLETED",
+      },
+    });
+
+    if (result.count > 0) {
+      logger.info({ count: result.count }, "Auto-completed service bookings based on service date");
+    }
+
+    return result.count;
+  }
+
+  async create(
+    userId: string,
+    data: {
+      serviceId?: string;
+      serviceName: string;
+      serviceCategory?: string;
+      serviceDate: Date;
+      serviceTime: string;
+      location: string;
+      notes?: string;
+      advanceAmount: number;
+      totalAmount?: number;
+      razorpayPaymentId?: string;
+      razorpayOrderId?: string;
+    },
+  ) {
     if (data.serviceId) {
-      const service = await prisma.service.findUnique({ where: { id: data.serviceId } });
+      const service = await prisma.service.findUnique({
+        where: { id: data.serviceId },
+      });
       if (!service || !service.isActive) {
-        const error = new Error('Service not found or inactive');
+        const error = new Error("Service not found or inactive");
         (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
         throw error;
       }
@@ -45,16 +70,21 @@ export class ServiceBookingsService {
         remainingAmount,
         razorpayPaymentId: data.razorpayPaymentId,
         razorpayOrderId: data.razorpayOrderId,
-        status: 'ADVANCE_PAID',
+        status: data.razorpayPaymentId ? "ADVANCE_PAID" : "PENDING",
       },
     });
 
-    logger.info({ serviceBookingId: booking.id }, 'Service booking created');
+    logger.info({ serviceBookingId: booking.id }, "Service booking created");
 
     return this.serialize(booking);
   }
 
-  async getMyBookings(userId: string, filters: { page: number; limit: number; status?: string }) {
+  async getMyBookings(
+    userId: string,
+    filters: { page: number; limit: number; status?: string },
+  ) {
+    await this.syncServiceBookingStatuses();
+
     const skip = (filters.page - 1) * filters.limit;
     const where: any = { userId };
 
@@ -65,7 +95,7 @@ export class ServiceBookingsService {
         where,
         skip,
         take: filters.limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.serviceBooking.count({ where }),
     ]);
@@ -81,7 +111,11 @@ export class ServiceBookingsService {
     };
   }
 
-  async getAllForAdmin(filters: { page: number; limit: number; status?: string }) {
+  async getAllForAdmin(filters: {
+    page: number;
+    limit: number;
+    status?: string;
+  }) {
     const skip = (filters.page - 1) * filters.limit;
     const where: any = {};
 
@@ -92,7 +126,7 @@ export class ServiceBookingsService {
         where,
         skip,
         take: filters.limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         include: {
           user: { select: { id: true, name: true, email: true, phone: true } },
         },
@@ -111,11 +145,20 @@ export class ServiceBookingsService {
     };
   }
 
-  async updateStatus(id: string, status: 'ADVANCE_PAID' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED', cancellationReason?: string) {
+  async updateStatus(
+    id: string,
+    status:
+      | "PENDING"
+      | "ADVANCE_PAID"
+      | "CONFIRMED"
+      | "COMPLETED"
+      | "CANCELLED",
+    cancellationReason?: string,
+  ) {
     const booking = await prisma.serviceBooking.findUnique({ where: { id } });
 
     if (!booking) {
-      const error = new Error('Service booking not found');
+      const error = new Error("Service booking not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -124,13 +167,17 @@ export class ServiceBookingsService {
       where: { id },
       data: {
         status,
-        adminContactedAt: status === 'CONFIRMED' ? new Date() : booking.adminContactedAt,
-        cancelledAt: status === 'CANCELLED' ? new Date() : null,
-        cancellationReason: status === 'CANCELLED' ? cancellationReason : null,
+        adminContactedAt:
+          status === "CONFIRMED" ? new Date() : booking.adminContactedAt,
+        cancelledAt: status === "CANCELLED" ? new Date() : null,
+        cancellationReason: status === "CANCELLED" ? cancellationReason : null,
       },
     });
 
-    logger.info({ serviceBookingId: id, status }, 'Service booking status updated');
+    logger.info(
+      { serviceBookingId: id, status },
+      "Service booking status updated",
+    );
 
     return this.serialize(updated);
   }
@@ -144,7 +191,7 @@ export class ServiceBookingsService {
     });
 
     if (!booking) {
-      const error = new Error('Service booking not found');
+      const error = new Error("Service booking not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -156,7 +203,7 @@ export class ServiceBookingsService {
     const booking = await prisma.serviceBooking.findUnique({ where: { id } });
 
     if (!booking) {
-      const error = new Error('Service booking not found');
+      const error = new Error("Service booking not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
     }
@@ -164,18 +211,84 @@ export class ServiceBookingsService {
     const updated = await prisma.serviceBooking.update({
       where: { id },
       data: {
-        status: 'CANCELLED',
+        status: "CANCELLED",
         cancelledAt: new Date(),
         cancellationReason: reason,
       },
     });
 
-    logger.info({ serviceBookingId: id, amount }, 'Service booking refund requested');
+    logger.info(
+      { serviceBookingId: id, amount },
+      "Service booking refund requested",
+    );
 
     return {
       booking: this.serialize(updated),
-      message: 'Refund recorded',
+      message: "Refund recorded",
     };
+  }
+
+  async getMyBookingById(id: string, userId: string) {
+    const booking = await prisma.serviceBooking.findFirst({
+      where: { id, userId },
+    });
+
+    if (!booking) {
+      const error = new Error("Service booking not found");
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return this.serialize(booking);
+  }
+
+  async generateInvoice(id: string, userId: string) {
+    const booking = await prisma.serviceBooking.findFirst({
+      where: { id, userId },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true } },
+      },
+    });
+
+    if (!booking) {
+      const error = new Error("Service booking not found");
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const invoiceData = {
+      invoiceNumber: generateInvoiceId(booking.bookingNumber),
+      bookingNumber: booking.bookingNumber,
+      date: booking.createdAt,
+      customer: {
+        name: booking.user?.name || "Customer",
+        email: booking.user?.email || "",
+        phone: booking.user?.phone || "",
+      },
+      service: {
+        name: booking.serviceName,
+        category: booking.serviceCategory || "",
+        date: booking.serviceDate,
+        time: booking.serviceTime,
+        location: booking.location,
+      },
+      pricing: {
+        advancePaid: Number(booking.advanceAmount),
+        totalAmount: Number(booking.totalAmount),
+        remainingAmount: Number(booking.remainingAmount),
+      },
+      status: booking.status,
+    };
+
+    const { generateServiceBookingInvoicePDF } = await import("../../services/pdf-invoice.service.js");
+    try {
+      const pdf = await generateServiceBookingInvoicePDF(invoiceData);
+      logger.info({ invoiceId: invoiceData.invoiceNumber, size: pdf.length }, "Invoice generated successfully");
+      return pdf;
+    } catch (pdfError) {
+      logger.error({ pdfError, invoiceData }, "Failed to generate PDF");
+      throw pdfError;
+    }
   }
 
   private serialize(booking: any) {
@@ -191,11 +304,13 @@ export class ServiceBookingsService {
       serviceTime: booking.serviceTime,
       location: booking.location,
       notes: booking.notes,
-      advanceAmount: booking.advanceAmount?.toNumber?.() ?? booking.advanceAmount,
+      advanceAmount:
+        booking.advanceAmount?.toNumber?.() ?? booking.advanceAmount,
       totalAmount: booking.totalAmount?.toNumber?.() ?? booking.totalAmount,
-      remainingAmount: booking.remainingAmount?.toNumber?.() ?? booking.remainingAmount,
+      remainingAmount:
+        booking.remainingAmount?.toNumber?.() ?? booking.remainingAmount,
       razorpayPaymentId: booking.razorpayPaymentId,
-      paymentStatus: booking.razorpayPaymentId ? 'COMPLETED' : 'PENDING',
+      paymentStatus: booking.razorpayPaymentId ? "COMPLETED" : "PENDING",
       status: booking.status,
       adminContactedAt: booking.adminContactedAt,
       cancelledAt: booking.cancelledAt,

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,6 +10,42 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { propertiesService } from '../lib/properties'
 
+const HOUSE_FORM_STORAGE_KEY = 'house_form_autosave'
+
+const loadSavedHouseForm = () => {
+    try {
+        const saved = localStorage.getItem(HOUSE_FORM_STORAGE_KEY)
+        if (saved) {
+            const parsed = JSON.parse(saved)
+            if (parsed && parsed.savedAt && Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
+                return parsed.values
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load saved house form:', e)
+    }
+    return null
+}
+
+const saveHouseFormToStorage = (values: any) => {
+    try {
+        localStorage.setItem(HOUSE_FORM_STORAGE_KEY, JSON.stringify({
+            values,
+            savedAt: Date.now()
+        }))
+    } catch (e) {
+        console.error('Failed to save house form:', e)
+    }
+}
+
+const clearSavedHouseForm = () => {
+    try {
+        localStorage.removeItem(HOUSE_FORM_STORAGE_KEY)
+    } catch (e) {
+        console.error('Failed to clear saved house form:', e)
+    }
+}
+
 const STEPS = [
     { label: 'Basic Info', icon: Home },
     { label: 'Media', icon: ImageIcon },
@@ -19,8 +55,6 @@ const STEPS = [
     { label: 'Availability', icon: CalendarCheck },
     { label: 'Review', icon: Rocket },
 ] as const
-
-const CITY_OPTIONS = ['VIJAYAWADA', 'NANDIYALA', 'VETLAPALEM', 'TIRUPATI'] as const
 
 const AMENITIES = [
     'WiFi', 'Kitchen', 'AC', 'Washing Machine', 'Refrigerator', 'Parking',
@@ -71,6 +105,8 @@ export default function AddHouse() {
         propertySizeSqft: '',
     })
     const [amenities, setAmenities] = useState<string[]>([])
+    const [amenityOptions, setAmenityOptions] = useState<string[]>(AMENITIES)
+    const [newAmenity, setNewAmenity] = useState('')
 
     const [pricing, setPricing] = useState({
         basePrice: '', weekendPrice: '', cleaningFee: '', securityDeposit: '',
@@ -89,6 +125,38 @@ export default function AddHouse() {
         totalUnits: '1', blockDates: '',
         nearbyAttractions: '', distanceStation: '',
     })
+    const [cityOptions, setCityOptions] = useState<string[]>([])
+
+    useEffect(() => {
+        propertiesService.getCityNames().then(setCityOptions).catch(() => {})
+        propertiesService.getAmenityNames().then((values) => {
+            if (Array.isArray(values) && values.length > 0) {
+                setAmenityOptions(Array.from(new Set([...AMENITIES, ...values])).sort())
+            }
+        }).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            saveHouseFormToStorage({ basic, images, videoUrl, capacity, amenities, pricing, rules, availability })
+        }, 1000)
+        return () => clearTimeout(timer)
+    }, [basic, images, videoUrl, capacity, amenities, pricing, rules, availability])
+
+    const addAmenity = async () => {
+        const trimmed = newAmenity.trim()
+        if (!trimmed) return
+        try {
+            const created = await propertiesService.createAmenity(trimmed)
+            const value = created?.name || trimmed
+            setAmenityOptions((prev) => Array.from(new Set([...prev, value])).sort())
+            setAmenities((prev) => prev.includes(value) ? prev : [...prev, value])
+            setNewAmenity('')
+            toast.success('Amenity added successfully!')
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || err?.message || 'Failed to add amenity.')
+        }
+    }
 
     // Helpers
     const setBasicField = (key: keyof typeof basic, v: string | boolean) => {
@@ -107,7 +175,7 @@ export default function AddHouse() {
         setAmenities(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a])
     }
 
-    const addImageSlot = () => { if (images.length < 15) setImages([...images, '']) }
+    const addImageSlot = () => { setImages([...images, '']) }
     const removeImageSlot = (idx: number) => {
         if (images.length <= 5) return
         const next = images.filter((_, i) => i !== idx)
@@ -152,7 +220,20 @@ export default function AddHouse() {
         return Object.keys(e).length === 0
     }
 
-    const goNext = () => { if (!validate()) { toast.error('Please fix errors.'); return } setDirection(1); setStep(s => Math.min(s + 1, STEPS.length - 1)) }
+    const goNext = () => { 
+        if (!validate()) { 
+            const errorCount = Object.keys(errors).length
+            if (errorCount === 1) {
+                const field = Object.keys(errors)[0].replace(/-\d+/, '').replace(/([A-Z])/g, ' $1')
+                toast.error(`Missing: ${field}`)
+            } else {
+                const fields = Object.keys(errors).slice(0, 3).map(f => f.replace(/-\d+/, '').replace(/([A-Z])/g, ' $1'))
+                toast.error(`Missing ${errorCount} fields: ${fields.join(', ')}${errorCount > 3 ? '...' : ''}`)
+            }
+            return 
+        } 
+        setDirection(1); setStep(s => Math.min(s + 1, STEPS.length - 1)) 
+    }
     const goBack = () => { setDirection(-1); setStep(s => Math.max(s - 1, 0)) }
     const jumpTo = (t: number) => { if (t < step) { setDirection(-1); setStep(t) } }
 
@@ -197,6 +278,7 @@ export default function AddHouse() {
         try {
             await propertiesService.createProperty(payload)
             toast.success('House created successfully!')
+            clearSavedHouseForm()
             navigate('/properties')
         } catch (err: any) {
             toast.error(err?.response?.data?.error?.message || err?.message || 'Failed to create house.')
@@ -240,9 +322,9 @@ export default function AddHouse() {
             {/* Step Content */}
             <AnimatePresence mode="wait" custom={direction}>
                 <motion.div key={step} custom={direction} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.25, ease: 'easeInOut' }}>
-                    {step === 0 && <Step1Basic basic={basic} setField={(k, v) => setBasicField(k as keyof typeof basic, v)} buildSlug={buildSlug} errors={errors} />}
+                    {step === 0 && <Step1Basic basic={basic} setField={(k, v) => setBasicField(k as keyof typeof basic, v)} buildSlug={buildSlug} errors={errors} cityOptions={cityOptions} />}
                     {step === 1 && <Step2Media images={images} setImages={setImages} videoUrl={videoUrl} setVideoUrl={setVideoUrl} primaryImageIndex={primaryImageIndex} setPrimaryImageIndex={setPrimaryImageIndex} addImageSlot={addImageSlot} removeImageSlot={removeImageSlot} errors={errors} setErrors={setErrors} />}
-                    {step === 2 && <Step3Capacity capacity={capacity} setCapacity={(k, v) => { setCapacity(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: '' })) }} amenities={amenities} toggleAmenity={toggleAmenity} errors={errors} />}
+                    {step === 2 && <Step3Capacity capacity={capacity} setCapacity={(k, v) => { setCapacity(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: '' })) }} amenities={amenities} toggleAmenity={toggleAmenity} errors={errors} amenityOptions={amenityOptions} newAmenity={newAmenity} setNewAmenity={setNewAmenity} addAmenity={addAmenity} />}
                     {step === 3 && <Step4Pricing pricing={pricing} setField={(k, v) => { setPricing(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: '' })) }} errors={errors} />}
                     {step === 4 && <Step5Rules rules={rules} setField={(k, v) => { setRules(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: '' })) }} errors={errors} />}
                     {step === 5 && <Step6Availability availability={availability} setField={(k, v) => { setAvailability(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: '' })) }} errors={errors} />}
@@ -271,7 +353,7 @@ export default function AddHouse() {
 
 /* ─── STEP COMPONENTS ─── */
 
-function Step1Basic({ basic, setField, buildSlug, errors }: { basic: Record<string, any>; setField: (k: string, v: string | boolean) => void; buildSlug: () => void; errors: Record<string, string> }) {
+function Step1Basic({ basic, setField, buildSlug, errors, cityOptions }: { basic: Record<string, any>; setField: (k: string, v: string | boolean) => void; buildSlug: () => void; errors: Record<string, string>; cityOptions: string[] }) {
     return (
         <Card className="border-slate-200/60 shadow-sm">
             <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-teal-50/80 to-cyan-50/80">
@@ -291,7 +373,8 @@ function Step1Basic({ basic, setField, buildSlug, errors }: { basic: Record<stri
                     <div>
                         <label className="mb-1 block text-sm font-semibold text-slate-600">City *</label>
                         <select value={basic.city} onChange={e => setField('city', e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition">
-                            {CITY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                            <option value="">Select city</option>
+                            {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </div>
                 </div>
@@ -385,7 +468,7 @@ function Step2Media({ images, setImages, videoUrl, setVideoUrl, primaryImageInde
     )
 }
 
-function Step3Capacity({ capacity, setCapacity, amenities, toggleAmenity, errors }: { capacity: Record<string, string>; setCapacity: (k: string, v: string) => void; amenities: string[]; toggleAmenity: (a: string) => void; errors: Record<string, string> }) {
+function Step3Capacity({ capacity, setCapacity, amenities, toggleAmenity, errors, amenityOptions, newAmenity, setNewAmenity, addAmenity }: { capacity: Record<string, string>; setCapacity: (k: string, v: string) => void; amenities: string[]; toggleAmenity: (a: string) => void; errors: Record<string, string>; amenityOptions: string[]; newAmenity: string; setNewAmenity: (value: string) => void; addAmenity: () => void }) {
     return (
         <Card className="border-slate-200/60 shadow-sm">
             <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-blue-50/80 to-indigo-50/80">
@@ -401,8 +484,22 @@ function Step3Capacity({ capacity, setCapacity, amenities, toggleAmenity, errors
                 </div>
                 <div>
                     <label className="mb-2 block text-sm font-semibold text-slate-600">Amenities * <span className="ml-1 text-xs font-normal text-slate-400">({amenities.length} selected)</span></label>
+                    <div className="mb-3">
+                        <label className="text-sm font-semibold text-slate-600 mb-2 block">Add New Amenity</label>
+                        <div className="flex gap-2">
+                            <input
+                                value={newAmenity}
+                                onChange={e => setNewAmenity(e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition"
+                                placeholder="Add a new amenity"
+                            />
+                            <button type="button" onClick={addAmenity} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
+                                Add
+                            </button>
+                        </div>
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                        {AMENITIES.map(a => (
+                        {amenityOptions.map(a => (
                             <button key={a} type="button" onClick={() => toggleAmenity(a)} className={`rounded-full px-3.5 py-2 text-sm font-medium transition-all ${amenities.includes(a) ? 'bg-blue-600 text-white shadow-sm shadow-blue-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                                 {amenities.includes(a) ? '✓ ' : ''}{a}
                             </button>

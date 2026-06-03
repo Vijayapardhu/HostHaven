@@ -5,6 +5,7 @@ import { ERROR_CODES } from "../../constants/error-codes";
 import { logger } from "../../utils/logger.util";
 import { z } from "zod";
 import { templeAIService } from "../../services/temple-ai.service";
+import { getActiveCities } from "../../utils/cities.util";
 
 const templeFilterSchema = z.object({
   page: z.coerce.number().optional(),
@@ -21,7 +22,7 @@ const templeIdSchema = z.object({
 const createTempleSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1),
-  city: z.enum(["VIJAYAWADA", "NANDIYALA", "VETLAPALEM", "TIRUPATI"]),
+  city: z.string().min(1),
   fullAddress: z.string().optional(),
   landmark: z.string().optional(),
   description: z.string().optional(),
@@ -215,9 +216,15 @@ export const TemplesController = {
 
   async create(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const data = createTempleSchema.parse(request.body);
+      const activeCities = await getActiveCities();
+      const citySchema = activeCities.length > 0 
+        ? z.enum(activeCities as [string, ...string[]])
+        : z.string().min(1);
+      const validatedData = createTempleSchema.extend({
+        city: citySchema,
+      }).parse(request.body);
 
-      const temple = await templesService.create(data);
+      const temple = await templesService.create(validatedData);
 
       return sendSuccess(reply, temple, 201);
     } catch (error: any) {
@@ -279,10 +286,10 @@ export const TemplesController = {
 
   async update(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { id } = templeIdSchema.parse(request.params);
+      const { idOrSlug } = request.params as any;
       const data = updateTempleSchema.parse(request.body);
 
-      const temple = await templesService.update(id, data);
+      const temple = await templesService.update(idOrSlug, data);
 
       return sendSuccess(reply, temple);
     } catch (error: any) {
@@ -312,8 +319,8 @@ export const TemplesController = {
 
   async activate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { id } = templeIdSchema.parse(request.params);
-      const result = await templesService.activate(id);
+      const { idOrSlug } = request.params as any;
+      const result = await templesService.activate(idOrSlug);
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, "Activate temple failed");
@@ -331,8 +338,8 @@ export const TemplesController = {
 
   async deactivate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { id } = templeIdSchema.parse(request.params);
-      const result = await templesService.deactivate(id);
+      const { idOrSlug } = request.params as any;
+      const result = await templesService.deactivate(idOrSlug);
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, "Deactivate temple failed");
@@ -350,8 +357,8 @@ export const TemplesController = {
 
   async delete(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { id } = templeIdSchema.parse(request.params);
-      const result = await templesService.delete(id);
+      const { idOrSlug } = request.params as any;
+      const result = await templesService.delete(idOrSlug);
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, "Delete temple failed");
@@ -362,6 +369,43 @@ export const TemplesController = {
         reply,
         ERROR_CODES.INTERNAL_ERROR,
         "Failed to delete temple",
+        500,
+      );
+    }
+  },
+
+  async exportTemples(_request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const buffer = await templesService.exportAllTemples();
+      reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      reply.header("Content-Disposition", "attachment; filename=temples.xlsx");
+      return reply.send(buffer);
+    } catch (error: any) {
+      logger.error({ error }, "Export temples failed");
+      return sendError(
+        reply,
+        ERROR_CODES.INTERNAL_ERROR,
+        "Failed to export temples",
+        500,
+      );
+    }
+  },
+
+  async importTemples(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = await request.file();
+      if (!data) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, "No file uploaded", 400);
+      }
+      const buffer = await data.toBuffer();
+      const results = await templesService.importTemples(buffer);
+      return sendSuccess(reply, results);
+    } catch (error: any) {
+      logger.error({ error }, "Import temples failed");
+      return sendError(
+        reply,
+        ERROR_CODES.INTERNAL_ERROR,
+        "Failed to import temples: " + error.message,
         500,
       );
     }

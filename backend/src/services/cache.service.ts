@@ -24,6 +24,7 @@ class CacheService {
     userSession: (userId: string) => `${this.prefix}session:${userId}`,
     searchResults: (query: string) => `${this.prefix}search:${query}`,
     stateToken: (token: string) => `${this.prefix}state:${token}`,
+    featuredProperties: () => `${this.prefix}properties:featured`,
   };
 
   async get<T>(key: string): Promise<T | null> {

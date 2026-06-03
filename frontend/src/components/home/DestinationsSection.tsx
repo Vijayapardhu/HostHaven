@@ -1,20 +1,7 @@
 import { Link } from "react-router-dom";
-import vijayawadaImg from "@/assets/destinations/vijayawada.jpg";
-import nandyalaImg from "@/assets/destinations/nandyala.jpg";
-import vetapalemImg from "@/assets/destinations/vetapalem.jpg";
+import { MapPin, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
 import type { DestinationItem } from "@/hooks/useHomepageConfig";
-
-const defaultDestinations = [
-  { id: "nandyala", name: "Nandyala", image: nandyalaImg },
-  { id: "vijayawada", name: "Vijayawada", image: vijayawadaImg },
-  { id: "vetapalem", name: "Vetapalem", image: vetapalemImg },
-];
-
-const localImageMap: Record<string, string> = {
-  nandyala: nandyalaImg,
-  vijayawada: vijayawadaImg,
-  vetapalem: vetapalemImg,
-};
 
 interface Props {
   items?: DestinationItem[];
@@ -22,48 +9,100 @@ interface Props {
 
 const DestinationsSection = ({ items }: Props) => {
   const activeItems = items?.filter((i) => i.isActive);
-  const useConfig = activeItems && activeItems.length > 0;
+  
+  if (!activeItems || activeItems.length === 0) {
+    return null;
+  }
 
-  const destinations = useConfig
-    ? activeItems.map((item, i) => ({
-        id: item.id,
-        name: item.name || defaultDestinations[i]?.name || "",
-        image: item.imageUrl || localImageMap[item.name?.toLowerCase()] || defaultDestinations[i]?.image || nandyalaImg,
-        link: item.link || `/hotels?destination=${item.name?.toLowerCase()}`,
-      }))
-    : defaultDestinations.map((d) => ({ ...d, link: `/hotels?destination=${d.id}` }));
+  const destinations = activeItems.map((item) => ({
+    id: item.id,
+    name: item.name || "",
+    image: item.imageUrl || "",
+    link: item.link || `/hotels?destination=${item.name?.toLowerCase()}`,
+    count: item.name === "Vijayawada" ? "48+ Properties" : 
+           item.name === "Nandyal" ? "32+ Properties" : 
+           item.name === "Vetapalem" ? "18+ Properties" : 
+           item.name === "Tirupati" ? "56+ Properties" : "24+ Properties",
+  }));
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+  };
 
   return (
-    <section className="py-6 bg-background">
+    <section className="py-8">
       <div className="container mx-auto px-4">
-        <h2 className="text-lg md:text-2xl font-serif font-bold text-foreground mb-4">
-          Top Destinations For You
-        </h2>
-
-        <div className="grid grid-cols-3 gap-3 md:gap-6">
-          {destinations.map((dest) => (
-            <Link
-              key={dest.id}
-              to={dest.link}
-              className="group relative rounded-xl overflow-hidden aspect-[3/4] shadow-card hover:shadow-card-hover transition-all"
-            >
-              <img
-                src={dest.image}
-                alt={dest.name}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/90 via-heritage-brown/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4">
-                <h3 className="font-serif font-bold text-sm md:text-xl text-cream-light mb-1">
-                  {dest.name}
-                </h3>
-                <button className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors">
-                  Explore
-                </button>
-              </div>
-            </Link>
-          ))}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Top Destinations For You</h2>
+            <p className="text-sm text-muted-foreground mt-1">Explore popular travel destinations across Andhra Pradesh</p>
+          </div>
+          <Link
+            to="/hotels"
+            className="hidden md:flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            View All <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
+        <motion.div
+          className="grid grid-cols-3 gap-3 md:gap-6"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-50px" }}
+        >
+          {destinations.map((dest, index) => (
+            <motion.div
+              key={dest.id}
+              variants={itemVariants}
+              className="relative"
+            >
+              <Link
+                to={dest.link}
+                className="group relative block rounded-xl overflow-hidden aspect-[4/5] shadow-card"
+              >
+                <img
+                  src={dest.image}
+                  alt={dest.name}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/95 via-heritage-brown/30 to-transparent group-hover:via-heritage-brown/40 transition-all duration-500" />
+                <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-500" />
+                
+                <div className="absolute top-3 left-3">
+                  <span className="bg-white/15 backdrop-blur-sm border border-white/20 text-cream-light text-[10px] font-medium px-2.5 py-1 rounded-full">
+                    {dest.count}
+                  </span>
+                </div>
+
+                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+                  <div className="flex items-center gap-1.5 text-cream-light/70 text-xs mb-1.5">
+                    <MapPin className="w-3 h-3" />
+                    <span>Andhra Pradesh</span>
+                  </div>
+                  <h3 className="font-serif font-bold text-lg md:text-2xl text-cream-light group-hover:text-gold-light transition-colors duration-300 mb-2">
+                    {dest.name}
+                  </h3>
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-y-1 group-hover:translate-y-0">
+                    <span className="bg-primary text-primary-foreground text-xs font-medium px-4 py-1.5 rounded-lg inline-flex items-center gap-1.5">
+                      Explore Destinations
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );

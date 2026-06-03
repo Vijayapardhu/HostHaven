@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import notificationsService from '../notifications/notifications.service';
 import { webPushService } from '../../services/webpush.service';
 import type { AdminCreateVendorOnboardingInput } from './vendor.schema';
+import { syncAmenityCatalog } from '../../utils/amenities.util';
 
 const toStartOfDayUtc = (dateString: string) => {
   const date = new Date(`${dateString}T00:00:00.000Z`);
@@ -93,6 +94,21 @@ export class VendorService {
     };
   }
 
+  async apply(data: {
+    email: string;
+    password: string;
+    name: string;
+    phone?: string;
+    businessName: string;
+    businessAddress?: string;
+    gstNumber?: string;
+    panNumber?: string;
+    aadhaarNumber?: string;
+    bankAccount?: any;
+  }) {
+    return this.register(data);
+  }
+
   async login(email: string, password: string) {
     const user = await prisma.user.findUnique({
       where: { email },
@@ -152,6 +168,52 @@ export class VendorService {
     };
   }
 
+  async changePassword(vendorId: string, currentPassword: string, newPassword: string) {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            passwordHash: true,
+          },
+        },
+      },
+    });
+
+    if (!vendor?.user) {
+      const error = new Error('Vendor not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    if (!vendor.user.passwordHash) {
+      const error = new Error('Current password is incorrect');
+      (error as any).code = ERROR_CODES.UNAUTHORIZED;
+      throw error;
+    }
+
+    const isValidPassword = await verifyPassword(
+      vendor.user.passwordHash,
+      currentPassword,
+    );
+
+    if (!isValidPassword) {
+      const error = new Error('Current password is incorrect');
+      (error as any).code = ERROR_CODES.UNAUTHORIZED;
+      throw error;
+    }
+
+    await prisma.user.update({
+      where: { id: vendor.user.id },
+      data: {
+        passwordHash: await hashPassword(newPassword),
+      },
+    });
+
+    return { message: 'Password updated successfully' };
+  }
+
   async getDashboard(vendorId: string) {
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
@@ -191,7 +253,7 @@ export class VendorService {
         _sum: { totalAmount: true },
       }),
       prisma.booking.findMany({
-        where: { property: { vendorId } },
+        where: { property: { vendorId }, isDeleted: false },
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -201,7 +263,7 @@ export class VendorService {
         },
       }),
       prisma.payout.findMany({
-        where: { vendorId, status: 'pending' },
+        where: { vendorId, status: 'PENDING' },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
@@ -344,7 +406,7 @@ export class VendorService {
         _count: true,
       }),
       prisma.payout.aggregate({
-        where: { vendorId, status: { in: ['pending', 'PROCESSING'] } },
+        where: { vendorId, status: { in: ['PENDING', 'APPROVED'] } },
         _sum: { amount: true },
         _count: true,
       }),
@@ -368,11 +430,11 @@ export class VendorService {
         count: paidCommissions._count,
       },
       completedPayouts: {
-        amount: completedPayouts._sum.amount?.toNumber() || 0,
+        amount: completedPayouts._sum?.amount?.toNumber() || 0,
         count: completedPayouts._count,
       },
       pendingPayouts: {
-        amount: pendingPayouts._sum.amount?.toNumber() || 0,
+        amount: pendingPayouts._sum?.amount?.toNumber() || 0,
         count: pendingPayouts._count,
       },
       recentPayouts: recentPayouts.map((p: any) => ({
@@ -436,6 +498,54 @@ export class VendorService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async requestPayout(vendorId: string, amount?: number) {
+    const { Prisma } = await import('@prisma/client');
+    const unpaidEntries = await prisma.commissionLedger.findMany({
+      where: { vendorId, payoutId: null },
+    });
+
+    if (unpaidEntries.length === 0) {
+      const error = new Error("No unpaid earnings available");
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const totalEarning = unpaidEntries.reduce(
+      (acc, entry) => acc.add(entry.vendorEarning),
+      new Prisma.Decimal(0),
+    );
+
+    const payoutAmount = amount ? new Prisma.Decimal(amount) : totalEarning;
+
+    if (payoutAmount.gt(totalEarning)) {
+      const error = new Error("Payout amount exceeds available earnings");
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const payout = await prisma.payout.create({
+      data: {
+        vendorId,
+        amount: payoutAmount,
+        status: "PENDING",
+        bookingIds: unpaidEntries.slice(0, amount ? undefined : unpaidEntries.length).map((e) => e.bookingId),
+        periodStart: unpaidEntries[unpaidEntries.length - 1]?.createdAt || new Date(),
+        periodEnd: new Date(),
+      },
+    });
+
+    if (!amount) {
+      await prisma.commissionLedger.updateMany({
+        where: { id: { in: unpaidEntries.map((e) => e.id) } },
+        data: { payoutId: payout.id },
+      });
+    }
+
+    logger.info({ vendorId, payoutId: payout.id }, "Vendor requested payout");
+
+    return payout;
   }
 
   async blockInventoryDate(vendorId: string, data: { roomTypeId: string; date: string; reason?: string }) {
@@ -657,6 +767,7 @@ export class VendorService {
         isApproved: true,
         approvedBy: adminId,
         approvedAt: new Date(),
+        applicationStatus: 'APPROVED',
       },
     });
 
@@ -681,6 +792,100 @@ export class VendorService {
       id: updated.id,
       isApproved: updated.isApproved,
       approvedAt: updated.approvedAt,
+    };
+  }
+
+  async rejectVendor(vendorId: string, adminId: string, reason: string) {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: { user: true },
+    });
+
+    if (!vendor) {
+      const error = new Error('Vendor not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    const updated = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        isApproved: false,
+        applicationStatus: 'REJECTED',
+        rejectionReason: reason,
+        rejectedAt: new Date(),
+      },
+    });
+
+    logger.info({ vendorId, adminId }, 'Vendor rejected');
+
+    await notificationsService.create({
+      userId: vendor.userId,
+      type: 'VENDOR_REJECTED',
+      title: 'Vendor Application Rejected',
+      message: `Your vendor application for "${vendor.businessName}" has been rejected. Reason: ${reason}`,
+      data: { vendorId: vendor.id, reason },
+    });
+
+    await webPushService.sendNotification(vendor.userId, {
+      title: 'Vendor Application Rejected',
+      body: `Your vendor application for "${vendor.businessName}" has been rejected.`,
+      tag: 'vendor-rejected',
+      data: { vendorId: vendor.id },
+    });
+
+    return {
+      id: updated.id,
+      isApproved: updated.isApproved,
+      applicationStatus: updated.applicationStatus,
+      rejectionReason: updated.rejectionReason,
+      rejectedAt: updated.rejectedAt,
+    };
+  }
+
+  async getVendorDetails(vendorId: string) {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!vendor) {
+      const error = new Error('Vendor not found');
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    return {
+      id: vendor.id,
+      businessName: vendor.businessName,
+      businessAddress: vendor.businessAddress,
+      gstNumber: vendor.gstNumber,
+      panNumber: vendor.panNumber,
+      aadhaarNumber: vendor.aadhaarNumber,
+      bankAccount: vendor.bankAccount,
+      passportPhoto: vendor.passportPhoto,
+      companyLogo: vendor.companyLogo,
+      isApproved: vendor.isApproved,
+      applicationStatus: vendor.applicationStatus,
+      rejectionReason: vendor.rejectionReason,
+      registrationFeePaid: vendor.registrationFeePaid,
+      registrationPaymentId: vendor.registrationPaymentId,
+      businessDocuments: vendor.businessDocuments,
+      createdAt: vendor.createdAt,
+      updatedAt: vendor.updatedAt,
+      approvedAt: vendor.approvedAt,
+      rejectedAt: vendor.rejectedAt,
+      user: vendor.user,
     };
   }
 
@@ -840,6 +1045,9 @@ export class VendorService {
           });
         }
       }
+
+      await syncAmenityCatalog(hotel.amenities);
+      await syncAmenityCatalog(rooms.flatMap((room) => room.roomAmenities));
 
       return {
         user,

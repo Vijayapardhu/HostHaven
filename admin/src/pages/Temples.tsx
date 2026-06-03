@@ -19,16 +19,27 @@ import {
 } from "../components/ui/Table";
 import { PageLoader } from "../components/ui/PageLoader";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { ImportExportButtons } from "../components/ui/ImportExportButtons";
 
 export default function Temples() {
   const [temples, setTemples] = useState<Temple[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">(
+    "all",
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Temple | null>(null);
+
+  const getTempleImageUrl = (image: Temple["images"] extends Array<infer T>
+    ? T
+    : never) => {
+    if (!image) return "";
+    return typeof image === "string" ? image : image.url || "";
+  };
 
   const fetchTemples = async () => {
     setIsLoading(true);
@@ -38,6 +49,10 @@ export default function Temples() {
         page,
         limit: pageSize,
         search: searchTerm || undefined,
+        active:
+          statusFilter === "all"
+            ? undefined
+            : statusFilter === "active",
       });
       setTemples(data.data ?? []);
       setTotal(data.pagination?.total ?? 0);
@@ -50,14 +65,14 @@ export default function Temples() {
 
   useEffect(() => {
     fetchTemples();
-  }, [page, pageSize, searchTerm]);
+  }, [page, pageSize, searchTerm, statusFilter]);
 
   const toggleActive = async (temple: Temple) => {
     try {
       if (temple.active) {
-        await templesService.deactivateTemple(temple.id);
+        await templesService.deactivateTemple(temple.slug);
       } else {
-        await templesService.activateTemple(temple.id);
+        await templesService.activateTemple(temple.slug);
       }
       setTemples((prev) =>
         prev.map((item) =>
@@ -77,9 +92,9 @@ export default function Temples() {
   const confirmDeleteAction = async () => {
     if (!confirmDelete) return;
     try {
-      await templesService.deleteTemple(confirmDelete);
+      await templesService.deleteTemple(confirmDelete.slug);
       setTemples((prev) =>
-        prev.filter((temple) => temple.id !== confirmDelete),
+        prev.filter((temple) => temple.id !== confirmDelete.id),
       );
       toast.success("Temple deleted successfully.");
     } catch (err: any) {
@@ -89,7 +104,10 @@ export default function Temples() {
     }
   };
 
-  const hasFilters = useMemo(() => searchTerm.length > 0, [searchTerm]);
+  const hasFilters = useMemo(
+    () => searchTerm.length > 0 || statusFilter !== "all",
+    [searchTerm, statusFilter],
+  );
 
   return (
     <div className="space-y-6">
@@ -97,24 +115,47 @@ export default function Temples() {
         title="Temples"
         description="Temples are content-only listings (no bookings or payments)."
         actions={
-          <Link
-            to="/temples/new"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-          >
-            Add temple
-          </Link>
+          <div className="flex items-center gap-3">
+            <ImportExportButtons 
+              entity="temples" 
+              onImportComplete={() => fetchTemples()}
+            />
+            <Link
+              to="/temples/new"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              Add temple
+            </Link>
+          </div>
         }
       />
 
       <FiltersBar>
-        <SearchInput
-          placeholder="Search by temple name or city"
-          value={searchTerm}
-          onChange={(event) => {
-            setPage(1);
-            setSearchTerm(event.target.value);
-          }}
-        />
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <SearchInput
+            containerClassName="w-full md:max-w-md"
+            placeholder="Search by temple name or city"
+            value={searchTerm}
+            onChange={(event) => {
+              setPage(1);
+              setSearchTerm(event.target.value);
+            }}
+          />
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setPage(1);
+              setStatusFilter(
+                event.target.value as "all" | "active" | "inactive",
+              );
+            }}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 md:w-48"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active only</option>
+            <option value="inactive">Inactive only</option>
+          </select>
+        </div>
       </FiltersBar>
 
       {isLoading ? (
@@ -160,13 +201,9 @@ export default function Temples() {
                   <TableRow key={temple.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        {temple.images && temple.images.length > 0 ? (
+                        {getTempleImageUrl(temple.images?.[0]) ? (
                           <img
-                            src={
-                              typeof temple.images[0] === "string"
-                                ? temple.images[0]
-                                : temple.images[0]?.url
-                            }
+                            src={getTempleImageUrl(temple.images?.[0])}
                             alt={temple.name}
                             className="h-12 w-12 rounded-lg object-cover"
                           />
@@ -194,13 +231,13 @@ export default function Temples() {
                     <TableCell className="text-right">
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <Link
-                          to={`/temples/${temple.id}`}
+                          to={`/temples/${temple.slug}`}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           View
                         </Link>
                         <Link
-                          to={`/temples/${temple.id}/edit`}
+                          to={`/temples/${temple.slug}/edit`}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                         >
                           Edit
@@ -214,7 +251,7 @@ export default function Temples() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setConfirmDelete(temple.id)}
+                           onClick={() => setConfirmDelete(temple)}
                           className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -236,13 +273,9 @@ export default function Temples() {
                 className="rounded-lg border border-slate-200 bg-white p-4"
               >
                 <div className="flex gap-4">
-                  {temple.images && temple.images.length > 0 ? (
+                  {getTempleImageUrl(temple.images?.[0]) ? (
                     <img
-                      src={
-                        typeof temple.images[0] === "string"
-                          ? temple.images[0]
-                          : temple.images[0]?.url
-                      }
+                      src={getTempleImageUrl(temple.images?.[0])}
                       alt={temple.name}
                       className="h-20 w-20 flex-shrink-0 rounded-lg object-cover"
                     />
@@ -266,13 +299,13 @@ export default function Temples() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link
-                    to={`/temples/${temple.id}`}
+                    to={`/temples/${temple.slug}`}
                     className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     View
                   </Link>
                   <Link
-                    to={`/temples/${temple.id}/edit`}
+                    to={`/temples/${temple.slug}/edit`}
                     className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     Edit
@@ -286,7 +319,7 @@ export default function Temples() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setConfirmDelete(temple.id)}
+                    onClick={() => setConfirmDelete(temple)}
                     className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                   >
                     <Trash2 className="h-4 w-4" />

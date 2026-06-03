@@ -119,7 +119,7 @@ export const supportService = {
   },
 
   getTicketById: async (id: string) => {
-    const response = await api.get(`/v1/support/tickets/admin`, { params: { page: 1, limit: 50 } })
+    const response = await api.get(`/v1/support/tickets/admin`, { params: { page: 1, limit: 100 } })
     const normalized = normalizeList(response.data)
     return normalized.data.find((item: SupportTicket) => item.id === id)
   },

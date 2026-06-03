@@ -11,6 +11,7 @@ export interface ServiceBooking {
     name?: string
   }
   serviceId?: string
+  service?: { name?: string; category?: string }
   serviceName?: string
   serviceCategory?: string
   serviceDate?: string
@@ -51,12 +52,18 @@ export const serviceBookingsService = {
     limit?: number
     status?: string
   }) => {
-    const response = await api.get('/v1/services/bookings/admin', { params })
+    const response = await api.get('/v1/services/bookings/admin', { 
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        status: params?.status || undefined,
+      }
+    })
     return normalizeList(response.data)
   },
 
   getServiceBookingById: async (id: string) => {
-    const response = await api.get<ServiceBooking>(`/v1/services/bookings/admin/${id}`)
+    const response = await api.get<any>(`/v1/services/bookings/admin/${id}`)
     return response.data?.data ?? response.data
   },
 

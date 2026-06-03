@@ -1,6 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { RoomsController } from './rooms.controller';
 import { requireRole } from '../../middleware/auth.middleware';
+import { config } from '../../config';
+
+const writeRateLimit = {
+  max: config.rateLimit.writeMax,
+  timeWindow: 60 * 1000,
+};
 
 export default async function roomsRoutes(fastify: FastifyInstance) {
   // Specific routes must come before parameterized routes
@@ -11,19 +17,19 @@ export default async function roomsRoutes(fastify: FastifyInstance) {
 
   fastify.post(
     '/',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')], config: { rateLimit: writeRateLimit } },
     RoomsController.create
   );
 
   fastify.put(
     '/:id',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')], config: { rateLimit: writeRateLimit } },
     RoomsController.update
   );
 
   fastify.delete(
     '/:id',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')], config: { rateLimit: writeRateLimit } },
     RoomsController.delete
   );
 }

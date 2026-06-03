@@ -1,48 +1,126 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, ArrowRight, Building2, User, Phone, Mail, Lock, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
+import { vendorService } from "@/lib/vendor";
+import { setTokens } from "@/services/tokenService";
 
-const VendorSignup = () => {
+interface VendorSignupProps {
+  reapply?: boolean;
+}
+
+const VendorSignup: React.FC<VendorSignupProps> = ({ reapply: isReapply = false }) => {
     const navigate = useNavigate();
+    const [_searchParams] = useSearchParams();
+    const { toast } = useToast();
+    
+const [_step, _setStep] = useState(isReapply ? 2 : 1);
+    const [_registrationFee, setRegistrationFee] = useState<{ amount: number; currency: string }>({ amount: 0, currency: 'INR' });
     const [formData, setFormData] = useState({
         name: "",
         email: "",
         password: "",
         phone: "",
         businessName: "",
+        businessAddress: "",
+        gstNumber: "",
+        panNumber: "",
+        aadhaarNumber: "",
+        bankName: "",
+        accountNumber: "",
+        ifscCode: "",
+        accountHolderName: "",
     });
-    const [confirmPassword, setConfirmPassword] = useState("");
+const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
-    const { toast } = useToast();
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    useEffect(() => {
+        const fetchFee = async () => {
+            try {
+                const fee = await vendorService.getRegistrationFee();
+                setRegistrationFee(fee);
+            } catch (error) {
+                console.error("Failed to fetch registration fee:", error);
+            }
+        };
+        fetchFee();
+    }, []);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+        setFormData((prev) => ({ ...prev, phone: value }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await api.post("/v1/vendor/register", {
-                name: formData.name,
+            const payload = {
                 email: formData.email,
                 password: formData.password,
+                name: formData.name,
                 phone: formData.phone || undefined,
                 businessName: formData.businessName,
-            });
-            setIsSuccess(true);
-            setTimeout(() => navigate("/vendor/login"), 3000);
+            };
+
+            const response = await api.post(isReapply ? "/v1/vendor/reapply" : "/v1/vendor/apply", payload);
+            
+            const responseData = response.data?.data ?? response.data;
+            
+            if (responseData?.accessToken && responseData?.vendor) {
+                setTokens({ 
+                    accessToken: responseData.accessToken, 
+                    refreshToken: responseData.refreshToken 
+                });
+                setIsSuccess(true);
+                setTimeout(() => {
+                    window.location.href = "/pending-verification";
+                }, 1500);
+            } else {
+                setIsSuccess(true);
+                setTimeout(() => navigate("/login"), 1500);
+            }
         } catch (error: any) {
+            const status = error.response?.status;
+            const message = error.response?.data?.message || error.message || "Failed to submit application";
+            
+            let title = isReapply ? "Resubmission failed" : "Registration failed";
+            let description = message;
+            
+            if (status === 409) {
+                title = "Account already exists";
+                description = "An account with this email already exists. Please login or use a different email.";
+            } else if (status === 400) {
+                title = "Invalid input";
+                if (message.includes("email")) {
+                    description = "Please enter a valid email address.";
+                } else if (message.includes("password")) {
+                    description = "Password must be at least 8 characters.";
+                } else {
+                    description = "Please fill in all required fields correctly.";
+                }
+            } else if (status === 500) {
+                if (message.includes("phone")) {
+                    title = "Phone number already registered";
+                    description = "This phone number is already registered. Please use a different phone number.";
+                } else {
+                    description = "Server error. Please try again later.";
+                }
+            }
+            
             toast({
-                title: "Registration failed",
-                description: error.response?.data?.message || error.message || "Failed to register",
+                title,
+                description,
                 variant: "destructive",
             });
         } finally {
@@ -50,7 +128,18 @@ const VendorSignup = () => {
         }
     };
 
-    const isStrong = formData.password.length >= 8;
+    const validatePassword = (password: string): string[] => {
+      const errors: string[] = [];
+      if (password.length < 8) errors.push("At least 8 characters");
+      if (!/[A-Z]/.test(password)) errors.push("One uppercase letter");
+      if (!/[a-z]/.test(password)) errors.push("One lowercase letter");
+      if (!/[0-9]/.test(password)) errors.push("One number");
+      if (!/[!@#$%^&*]/.test(password)) errors.push("One special character (!@#$%^&*)");
+      return errors;
+    };
+
+    const passwordErrors = validatePassword(formData.password);
+    const isStrong = passwordErrors.length === 0;
     const passwordsMatch = confirmPassword === "" || formData.password === confirmPassword;
     const canSubmit = isStrong && formData.password === confirmPassword && confirmPassword.length > 0;
 
@@ -150,8 +239,8 @@ const VendorSignup = () => {
 
                     {/* Header */}
                     <div className="space-y-1">
-                        <h2 className="text-3xl font-bold text-white tracking-tight">Create account</h2>
-                        <p className="text-white/40 text-sm">Start listing your property on HostHaven today.</p>
+                        <h2 className="text-3xl font-bold text-white tracking-tight">{isReapply ? "Apply Again" : "Create account"}</h2>
+                        <p className="text-white/40 text-sm">{isReapply ? "Update your details and resubmit your application" : "Start listing your property on HostHaven today."}</p>
                     </div>
 
                     {/* Form Card */}
@@ -191,7 +280,9 @@ const VendorSignup = () => {
                                                 name="phone"
                                                 placeholder="9876543210"
                                                 value={formData.phone}
-                                                onChange={handleInputChange}
+                                                onChange={handlePhoneChange}
+                                                maxLength={10}
+                                                inputMode="numeric"
                                                 className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 text-sm outline-none focus:border-orange-500/60 focus:ring-2 focus:ring-orange-500/10 transition-all"
                                             />
                                         </div>
@@ -324,11 +415,11 @@ const VendorSignup = () => {
                                             {isLoading ? (
                                                 <>
                                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                    Creating account...
+                                                    Submitting...
                                                 </>
                                             ) : (
                                                 <>
-                                                    Create Account
+                                                    {isReapply ? "Resubmit Application" : "Submit Application"}
                                                     <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                                                 </>
                                             )}
@@ -346,8 +437,8 @@ const VendorSignup = () => {
                                         <CheckCircle className="w-8 h-8 text-green-400" />
                                     </div>
                                     <div className="space-y-2">
-                                        <h3 className="text-xl font-bold text-white">Account created!</h3>
-                                        <p className="text-white/40 text-sm">Redirecting you to login...</p>
+                                        <h3 className="text-xl font-bold text-white">{isReapply ? "Application Resubmitted!" : "Application Submitted!"}</h3>
+                                        <p className="text-white/40 text-sm">Redirecting to status page...</p>
                                     </div>
                                     <div className="w-8 h-8 border-2 border-orange-500/30 border-t-orange-500 rounded-full animate-spin mx-auto" />
                                 </motion.div>
@@ -359,7 +450,7 @@ const VendorSignup = () => {
                     <div className="text-center space-y-1">
                         <p className="text-white/30 text-sm">Already a partner?</p>
                         <Link
-                            to="/vendor/login"
+                            to="/login"
                             className="text-sm text-orange-400 hover:text-orange-300 font-medium transition-colors"
                         >
                             Sign in to your account →

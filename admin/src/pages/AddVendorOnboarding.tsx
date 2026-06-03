@@ -1,9 +1,10 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { PageHeader } from '../components/ui/PageHeader'
 import { vendorsService } from '../lib/vendors'
+import { propertiesService } from '../lib/properties'
 
 const STEPS = [
   'Account',
@@ -14,7 +15,6 @@ const STEPS = [
   'Submit',
 ] as const
 
-const CITY_OPTIONS = ['VIJAYAWADA', 'NANDIYALA', 'VETLAPALEM', 'TIRUPATI'] as const
 const APPROVAL_OPTIONS = ['PENDING', 'ACTIVE', 'INACTIVE', 'REJECTED'] as const
 
 type RoomForm = {
@@ -96,6 +96,29 @@ export default function AddVendorOnboarding() {
   })
 
   const [rooms, setRooms] = useState<RoomForm[]>([emptyRoom()])
+  const [cityOptions, setCityOptions] = useState<string[]>([])
+  const [amenityOptions, setAmenityOptions] = useState<string[]>([])
+  const [newAmenity, setNewAmenity] = useState('')
+  const [newRoomAmenity, setNewRoomAmenity] = useState('')
+
+  useEffect(() => {
+    propertiesService.getCityNames().then(setCityOptions).catch(() => {})
+    propertiesService.getAmenityNames().then(setAmenityOptions).catch(() => {})
+  }, [])
+
+  const addAmenity = async (name: string, onAdded?: (value: string) => void) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    try {
+      const created = await propertiesService.createAmenity(trimmed)
+      const value = created?.name || trimmed
+      setAmenityOptions((prev) => Array.from(new Set([...prev, value])).sort())
+      onAdded?.(value)
+      toast.success('Amenity added successfully.')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error?.message || error?.message || 'Unable to add amenity.')
+    }
+  }
 
   const progressClass = useMemo(
     () => ['w-[16%]', 'w-[33%]', 'w-1/2', 'w-[66%]', 'w-[83%]', 'w-full'][currentStep] || 'w-0',
@@ -244,7 +267,7 @@ export default function AddVendorOnboarding() {
       },
       businessInfo: {
         businessAddress: form.businessAddress.trim(),
-        city: form.city as (typeof CITY_OPTIONS)[number],
+        city: form.city as string,
         state: form.state.trim(),
         pincode: form.pincode.trim(),
         gstNumber: form.gstNumber.trim() || undefined,
@@ -337,12 +360,12 @@ export default function AddVendorOnboarding() {
         <Card>
           <CardHeader><CardTitle>1) Account Details</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Full Name" value={form.fullName} onChange={(v) => setField('fullName', v)} error={errors.fullName} />
-            <Field label="Email" type="email" value={form.email} onChange={(v) => setField('email', v)} error={errors.email} />
-            <Field label="Password" type="password" value={form.password} onChange={(v) => setField('password', v)} error={errors.password} />
-            <Field label="Phone Number" value={form.phoneNumber} onChange={(v) => setField('phoneNumber', v)} error={errors.phoneNumber} />
+            <Field label="Full Name" value={form.fullName} onChange={(v) => setField('fullName', v)} error={errors.fullName} maxLength={100} />
+            <Field label="Email" type="email" inputMode="email" value={form.email} onChange={(v) => setField('email', v)} error={errors.email} />
+            <Field label="Password" type="password" value={form.password} onChange={(v) => setField('password', v)} error={errors.password} maxLength={100} />
+            <Field label="Phone Number" value={form.phoneNumber} onChange={(v) => setField('phoneNumber', v)} error={errors.phoneNumber} inputMode="numeric" maxLength={10} numeric />
             <div className="md:col-span-2">
-              <Field label="Business Name" value={form.businessName} onChange={(v) => setField('businessName', v)} error={errors.businessName} />
+              <Field label="Business Name" value={form.businessName} onChange={(v) => setField('businessName', v)} error={errors.businessName} maxLength={200} />
             </div>
           </CardContent>
         </Card>
@@ -364,13 +387,14 @@ export default function AddVendorOnboarding() {
                 title="City"
                 aria-label="City"
               >
-                {CITY_OPTIONS.map((city) => <option key={city} value={city}>{city}</option>)}
+                <option value="">Select city</option>
+                {cityOptions.map((city) => <option key={city} value={city}>{city}</option>)}
               </select>
             </div>
-            <Field label="State" value={form.state} onChange={(v) => setField('state', v)} error={errors.state} />
-            <Field label="Pincode" value={form.pincode} onChange={(v) => setField('pincode', v)} error={errors.pincode} />
-            <Field label="GST Number (Optional)" value={form.gstNumber} onChange={(v) => setField('gstNumber', v.toUpperCase())} error={errors.gstNumber} />
-            <Field label="PAN Number (Optional)" value={form.panNumber} onChange={(v) => setField('panNumber', v.toUpperCase())} error={errors.panNumber} />
+            <Field label="State" value={form.state} onChange={(v) => setField('state', v)} error={errors.state} maxLength={100} />
+            <Field label="Pincode" value={form.pincode} onChange={(v) => setField('pincode', v)} error={errors.pincode} inputMode="numeric" maxLength={6} numeric />
+            <Field label="GST Number (Optional)" value={form.gstNumber} onChange={(v) => setField('gstNumber', v.toUpperCase())} error={errors.gstNumber} maxLength={15} />
+            <Field label="PAN Number (Optional)" value={form.panNumber} onChange={(v) => setField('panNumber', v.toUpperCase())} error={errors.panNumber} maxLength={10} />
           </CardContent>
         </Card>
       ) : null}
@@ -379,12 +403,12 @@ export default function AddVendorOnboarding() {
         <Card>
           <CardHeader><CardTitle>3) Payout / Bank Details</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Bank Name" value={form.bankName} onChange={(v) => setField('bankName', v)} error={errors.bankName} />
-            <Field label="Account Holder Name" value={form.accountHolderName} onChange={(v) => setField('accountHolderName', v)} error={errors.accountHolderName} />
-            <Field label="Account Number" value={form.accountNumber} onChange={(v) => setField('accountNumber', v)} error={errors.accountNumber} />
-            <Field label="IFSC Code" value={form.ifscCode} onChange={(v) => setField('ifscCode', v.toUpperCase())} error={errors.ifscCode} />
+            <Field label="Bank Name" value={form.bankName} onChange={(v) => setField('bankName', v)} error={errors.bankName} maxLength={100} />
+            <Field label="Account Holder Name" value={form.accountHolderName} onChange={(v) => setField('accountHolderName', v)} error={errors.accountHolderName} maxLength={100} />
+            <Field label="Account Number" value={form.accountNumber} onChange={(v) => setField('accountNumber', v)} error={errors.accountNumber} numeric maxLength={18} />
+            <Field label="IFSC Code" value={form.ifscCode} onChange={(v) => setField('ifscCode', v.toUpperCase())} error={errors.ifscCode} maxLength={11} />
             <div className="md:col-span-2">
-              <Field label="UPI ID (Optional)" value={form.upiId} onChange={(v) => setField('upiId', v)} error={errors.upiId} />
+              <Field label="UPI ID (Optional)" value={form.upiId} onChange={(v) => setField('upiId', v)} error={errors.upiId} maxLength={50} />
             </div>
           </CardContent>
         </Card>
@@ -423,13 +447,51 @@ export default function AddVendorOnboarding() {
               <Field label="Base Price" value={form.basePrice} onChange={(v) => setField('basePrice', v)} error={errors.basePrice} />
             </div>
 
-            <TextAreaField
-              label="Amenities (comma separated)"
-              value={form.amenities}
-              onChange={(v) => setField('amenities', v)}
-              error={errors.amenities}
-              rows={2}
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Amenities (comma separated)</label>
+              <div className="flex gap-2">
+                <input
+                  value={newAmenity}
+                  onChange={(e) => setNewAmenity(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Add a new amenity"
+                />
+                <button
+                  type="button"
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => addAmenity(newAmenity, (value) => {
+                    setField('amenities', form.amenities ? `${form.amenities}, ${value}` : value)
+                    setNewAmenity('')
+                  })}
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {amenityOptions.map((amenity) => (
+                  <button
+                    key={amenity}
+                    type="button"
+                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                    onClick={() => {
+                      const values = splitByComma(form.amenities)
+                      if (!values.includes(amenity)) {
+                        setField('amenities', values.length ? `${values.join(', ')}, ${amenity}` : amenity)
+                      }
+                    }}
+                  >
+                    {amenity}
+                  </button>
+                ))}
+              </div>
+              <TextAreaField
+                label=""
+                value={form.amenities}
+                onChange={(v) => setField('amenities', v)}
+                error={errors.amenities}
+                rows={2}
+              />
+            </div>
             <TextAreaField
               label="Highlights (comma separated)"
               value={form.highlights}
@@ -490,13 +552,52 @@ export default function AddVendorOnboarding() {
                   <Field label="Weekend Price (Optional)" value={room.weekendPrice} onChange={(v) => setRoomField(index, 'weekendPrice', v)} />
                   <Field label="Total Rooms" value={room.totalRooms} onChange={(v) => setRoomField(index, 'totalRooms', v)} error={errors[`room-${index}-totalRooms`]} />
                   <div className="md:col-span-2">
-                    <TextAreaField
-                      label="Room Amenities (comma separated)"
-                      value={room.roomAmenities}
-                      onChange={(v) => setRoomField(index, 'roomAmenities', v)}
-                      error={errors[`room-${index}-roomAmenities`]}
-                      rows={2}
-                    />
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Room Amenities (comma separated)</label>
+                      <div className="flex gap-2">
+                        <input
+                          value={newRoomAmenity}
+                          onChange={(e) => setNewRoomAmenity(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="Add a new room amenity"
+                        />
+                        <button
+                          type="button"
+                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                          onClick={() => addAmenity(newRoomAmenity, (value) => {
+                            const values = splitByComma(room.roomAmenities)
+                            setRoomField(index, 'roomAmenities', values.length ? `${values.join(', ')}, ${value}` : value)
+                            setNewRoomAmenity('')
+                          })}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {amenityOptions.map((amenity) => (
+                          <button
+                            key={amenity}
+                            type="button"
+                            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                            onClick={() => {
+                              const values = splitByComma(room.roomAmenities)
+                              if (!values.includes(amenity)) {
+                                setRoomField(index, 'roomAmenities', values.length ? `${values.join(', ')}, ${amenity}` : amenity)
+                              }
+                            }}
+                          >
+                            {amenity}
+                          </button>
+                        ))}
+                      </div>
+                      <TextAreaField
+                        label=""
+                        value={room.roomAmenities}
+                        onChange={(v) => setRoomField(index, 'roomAmenities', v)}
+                        error={errors[`room-${index}-roomAmenities`]}
+                        rows={2}
+                      />
+                    </div>
                   </div>
                   <div className="md:col-span-2">
                     <TextAreaField
@@ -625,12 +726,18 @@ function Field({
   onChange,
   error,
   type = 'text',
+  inputMode,
+  maxLength,
+  numeric,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   error?: string
   type?: string
+  inputMode?: 'numeric' | 'email' | 'tel'
+  maxLength?: number
+  numeric?: boolean
 }) {
   const inputId = useId()
   return (
@@ -639,8 +746,14 @@ function Field({
       <input
         id={inputId}
         type={type}
+        inputMode={inputMode || (numeric ? 'numeric' : undefined)}
+        maxLength={maxLength}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          let val = event.target.value
+          if (numeric) val = val.replace(/\D/g, '')
+          onChange(val)
+        }}
         className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
         title={label}
         placeholder={label}

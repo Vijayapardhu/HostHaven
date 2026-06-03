@@ -13,9 +13,21 @@ export interface Review {
   status: 'approved' | 'pending' | 'rejected'
   createdAt: string
   updatedAt: string
+  propertyName?: string
+  propertyCity?: string
+  propertyType?: string
+  isVisible?: boolean
+  isVerified?: boolean
+  vendorResponse?: string
+  respondedAt?: string
+  cleanliness?: number
+  service?: number
+  location?: number
+  value?: number
 }
 
 const normalizeStatus = (review: any): Review['status'] => {
+  if (review?.status) return review.status
   if (review?.isVisible === false) return 'rejected'
   if (review?.isVerified === false) return 'pending'
   return 'approved'
@@ -34,6 +46,17 @@ const mapReview = (review: any): Review => ({
   status: normalizeStatus(review),
   createdAt: review.createdAt,
   updatedAt: review.updatedAt ?? review.createdAt,
+  propertyName: review.property?.name,
+  propertyCity: review.property?.city,
+  propertyType: review.property?.type,
+  isVisible: review.isVisible,
+  isVerified: review.isVerified,
+  vendorResponse: review.vendorResponse,
+  respondedAt: review.respondedAt,
+  cleanliness: review.cleanliness,
+  service: review.service,
+  location: review.location,
+  value: review.value,
 })
 
 const normalizeList = (payload: any) => {
@@ -65,26 +88,26 @@ export const reviewsService = {
       params: {
         page: params?.page,
         limit: params?.limit,
+        search: params?.search || undefined,
+        status: params?.status || undefined,
         rating: params?.rating,
         propertyId: params?.propertyId,
       },
     })
-    const normalized = normalizeList(response.data)
-    let filtered = normalized.data
-    if (params?.status) {
-      filtered = filtered.filter((review) => review.status === params.status)
+    const payload = response.data
+    const data = payload?.data ?? []
+    const meta = payload?.meta ?? payload?.pagination
+    return {
+      data: Array.isArray(data) ? data.map(mapReview) : [],
+      pagination: meta
+        ? {
+            total: meta.total ?? 0,
+            page: meta.page ?? 1,
+            limit: meta.limit ?? 10,
+            totalPages: meta.totalPages ?? meta.pages ?? 1,
+          }
+        : { total: 0, page: 1, limit: 10, totalPages: 1 },
     }
-    if (params?.search) {
-      const query = params.search.toLowerCase()
-      filtered = filtered.filter((review) => {
-        const haystack = [review.userName, review.title, review.comment, review.propertyId]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-        return haystack.includes(query)
-      })
-    }
-    return { ...normalized, data: filtered }
   },
 
   getReviewById: async (id: string) => {

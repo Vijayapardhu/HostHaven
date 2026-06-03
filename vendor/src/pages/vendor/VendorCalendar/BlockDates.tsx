@@ -71,7 +71,7 @@ const BlockDates = () => {
       });
 
       toast({ title: "Dates blocked", description: "Availability was updated successfully" });
-      navigate("/vendor/calendar");
+      navigate("/calendar");
     } catch (error: any) {
       toast({
         title: "Failed to block dates",
@@ -123,7 +123,7 @@ const BlockDates = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => navigate("/vendor/calendar")} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={() => navigate("/calendar")} disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>

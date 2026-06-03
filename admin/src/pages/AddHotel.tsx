@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -8,7 +8,45 @@ import {
     Check, MapPin, Video, Plus, Trash2, Clock, Percent
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { ImageUpload } from '../components/ui/ImageUpload'
 import { propertiesService } from '../lib/properties'
+import { getFieldErrors } from '../lib/errorUtils'
+
+const HOTEL_FORM_STORAGE_KEY = 'hotel_form_autosave'
+
+const loadSavedHotelForm = () => {
+    try {
+        const saved = localStorage.getItem(HOTEL_FORM_STORAGE_KEY)
+        if (saved) {
+            const parsed = JSON.parse(saved)
+            if (parsed && parsed.savedAt && Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
+                return parsed.values
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load saved hotel form:', e)
+    }
+    return null
+}
+
+const saveHotelFormToStorage = (values: any) => {
+    try {
+        localStorage.setItem(HOTEL_FORM_STORAGE_KEY, JSON.stringify({
+            values,
+            savedAt: Date.now()
+        }))
+    } catch (e) {
+        console.error('Failed to save hotel form:', e)
+    }
+}
+
+const clearSavedHotelForm = () => {
+    try {
+        localStorage.removeItem(HOTEL_FORM_STORAGE_KEY)
+    } catch (e) {
+        console.error('Failed to clear saved hotel form:', e)
+    }
+}
 
 /* ─── constants ─── */
 const STEPS = [
@@ -20,8 +58,6 @@ const STEPS = [
     { label: 'Policies', icon: ShieldCheck },
     { label: 'Review', icon: ClipboardCheck },
 ] as const
-
-const CITY_OPTIONS = ['VIJAYAWADA', 'NANDIYALA', 'VETLAPALEM', 'TIRUPATI'] as const
 
 const AMENITIES = [
     'Free WiFi', 'AC', 'Parking', 'Lift', 'Restaurant',
@@ -63,6 +99,7 @@ type RoomForm = {
     totalRooms: string
     roomAmenities: string[]
     roomImages: string[]
+    roomVideos: { url: string; alt: string }[]
 }
 
 const emptyRoom = (): RoomForm => ({
@@ -75,6 +112,7 @@ const emptyRoom = (): RoomForm => ({
     totalRooms: '1',
     roomAmenities: [],
     roomImages: [],
+    roomVideos: [],
 })
 
 /* ─── animations ─── */
@@ -104,6 +142,7 @@ export default function AddHotel() {
     const [primaryImageIndex, setPrimaryImageIndex] = useState(0)
 
     const [amenities, setAmenities] = useState<string[]>([])
+    const [newAmenity, setNewAmenity] = useState('')
     const [highlights, setHighlights] = useState<string[]>([])
 
     const [rooms, setRooms] = useState<RoomForm[]>([emptyRoom()])
@@ -113,6 +152,18 @@ export default function AddHotel() {
         cancellationPolicy: 'FREE_CANCELLATION',
         checkInTime: '14:00', checkOutTime: '11:00',
     })
+    const [cityOptions, setCityOptions] = useState<string[]>([])
+
+    useEffect(() => {
+        propertiesService.getCityNames().then(setCityOptions).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            saveHotelFormToStorage({ basic, images, videoUrl, amenities, highlights, rooms, policies })
+        }, 1000)
+        return () => clearTimeout(timer)
+    }, [basic, images, videoUrl, amenities, highlights, rooms, policies])
 
     /* ── helpers ── */
     const setBasicField = (key: keyof typeof basic, v: string) => {
@@ -136,12 +187,19 @@ export default function AddHotel() {
         setter(list.includes(item) ? list.filter(i => i !== item) : [...list, item])
     }
 
+    const addAmenity = () => {
+        const trimmed = newAmenity.trim()
+        if (!trimmed || amenities.includes(trimmed)) return
+        setAmenities(prev => [...prev, trimmed])
+        setNewAmenity('')
+    }
+
     const setRoomField = (idx: number, key: keyof RoomForm, value: any) => {
         setRooms(prev => prev.map((r, i) => i === idx ? { ...r, [key]: value } : r))
         setErrors(prev => ({ ...prev, [`room-${idx}-${key}`]: '' }))
     }
 
-    const addImageSlot = () => { if (images.length < 15) setImages([...images, '']) }
+    const addImageSlot = () => { setImages([...images, '']) }
     const removeImageSlot = (idx: number) => {
         if (images.length <= 5) return
         const next = images.filter((_, i) => i !== idx)
@@ -211,7 +269,17 @@ export default function AddHotel() {
     }
 
     const goNext = () => {
-        if (!validate()) { toast.error('Please fix the errors before continuing.'); return }
+        if (!validate()) { 
+            const errorCount = Object.keys(errors).length
+            if (errorCount === 1) {
+                const field = Object.keys(errors)[0].replace(/-\d+/, '').replace(/([A-Z])/g, ' $1')
+                toast.error(`Missing: ${field}`)
+            } else {
+                const fields = Object.keys(errors).slice(0, 3).map(f => f.replace(/-\d+/, '').replace(/([A-Z])/g, ' $1'))
+                toast.error(`Missing ${errorCount} fields: ${fields.join(', ')}${errorCount > 3 ? '...' : ''}`)
+            }
+            return 
+        }
         setDirection(1)
         setStep(s => Math.min(s + 1, STEPS.length - 1))
     }
@@ -262,12 +330,14 @@ export default function AddHotel() {
                 totalRooms: Number(r.totalRooms),
                 roomAmenities: r.roomAmenities,
                 roomImages: r.roomImages.filter(u => u.trim()),
+                roomVideo: r.roomVideos?.[0]?.url || undefined,
             })),
         }
 
         try {
             await propertiesService.createProperty(payload)
             toast.success('Hotel created successfully!')
+            clearSavedHotelForm()
             navigate('/properties')
         } catch (err: any) {
             toast.error(err?.response?.data?.error?.message || err?.message || 'Failed to create hotel.')
@@ -351,9 +421,9 @@ export default function AddHotel() {
                     exit="exit"
                     transition={{ duration: 0.25, ease: 'easeInOut' }}
                 >
-                    {step === 0 && <StepBasicInfo basic={basic} setField={(k, v) => setBasicField(k as keyof typeof basic, v)} buildSlug={buildSlug} errors={errors} />}
+                    {step === 0 && <StepBasicInfo basic={basic} setField={(k, v) => setBasicField(k as keyof typeof basic, v)} buildSlug={buildSlug} errors={errors} cityOptions={cityOptions} />}
                     {step === 1 && <StepMedia images={images} setImages={setImages} videoUrl={videoUrl} setVideoUrl={setVideoUrl} primaryImageIndex={primaryImageIndex} setPrimaryImageIndex={setPrimaryImageIndex} addImageSlot={addImageSlot} removeImageSlot={removeImageSlot} errors={errors} setErrors={setErrors} />}
-                    {step === 2 && <StepAmenities selected={amenities} toggle={(a) => toggleItem(amenities, a, setAmenities)} errors={errors} />}
+                    {step === 2 && <StepAmenities selected={amenities} toggle={(a) => toggleItem(amenities, a, setAmenities)} errors={errors} options={AMENITIES} newAmenity={newAmenity} setNewAmenity={setNewAmenity} addAmenity={addAmenity} />}
                     {step === 3 && <StepHighlights selected={highlights} toggle={(h) => toggleItem(highlights, h, setHighlights)} />}
                     {step === 4 && <StepRooms rooms={rooms} setRooms={setRooms} setRoomField={setRoomField} addRoomImageSlot={addRoomImageSlot} errors={errors} />}
                     {step === 5 && <StepPolicies policies={policies} setField={(k, v) => setPolicyField(k as keyof typeof policies, v)} errors={errors} />}
@@ -400,8 +470,8 @@ export default function AddHotel() {
 /* ═════════════════════════════════════════════════════════ */
 
 /* ── Step 1: Basic Info ── */
-function StepBasicInfo({ basic, setField, buildSlug, errors }: {
-    basic: Record<string, string>; setField: (k: string, v: string) => void; buildSlug: () => void; errors: Record<string, string>
+function StepBasicInfo({ basic, setField, buildSlug, errors, cityOptions }: {
+    basic: Record<string, string>; setField: (k: string, v: string) => void; buildSlug: () => void; errors: Record<string, string>; cityOptions: string[]
 }) {
     return (
         <Card className="border-slate-200/60 shadow-sm">
@@ -426,7 +496,8 @@ function StepBasicInfo({ basic, setField, buildSlug, errors }: {
                     <div>
                         <label className="mb-1 block text-sm font-semibold text-slate-600">City *</label>
                         <select value={basic.city} onChange={e => setField('city', e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition">
-                            {CITY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                            <option value="">Select city</option>
+                            {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                         {errors.city && <p className="mt-1 text-xs text-rose-600">{errors.city}</p>}
                     </div>
@@ -546,7 +617,7 @@ function StepMedia({ images, setImages, videoUrl, setVideoUrl, primaryImageIndex
 }
 
 /* ── Step 3: Amenities ── */
-function StepAmenities({ selected, toggle, errors }: { selected: string[]; toggle: (a: string) => void; errors: Record<string, string> }) {
+function StepAmenities({ selected, toggle, errors, options, newAmenity, setNewAmenity, addAmenity }: { selected: string[]; toggle: (a: string) => void; errors: Record<string, string>; options: string[]; newAmenity: string; setNewAmenity: (value: string) => void; addAmenity: () => void }) {
     return (
         <Card className="border-slate-200/60 shadow-sm">
             <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 to-teal-50/80">
@@ -557,8 +628,22 @@ function StepAmenities({ selected, toggle, errors }: { selected: string[]; toggl
             </CardHeader>
             <CardContent className="pt-5">
                 <p className="mb-4 text-sm text-slate-500">Select facilities available at your hotel. These appear on filters and the listing page.</p>
+                <div className="mb-4">
+                    <label className="text-sm font-semibold text-slate-600 mb-2 block">Add New Amenity</label>
+                    <div className="flex gap-2">
+                        <input
+                            value={newAmenity}
+                            onChange={e => setNewAmenity(e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                            placeholder="Add a new amenity"
+                        />
+                        <button type="button" onClick={addAmenity} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                            Add
+                        </button>
+                    </div>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                    {AMENITIES.map(a => (
+                    {options.map(a => (
                         <button
                             key={a} type="button" onClick={() => toggle(a)}
                             className={`rounded-full px-3.5 py-2 text-sm font-medium transition-all ${selected.includes(a)
@@ -693,6 +778,18 @@ function StepRooms({ rooms, setRooms, setRoomField, addRoomImageSlot, errors }: 
                             <button type="button" onClick={() => addRoomImageSlot(idx)} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-slate-400 transition">
                                 <Plus className="h-3 w-3" /> Add Image
                             </button>
+                        </div>
+
+                        {/* Room Video - Optional for Admin */}
+                        <div className="mt-4">
+                            <ImageUpload
+                                images={room.roomVideos}
+                                onChange={(videos) => setRoomField(idx, 'roomVideos', videos)}
+                                maxImages={1}
+                                folder={`hosthaven/rooms/${idx}`}
+                                resourceType="video"
+                                label="Room Video"
+                            />
                         </div>
                     </CardContent>
                 </Card>

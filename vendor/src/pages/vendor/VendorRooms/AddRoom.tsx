@@ -51,10 +51,11 @@ const AddRoom = () => {
         totalRooms: values.totalRooms,
         availableRooms: values.totalRooms,
         images: values.images,
+        video: values.video,
       });
 
       toast({ title: "Room created successfully" });
-      navigate("/vendor/rooms");
+      navigate("/rooms");
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to create room", variant: "destructive" });
     } finally {
@@ -73,7 +74,7 @@ const AddRoom = () => {
           submitLabel="Create Room"
           submitting={submitting}
           onSubmit={handleSubmit}
-          onCancel={() => navigate("/vendor/rooms")}
+          onCancel={() => navigate("/rooms")}
         />
       </CardContent>
     </Card>

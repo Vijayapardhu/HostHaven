@@ -23,6 +23,7 @@ interface RoomRecord {
   totalRooms: number;
   amenities?: string[];
   images?: any[];
+  video?: string;
   property?: { id: string };
 }
 
@@ -55,7 +56,7 @@ const EditRoom = () => {
 
         if (!foundRoom) {
           toast({ title: "Room not found", variant: "destructive" });
-          navigate("/vendor/rooms");
+          navigate("/rooms");
           return;
         }
 
@@ -85,6 +86,7 @@ const EditRoom = () => {
       amenities: room.amenities || [],
       totalRooms: room.totalRooms,
       images: room.images || [],
+      video: room.video || "",
     };
   }, [room]);
 
@@ -104,10 +106,11 @@ const EditRoom = () => {
         amenities: values.amenities,
         totalRooms: values.totalRooms,
         images: values.images,
+        video: values.video,
       });
 
       toast({ title: "Room updated successfully" });
-      navigate(`/vendor/rooms/${id}`);
+      navigate(`/rooms/${id}`);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to update room", variant: "destructive" });
     } finally {
@@ -135,7 +138,7 @@ const EditRoom = () => {
           submitLabel="Update Room"
           submitting={submitting}
           onSubmit={handleSubmit}
-          onCancel={() => navigate(`/vendor/rooms/${id}`)}
+          onCancel={() => navigate(`/rooms/${id}`)}
         />
       </CardContent>
     </Card>

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Star, MapPin, Search, Home, Users, Bed } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import WishlistButton from "@/components/WishlistButton";
+import SEOHead from "@/components/SEOHead";
 import { api } from "@/lib/api";
+import { formatCity } from "@/lib/utils";
 import {
   Pagination,
   PaginationContent,
@@ -16,6 +19,7 @@ import {
 
 interface RentalHome {
   id: string;
+  slug?: string;
   name: string;
   city: string;
   basePrice: number;
@@ -26,12 +30,25 @@ interface RentalHome {
   amenities: string[];
 }
 
+interface CityData {
+  city: string;
+  state: string;
+  count: number;
+}
+
 const Homes = () => {
+  const [searchParams] = useSearchParams();
+  const checkInParam = searchParams.get("checkIn");
+  const checkOutParam = searchParams.get("checkOut");
+  const roomsParam = searchParams.get("rooms");
+  const guestsParam = searchParams.get("guests");
+
   const [homes, setHomes] = useState<RentalHome[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("all");
+  const [locations, setLocations] = useState<string[]>(["all"]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [sortBy, setSortBy] = useState("popularity");
@@ -62,12 +79,44 @@ const Homes = () => {
     fetchHomes();
   }, [page, searchQuery, selectedLocation, sortBy]);
 
-  const locations = useMemo(() => {
-    const uniqueCities = new Set(homes.map((home) => home.city));
-    return ["all", ...Array.from(uniqueCities)];
-  }, [homes]);
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const cities = await api.properties.getCities();
+        if (cities && Array.isArray(cities)) {
+          const cityNames = cities.map((c: CityData) => c.city.toUpperCase());
+          setLocations(["all", ...cityNames]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch cities:", err);
+        setLocations(["all"]);
+      }
+    };
+    fetchCities();
+  }, []);
 
   const filteredHomes = useMemo(() => homes, [homes]);
+
+  const selectedCityLabel = selectedLocation === "all"
+    ? "Andhra Pradesh"
+    : formatCity(selectedLocation);
+
+  const seoTitle =
+    selectedLocation === "all"
+      ? "Homestays in Andhra Pradesh"
+      : `Homestays in ${selectedCityLabel}`;
+
+  const seoDescription =
+    selectedLocation === "all"
+      ? "Book trusted homestays across Andhra Pradesh on HostHaven. Compare prices, amenities, and guest ratings."
+      : `Find top-rated homestays in ${selectedCityLabel} on HostHaven with verified listings and transparent pricing.`;
+
+  const seoKeywords =
+    selectedLocation === "all"
+      ? "HostHaven homestays, homestays Andhra Pradesh, homestay booking Andhra Pradesh"
+      : `homestays in ${selectedCityLabel.toLowerCase()}, ${selectedCityLabel.toLowerCase()} homestay booking, HostHaven homestays ${selectedCityLabel.toLowerCase()}`;
+
+  const canonicalPath = selectedLocation === "all" ? "/homes" : `/homes?destination=${selectedLocation.toLowerCase()}`;
 
   const getHomeImage = (images: RentalHome["images"]) => {
     if (!images?.length) return "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800";
@@ -79,16 +128,30 @@ const Homes = () => {
 
   return (
     <Layout>
+      <SEOHead
+        title={seoTitle}
+        description={seoDescription}
+        keywords={seoKeywords}
+        canonical={`https://hosthaven.in${canonicalPath}`}
+      />
       <div className="py-8">
         <div className="container mx-auto px-4">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
-              Rental Homes
+              Homestays in Andhra Pradesh
             </h1>
             <p className="text-muted-foreground mt-2">
-              Experience authentic local stays across Andhra Pradesh
+              Experience authentic local stays for your journey
             </p>
+            {(checkInParam || checkOutParam || roomsParam || guestsParam) && (
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {checkInParam && <span className="px-3 py-1 rounded-full bg-muted">Check In: {checkInParam}</span>}
+                {checkOutParam && <span className="px-3 py-1 rounded-full bg-muted">Check Out: {checkOutParam}</span>}
+                {roomsParam && <span className="px-3 py-1 rounded-full bg-muted">Rooms: {roomsParam}</span>}
+                {guestsParam && <span className="px-3 py-1 rounded-full bg-muted">Guests: {guestsParam}</span>}
+              </div>
+            )}
           </div>
 
           {/* Filters */}
@@ -109,6 +172,8 @@ const Homes = () => {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <select
+                  title="Sort homes"
+                  aria-label="Sort homes"
                   value={sortBy}
                   onChange={(event) => {
                     setPage(1);
@@ -129,13 +194,12 @@ const Homes = () => {
                       setPage(1);
                       setSelectedLocation(loc);
                     }}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                      selectedLocation === loc
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedLocation === loc
                         ? "gradient-gold text-primary-foreground shadow-gold"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                      }`}
                   >
-                    {loc === "all" ? "All Locations" : loc}
+                    {loc === "all" ? "All Locations" : formatCity(loc)}
                   </button>
                 ))}
               </div>
@@ -159,10 +223,19 @@ const Homes = () => {
                 const maxGuests = home.rooms?.length
                   ? Math.max(...home.rooms.map((room) => room.capacity))
                   : 4;
+
+                // Build URL params for details page
+                const detailParams = new URLSearchParams();
+                if (checkInParam) detailParams.set("checkIn", checkInParam);
+                if (checkOutParam) detailParams.set("checkOut", checkOutParam);
+                if (guestsParam) detailParams.set("guests", guestsParam);
+                if (roomsParam) detailParams.set("rooms", roomsParam);
+                const detailQuery = detailParams.toString();
+
                 return (
                   <Link
                     key={home.id}
-                    to={`/homes/${home.id}`}
+                    to={`/homes/${home.slug || home.id}${detailQuery ? `?${detailQuery}` : ''}`}
                     className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
                   >
                     <div className="relative h-52 overflow-hidden">
@@ -171,9 +244,22 @@ const Homes = () => {
                         alt={home.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
-                      <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
+                      <WishlistButton
+                        variant="card"
+                        item={{
+                          id: home.id,
+                          type: "home",
+                          name: home.name,
+                          location: formatCity(home.city),
+                          image: image,
+                          price: home.basePrice,
+                          rating: home.rating,
+                        }}
+                      />
+                      <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
                         <Star className="w-4 h-4 text-primary fill-primary" />
                         <span className="text-sm font-medium">{home.rating}</span>
+                        <span className="text-xs text-muted-foreground">({home.reviewCount})</span>
                       </div>
                     </div>
                     <div className="p-5">
@@ -182,22 +268,23 @@ const Homes = () => {
                       </h3>
                       <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
                         <MapPin className="w-4 h-4" />
-                        {home.city}
+                        {formatCity(home.city)}
                       </div>
-                      <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Bed className="w-4 h-4" />
-                          {home.rooms?.length || 1} rooms
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          {maxGuests} guests
-                        </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {home.amenities.slice(0, 3).map((amenity) => (
+                          <span
+                            key={amenity}
+                            className="px-2 py-1 bg-muted rounded-lg text-xs text-muted-foreground"
+                          >
+                            {amenity}
+                          </span>
+                        ))}
                       </div>
                       <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
                         <div>
+                          <p className="text-sm text-muted-foreground">Starting from</p>
                           <p className="text-xl font-semibold text-foreground">
-                            ₹{home.basePrice.toLocaleString()}
+                            ₹{(home.basePrice || 0).toLocaleString()}
                             <span className="text-muted-foreground font-normal text-sm">/night</span>
                           </p>
                         </div>

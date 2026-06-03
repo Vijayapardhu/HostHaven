@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { X, Play, Loader2, Video, Image as ImageIcon } from "lucide-react";
+import { vendorService } from "@/lib/vendor";
 
 export interface RoomFormValues {
   propertyId: string;
@@ -17,6 +19,7 @@ export interface RoomFormValues {
   amenities: string[];
   totalRooms: number;
   images: any[];
+  video: string;
 }
 
 interface PropertyOption {
@@ -58,6 +61,7 @@ const defaultValues: RoomFormValues = {
   amenities: [],
   totalRooms: 1,
   images: [],
+  video: "",
 };
 
 const RoomForm = ({
@@ -72,6 +76,10 @@ const RoomForm = ({
     ...defaultValues,
     ...initialValues,
   });
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const imagesInputRef = useRef<HTMLInputElement>(null);
 
   const handleAmenityToggle = (amenity: string) => {
     setValues((prev) => ({
@@ -79,6 +87,70 @@ const RoomForm = ({
       amenities: prev.amenities.includes(amenity)
         ? prev.amenities.filter((item) => item !== amenity)
         : [...prev.amenities, amenity],
+    }));
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingVideo(true);
+    try {
+      const result = await vendorService.uploadImage(file, "hosthaven/rooms");
+      if (result?.url) {
+        setValues((prev) => ({ ...prev, video: result.url }));
+      }
+    } catch (error) {
+      console.error("Video upload failed:", error);
+    } finally {
+      setIsUploadingVideo(false);
+    }
+  };
+
+  const removeVideo = () => {
+    setValues((prev) => ({ ...prev, video: "" }));
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setIsUploadingImages(true);
+    try {
+      const uploadedImages = await Promise.all(
+        files.map(async (file) => {
+          const result = await vendorService.uploadImage(file, "hosthaven/rooms");
+          return { url: result.url, alt: file.name, isPrimary: false };
+        })
+      );
+      setValues((prev) => {
+        const hasPrimary = prev.images.some(img => img.isPrimary);
+        if (!hasPrimary && uploadedImages.length > 0) {
+          uploadedImages[0].isPrimary = true;
+        }
+        return { ...prev, images: [...prev.images, ...uploadedImages] };
+      });
+    } catch (error) {
+      console.error("Image upload failed:", error);
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setValues((prev) => {
+      const newImages = prev.images.filter((_, i) => i !== index);
+      if (prev.images[index]?.isPrimary && newImages.length > 0) {
+        newImages[0].isPrimary = true;
+      }
+      return { ...prev, images: newImages };
+    });
+  };
+
+  const setPrimaryImage = (index: number) => {
+    setValues((prev) => ({
+      ...prev,
+      images: prev.images.map((img, i) => ({ ...img, isPrimary: i === index })),
     }));
   };
 
@@ -211,6 +283,148 @@ const RoomForm = ({
             </label>
           ))}
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Room Images (No Limit)</Label>
+        <input
+          ref={imagesInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageUpload}
+          className="hidden"
+        />
+        
+        {values.images.length > 0 ? (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            {values.images.map((img, index) => (
+              <div key={index} className="relative group rounded-lg overflow-hidden aspect-square border">
+                <img src={img.url} alt={img.alt || `Room ${index + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    className="bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {img.isPrimary && (
+                  <span className="absolute bottom-1 left-1 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+                    ★ Primary
+                  </span>
+                )}
+                {!img.isPrimary && (
+                  <button
+                    type="button"
+                    onClick={() => setPrimaryImage(index)}
+                    className="absolute bottom-1 right-1 bg-white/80 text-gray-700 text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-medium"
+                  >
+                    Set ★
+                  </button>
+                )}
+              </div>
+            ))}
+            <label className="cursor-pointer rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 transition flex items-center justify-center aspect-square">
+              <div className="text-center">
+                <ImageIcon className="w-6 h-6 mx-auto text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Add</span>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
+        ) : (
+          <div 
+            onClick={() => imagesInputRef.current?.click()}
+            className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition"
+          >
+            {isUploadingImages ? (
+              <>
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Uploading...</p>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                  <ImageIcon className="w-6 h-6 text-primary" />
+                </div>
+                <p className="text-sm font-medium">Upload room images</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Click to select multiple images
+                </p>
+              </>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Upload multiple room images. First image is set as primary by default.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Room Video Tour</Label>
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          capture="environment"
+          onChange={handleVideoUpload}
+          className="hidden"
+        />
+        
+        {values.video ? (
+          <div className="relative rounded-lg overflow-hidden border bg-muted">
+            <video 
+              src={values.video} 
+              className="w-full h-48 object-cover"
+              controls
+              preload="metadata"
+            />
+            <button
+              type="button"
+              onClick={removeVideo}
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+              <Play className="w-3 h-3 inline mr-1" />
+              Video uploaded
+            </div>
+          </div>
+        ) : (
+          <div 
+            onClick={() => videoInputRef.current?.click()}
+            className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition"
+          >
+            {isUploadingVideo ? (
+              <>
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Uploading video...</p>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                  <Video className="w-6 h-6 text-primary" />
+                </div>
+                <p className="text-sm font-medium">Upload room video</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Click to capture or select video
+                </p>
+              </>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Upload a video tour of this room. Users can watch before booking.
+        </p>
       </div>
 
       <div className="flex justify-end gap-3 pt-2">

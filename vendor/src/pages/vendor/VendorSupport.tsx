@@ -6,13 +6,11 @@ import {
   Search,
   Clock,
   CheckCircle,
-  XCircle,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
-  Paperclip,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +60,6 @@ const VendorSupport = () => {
 
   const [newTicket, setNewTicket] = useState({
     category: "",
-    subject: "",
     message: "",
     bookingReference: "",
   });
@@ -103,7 +100,7 @@ const VendorSupport = () => {
       });
       toast({ title: "Support ticket created" });
       setIsCreateOpen(false);
-      setNewTicket({ category: "", subject: "", message: "", bookingReference: "" });
+      setNewTicket({ category: "", message: "", bookingReference: "" });
       fetchTickets();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -140,8 +137,8 @@ const VendorSupport = () => {
 
   const filteredTickets = tickets.filter(
     (t) =>
-      t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      (t.subject || t.message).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.ticketNumber || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const stats = {
@@ -318,7 +315,7 @@ const VendorSupport = () => {
                         {getStatusBadge(ticket.status)}
                         {getPriorityBadge(ticket.priority)}
                       </div>
-                      <h3 className="font-semibold mt-1">{ticket.subject}</h3>
+                      <h3 className="font-semibold mt-1">{ticket.subject || ticket.category}</h3>
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{ticket.message}</p>
                       <p className="text-xs text-muted-foreground mt-2">
                         Created {new Date(ticket.createdAt).toLocaleDateString()}

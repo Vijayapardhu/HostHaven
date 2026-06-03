@@ -291,12 +291,15 @@ const VendorHotel = () => {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {hotel.images?.map((img: any, index: number) => (
+<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {hotel.images?.map((img: any, index: number) => {
+                                    const imageUrl = typeof img === 'string' ? img : img?.url;
+                                    if (!imageUrl) return null;
+                                    return (
                                     <div key={index} className="relative group rounded-xl overflow-hidden border bg-muted aspect-video">
                                         <img
-                                            src={img.url}
-                                            alt={img.alt || `Hotel Image ${index + 1}`}
+                                            src={imageUrl}
+                                            alt={img?.alt || `Hotel Image ${index + 1}`}
                                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                         />
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -313,7 +316,8 @@ const VendorHotel = () => {
                                             <Badge className="absolute top-2 left-2 bg-primary">Primary</Badge>
                                         )}
                                     </div>
-                                ))}
+                                    );
+                                })}
 
                                 {hotel.videos?.map((vid: any, index: number) => (
                                     <div key={`vid-${index}`} className="relative group rounded-xl overflow-hidden border bg-muted aspect-video">

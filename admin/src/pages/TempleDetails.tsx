@@ -32,7 +32,7 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { EmptyState } from "../components/ui/EmptyState";
 
 export default function TempleDetails() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [temple, setTemple] = useState<Temple | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,12 +42,29 @@ export default function TempleDetails() {
   >(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const getTempleImage = (image: Temple["images"] extends Array<infer T>
+    ? T
+    : never) => {
+    if (!image) {
+      return { url: "", alt: "" };
+    }
+
+    if (typeof image === "string") {
+      return { url: image, alt: "" };
+    }
+
+    return {
+      url: image.url || "",
+      alt: image.alt || "",
+    };
+  };
+
   const fetchTemple = async () => {
-    if (!id) return;
+    if (!slug) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await templesService.getTempleById(id);
+      const data = await templesService.getTempleBySlug(slug);
       setTemple(data);
     } catch (err: any) {
       setError(
@@ -60,17 +77,17 @@ export default function TempleDetails() {
 
   useEffect(() => {
     fetchTemple();
-  }, [id]);
+  }, [slug]);
 
   const confirmStatusChange = async () => {
     if (!temple || !confirmAction) return;
     try {
       if (confirmAction === "activate") {
-        await templesService.activateTemple(temple.id);
+        await templesService.activateTemple(temple.slug);
         setTemple({ ...temple, active: true });
         toast.success("Temple activated successfully.");
       } else {
-        await templesService.deactivateTemple(temple.id);
+        await templesService.deactivateTemple(temple.slug);
         setTemple({ ...temple, active: false });
         toast.success("Temple deactivated successfully.");
       }
@@ -86,7 +103,7 @@ export default function TempleDetails() {
   const handleDelete = async () => {
     if (!temple) return;
     try {
-      await templesService.deleteTemple(temple.id);
+      await templesService.deleteTemple(temple.slug);
       toast.success("Temple deleted successfully.");
       navigate("/temples");
     } catch (err: any) {
@@ -240,18 +257,26 @@ export default function TempleDetails() {
             <CardContent>
               {(temple.images ?? []).length > 0 ? (
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                  {temple.images?.map((img, index) => (
-                    <div
-                      key={index}
-                      className="overflow-hidden rounded-lg border border-slate-200"
-                    >
-                      <img
-                        src={img}
-                        alt={`Temple ${index + 1}`}
-                        className="h-32 w-full object-cover"
-                      />
-                    </div>
-                  ))}
+                  {temple.images?.map((img, index) => {
+                    const image = getTempleImage(img);
+
+                    if (!image.url) {
+                      return null;
+                    }
+
+                    return (
+                      <div
+                        key={index}
+                        className="overflow-hidden rounded-lg border border-slate-200"
+                      >
+                        <img
+                          src={image.url}
+                          alt={image.alt || `${temple.name} image ${index + 1}`}
+                          className="h-32 w-full object-cover"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-300 py-8">
@@ -811,7 +836,7 @@ export default function TempleDetails() {
               <div className="space-y-3">
                 <button
                   type="button"
-                  onClick={() => navigate(`/temples/${temple.id}/edit`)}
+                  onClick={() => navigate(`/temples/${temple.slug}/edit`)}
                   className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Edit Temple

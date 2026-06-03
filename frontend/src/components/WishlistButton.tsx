@@ -10,7 +10,7 @@ interface WishlistButtonProps {
 
 const WishlistButton = ({ item, variant = "default", className = "" }: WishlistButtonProps) => {
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const inWishlist = isInWishlist(item.id);
+  const inWishlist = isInWishlist(item.id, item.type);
 
   if (variant === "icon") {
     return (
@@ -20,6 +20,8 @@ const WishlistButton = ({ item, variant = "default", className = "" }: WishlistB
           e.stopPropagation();
           toggleWishlist(item);
         }}
+        title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+        aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
         className={`p-2 rounded-full bg-card/90 backdrop-blur-sm hover:bg-card transition-colors ${className}`}
       >
         <Heart
@@ -39,6 +41,8 @@ const WishlistButton = ({ item, variant = "default", className = "" }: WishlistB
           e.stopPropagation();
           toggleWishlist(item);
         }}
+        title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+        aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
         className={`absolute top-3 right-3 p-2 rounded-full bg-card/90 backdrop-blur-sm hover:bg-card transition-colors z-10 ${className}`}
       >
         <Heart

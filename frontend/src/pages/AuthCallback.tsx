@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const AUTH_KEY = "hosthaven_auth";
+
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -25,6 +27,17 @@ const AuthCallback = () => {
     }
 
     if (accessToken && refreshToken) {
+      // Store using new combined format
+      const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
+      const authData = {
+        accessToken,
+        refreshToken,
+        user: null, // Will be fetched on app load
+        expiresAt,
+      };
+      localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
+      
+      // Also keep old keys for backward compatibility
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
 

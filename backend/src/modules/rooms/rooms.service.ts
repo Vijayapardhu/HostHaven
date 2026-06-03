@@ -1,8 +1,10 @@
 import prisma from '../../config/database';
 import { cacheService } from '../../services/cache.service';
+import { mediaService } from '../../services/media.service';
 import { logger } from '../../utils/logger.util';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
+import { syncAmenityCatalog } from '../../utils/amenities.util';
 
 export class RoomsService {
   async getAll(filters: {
@@ -85,7 +87,7 @@ export class RoomsService {
   }
 
   async getById(id: string) {
-    const room = await prisma.room.findUnique({
+    const room = await prisma.room.findFirst({
       where: { id, isDeleted: false },
       include: {
         property: {
@@ -125,7 +127,7 @@ export class RoomsService {
     images: any[];
     totalRooms: number;
     availableRooms: number;
-  }) {
+  }, vendorId?: string) {
     const property = await prisma.property.findUnique({
       where: { id: data.propertyId, isDeleted: false },
     });
@@ -133,6 +135,12 @@ export class RoomsService {
     if (!property) {
       const error = new Error('Property not found');
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    if (vendorId && property.vendorId !== vendorId) {
+      const error = new Error('Not authorized to add rooms to this property');
+      (error as any).code = ERROR_CODES.FORBIDDEN;
       throw error;
     }
 
@@ -154,6 +162,9 @@ export class RoomsService {
         availableRooms: data.availableRooms,
       },
     });
+
+    await mediaService.syncEntityMedia('ROOM', room.id, data.images, 'image');
+    await syncAmenityCatalog(data.amenities);
 
     await cacheService.del(cacheService.keys.property(data.propertyId));
 
@@ -177,7 +188,7 @@ export class RoomsService {
     totalRooms: number;
     availableRooms: number;
     isActive: boolean;
-  }>) {
+  }>, vendorId?: string) {
     const room = await prisma.room.findUnique({
       where: { id, isDeleted: false },
       include: { property: true },
@@ -186,6 +197,12 @@ export class RoomsService {
     if (!room) {
       const error = new Error('Room not found');
       (error as any).code = ERROR_CODES.ROOM_NOT_FOUND;
+      throw error;
+    }
+
+    if (vendorId && room.property?.vendorId !== vendorId) {
+      const error = new Error('Not authorized to update this room');
+      (error as any).code = ERROR_CODES.FORBIDDEN;
       throw error;
     }
 
@@ -206,6 +223,13 @@ export class RoomsService {
       data: updateData,
     });
 
+    if (data.images !== undefined) {
+      await mediaService.syncEntityMedia('ROOM', id, data.images, 'image');
+    }
+    if (data.amenities !== undefined) {
+      await syncAmenityCatalog(data.amenities);
+    }
+
     await cacheService.del(cacheService.keys.property(room.propertyId));
 
     logger.info({ roomId: id }, 'Room updated');
@@ -213,7 +237,7 @@ export class RoomsService {
     return this.sanitizeRoom(updated);
   }
 
-  async delete(id: string) {
+  async delete(id: string, vendorId?: string) {
     const room = await prisma.room.findUnique({
       where: { id },
       include: { property: true },
@@ -222,6 +246,12 @@ export class RoomsService {
     if (!room) {
       const error = new Error('Room not found');
       (error as any).code = ERROR_CODES.ROOM_NOT_FOUND;
+      throw error;
+    }
+
+    if (vendorId && room.property?.vendorId !== vendorId) {
+      const error = new Error('Not authorized to delete this room');
+      (error as any).code = ERROR_CODES.FORBIDDEN;
       throw error;
     }
 
@@ -247,6 +277,35 @@ export class RoomsService {
       const error = new Error('Room not found');
       (error as any).code = ERROR_CODES.ROOM_NOT_FOUND;
       throw error;
+    }
+
+    const stayDates: Date[] = [];
+    const current = new Date(checkIn);
+    while (current < checkOut) {
+      stayDates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    const inventoryDays = await prisma.inventoryDay.findMany({
+      where: {
+        roomId,
+        date: { in: stayDates },
+      },
+    });
+
+    if (inventoryDays.length > 0) {
+      const minAvailable = Math.min(...inventoryDays.map(d => d.availableRooms));
+      return {
+        available: minAvailable > 0,
+        availableRooms: minAvailable,
+        totalRooms: room.totalRooms,
+        room: {
+          id: room.id,
+          name: room.name,
+          type: room.type,
+          pricePerNight: room.pricePerNight.toNumber(),
+        },
+      };
     }
 
     const overlappingBookings = await prisma.booking.count({

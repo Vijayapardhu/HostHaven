@@ -1,27 +1,99 @@
-import { Link } from "react-router-dom";
-import { Star, MessageSquare } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Star, MessageSquare, Loader2 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
+import { ReviewCard, Review } from "@/components/review/ReviewCard";
 
 const ReviewsPage = () => {
+  const navigate = useNavigate();
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchMyReviews();
+  }, []);
+
+  const fetchMyReviews = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.reviews.getMy();
+      const reviewsData = Array.isArray(response) ? response : response?.data || [];
+      setReviews(reviewsData);
+    } catch (err: any) {
+      console.error("Failed to fetch reviews:", err);
+      if (err.response?.status === 401) {
+        navigate("/login");
+        return;
+      }
+      setError("Failed to load your reviews");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="py-8">
+          <div className="container mx-auto px-4 max-w-4xl">
+            <h1 className="text-2xl font-serif font-bold text-foreground mb-6">My Reviews</h1>
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="py-8">
-        <div className="container mx-auto px-4 max-w-2xl">
+        <div className="container mx-auto px-4 max-w-4xl">
           <h1 className="text-2xl font-serif font-bold text-foreground mb-6">My Reviews</h1>
           
-          <div className="bg-card rounded-2xl shadow-card p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-              <MessageSquare className="w-8 h-8 text-amber-600" />
+          {error ? (
+            <div className="bg-card rounded-2xl shadow-card p-8 text-center">
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={fetchMyReviews} variant="outline">
+                Try Again
+              </Button>
             </div>
-            <h2 className="text-lg font-semibold text-foreground mb-2">No Reviews Yet</h2>
-            <p className="text-muted-foreground mb-6">
-              Reviews you write for temples and properties will appear here.
-            </p>
-            <Link to="/bookings">
-              <Button variant="gold">View Your Bookings</Button>
-            </Link>
-          </div>
+          ) : reviews.length === 0 ? (
+            <div className="bg-card rounded-2xl shadow-card p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground mb-2">No Reviews Yet</h2>
+              <p className="text-muted-foreground mb-6">
+                Reviews you write for temples and properties will appear here.
+              </p>
+              <Link to="/bookings">
+                <Button variant="gold">View Your Bookings</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-6">
+                <p className="text-muted-foreground">
+                  You have written {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+                </p>
+                <Link to="/bookings">
+                  <Button variant="outline" size="sm">
+                    Write More Reviews
+                  </Button>
+                </Link>
+              </div>
+              
+              {reviews.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Layout>

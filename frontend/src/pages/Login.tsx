@@ -9,6 +9,7 @@ import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import { getFriendlyAuthError } from "@/lib/errors";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -21,7 +22,14 @@ const Login = () => {
   const location = useLocation();
   
   // Get the page user came from (for redirect after login)
-  const from = (location.state as any)?.from || "/";
+  // Validate redirect is internal to prevent open redirect vulnerability
+  const getValidRedirect = (from: any): string => {
+    if (typeof from !== 'string') return '/';
+    if (from.startsWith('http') || from.startsWith('//')) return '/';
+    if (!from.startsWith('/')) return '/';
+    return from;
+  };
+  const redirectTo = getValidRedirect((location.state as any)?.from);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,11 +42,12 @@ const Login = () => {
         description: "You have successfully logged in.",
       });
       // Redirect to the page user came from
-      navigate(from);
+      navigate(redirectTo);
     } catch (error: any) {
+      const friendlyError = getFriendlyAuthError(error);
       toast({
-        title: "Login failed",
-        description: error.message || "Please check your credentials and try again.",
+        title: friendlyError.title,
+        description: friendlyError.description,
         variant: "destructive",
       });
     } finally {
@@ -227,7 +236,7 @@ const Login = () => {
               <p className="text-sm text-muted-foreground mb-3">
                 Don't have an account?
               </p>
-              <Link to="/signup" state={{ from }}>
+              <Link to="/signup" state={{ from: redirectTo }}>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     variant="outline"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { vendorService } from "@/lib/vendor";
@@ -109,7 +109,7 @@ const VendorCalendarIndex = () => {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => navigate("/vendor/calendar/block-dates")}>Block Dates</Button>
+          <Button onClick={() => navigate("/calendar/block-dates")}>Block Dates</Button>
         </div>
       </div>
 

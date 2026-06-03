@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Bell, CheckCircle, Clock, Mail, MessageSquare, Calendar, CreditCard, Home, User } from 'lucide-react'
 import { notificationsService, type NotificationItem } from '../lib/notifications'
@@ -10,8 +10,10 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { PageLoader } from '../components/ui/PageLoader'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import api from '../lib/api'
 
 type NotificationFilter = 'all' | 'unread' | 'read'
+type PushTarget = 'all' | 'users' | 'vendors' | 'admins'
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
@@ -23,6 +25,45 @@ export default function Notifications() {
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [confirmMarkAll, setConfirmMarkAll] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [pushImageFile, setPushImageFile] = useState<File | null>(null)
+  const [pushImagePreview, setPushImagePreview] = useState('')
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [pushForm, setPushForm] = useState<{
+    title: string
+    message: string
+    target: PushTarget
+    type: string
+  }>({
+    title: '',
+    message: '',
+    target: 'all',
+    type: 'admin_announcement',
+  })
+
+  const handlePushImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      setPushImageFile(null)
+      setPushImagePreview('')
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.')
+      event.target.value = ''
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be 5MB or less.')
+      event.target.value = ''
+      return
+    }
+
+    setPushImageFile(file)
+    setPushImagePreview(URL.createObjectURL(file))
+  }
 
   const fetchNotifications = async () => {
     setIsLoading(true)
@@ -72,6 +113,50 @@ export default function Notifications() {
       toast.error(err?.response?.data?.message || 'Unable to mark notifications as read.')
     } finally {
       setConfirmMarkAll(false)
+    }
+  }
+
+  const handleSendPush = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!pushForm.title.trim() || !pushForm.message.trim()) {
+      toast.error('Title and message are required.')
+      return
+    }
+
+    try {
+      setIsSending(true)
+      let imageUrl: string | undefined
+
+      if (pushImageFile) {
+        setIsUploadingImage(true)
+        const formData = new FormData()
+        formData.append('file', pushImageFile)
+        const uploadRes = await api.post('/v1/uploads/single?folder=notifications', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        imageUrl = uploadRes.data?.data?.url ?? uploadRes.data?.url
+      }
+
+      const result = await notificationsService.sendPushNotification({
+        title: pushForm.title.trim(),
+        message: pushForm.message.trim(),
+        target: pushForm.target,
+        imageUrl,
+      })
+      toast.success(`Push notification sent to ${result?.sentCount ?? 0} recipients.`)
+      setPushForm({
+        title: '',
+        message: '',
+        target: pushForm.target,
+        type: pushForm.type,
+      })
+      setPushImageFile(null)
+      setPushImagePreview('')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to send push notification.')
+    } finally {
+      setIsSending(false)
+      setIsUploadingImage(false)
     }
   }
 
@@ -174,6 +259,76 @@ export default function Notifications() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Send Web Push Notification</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSendPush} className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="md:col-span-1">
+              <label className="text-xs font-medium text-slate-500">Audience</label>
+              <select
+                value={pushForm.target}
+                onChange={(event) =>
+                  setPushForm((prev) => ({ ...prev, target: event.target.value as PushTarget }))
+                }
+                title="Notification audience"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <option value="all">All Users</option>
+                <option value="users">Customers</option>
+                <option value="vendors">Vendors</option>
+                <option value="admins">Admins</option>
+              </select>
+            </div>
+            <div className="md:col-span-1">
+              <label className="text-xs font-medium text-slate-500">Title</label>
+              <input
+                type="text"
+                value={pushForm.title}
+                onChange={(event) => setPushForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Notification title"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-medium text-slate-500">Message</label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  type="text"
+                  value={pushForm.message}
+                  onChange={(event) => setPushForm((prev) => ({ ...prev, message: event.target.value }))}
+                  placeholder="Message to send"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={isSending || isUploadingImage}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {isSending || isUploadingImage ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+            </div>
+            <div className="md:col-span-4">
+              <label className="text-xs font-medium text-slate-500">Image (optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePushImageChange}
+                title="Upload notification image"
+                className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              />
+              {pushImagePreview ? (
+                <div className="mt-2">
+                  <img src={pushImagePreview} alt="Notification preview" className="h-24 rounded-lg border object-cover" />
+                </div>
+              ) : null}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
       <FiltersBar>
         <div className="flex w-full flex-col gap-3 md:flex-row md:items-center">
           <div className="flex-1">
@@ -189,6 +344,7 @@ export default function Notifications() {
               setPage(1)
               setFilter(event.target.value as NotificationFilter)
             }}
+            title="Notification filter"
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
           >
             <option value="all">All</option>
@@ -242,6 +398,15 @@ export default function Notifications() {
                       {!notification.isRead ? <span className="h-2 w-2 rounded-full bg-blue-500" /> : null}
                     </div>
                     <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
+                    {typeof notification.data?.imageUrl === 'string' && notification.data.imageUrl ? (
+                      <div className="mt-2">
+                        <img
+                          src={notification.data.imageUrl}
+                          alt="Notification"
+                          className="max-h-44 rounded-lg border object-cover"
+                        />
+                      </div>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                       <span>by {notification.userName || 'System'}</span>
                       <span>{new Date(notification.createdAt).toLocaleString()}</span>

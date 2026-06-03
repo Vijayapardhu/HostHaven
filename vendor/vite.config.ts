@@ -24,7 +24,7 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait-primary',
         scope: '/',
-        start_url: '/vendor/dashboard',
+        start_url: '/dashboard',
         categories: ['business', 'travel', 'productivity'],
         icons: [
           {
@@ -49,12 +49,12 @@ export default defineConfig({
         shortcuts: [
           {
             name: 'Dashboard',
-            url: '/vendor/dashboard',
+            url: '/dashboard',
             description: 'View your vendor dashboard',
           },
           {
             name: 'Bookings',
-            url: '/vendor/bookings',
+            url: '/bookings',
             description: 'Manage your bookings',
           },
         ],

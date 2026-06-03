@@ -18,7 +18,7 @@ const PayoutHistory = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/vendor/earnings")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/earnings")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div>

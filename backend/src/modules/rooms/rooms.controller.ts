@@ -52,14 +52,19 @@ export const RoomsController = {
   async create(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = createRoomSchema.parse(request.body);
+      const user = (request as any).user;
+      const vendorId = user?.role === 'VENDOR' ? user.vendorId : undefined;
 
-      const room = await roomsService.create(data);
+      const room = await roomsService.create(data, vendorId);
 
       return sendSuccess(reply, room, 201);
     } catch (error: any) {
       logger.error({ error }, 'Create room failed');
       if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
         return sendError(reply, error.code, error.message, 404);
+      }
+      if (error.code === ERROR_CODES.FORBIDDEN) {
+        return sendError(reply, error.code, error.message, 403);
       }
       if (error.name === 'ZodError') {
         return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
@@ -72,14 +77,19 @@ export const RoomsController = {
     try {
       const { id } = roomIdSchema.parse(request.params);
       const data = updateRoomSchema.parse(request.body);
+      const user = (request as any).user;
+      const vendorId = user?.role === 'VENDOR' ? user.vendorId : undefined;
 
-      const room = await roomsService.update(id, data);
+      const room = await roomsService.update(id, data, vendorId);
 
       return sendSuccess(reply, room);
     } catch (error: any) {
       logger.error({ error }, 'Update room failed');
       if (error.code === ERROR_CODES.ROOM_NOT_FOUND) {
         return sendError(reply, error.code, error.message, 404);
+      }
+      if (error.code === ERROR_CODES.FORBIDDEN) {
+        return sendError(reply, error.code, error.message, 403);
       }
       if (error.name === 'ZodError') {
         return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
@@ -91,12 +101,17 @@ export const RoomsController = {
   async delete(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = roomIdSchema.parse(request.params);
-      const result = await roomsService.delete(id);
+      const user = (request as any).user;
+      const vendorId = user?.role === 'VENDOR' ? user.vendorId : undefined;
+      const result = await roomsService.delete(id, vendorId);
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Delete room failed');
       if (error.code === ERROR_CODES.ROOM_NOT_FOUND) {
         return sendError(reply, error.code, error.message, 404);
+      }
+      if (error.code === ERROR_CODES.FORBIDDEN) {
+        return sendError(reply, error.code, error.message, 403);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to delete room', 500);
     }
@@ -104,7 +119,7 @@ export const RoomsController = {
 
   async getByProperty(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { propertyId } = request.query as { propertyId: string };
+      const { propertyId } = request.params as { propertyId: string };
 
       if (!propertyId) {
         return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'propertyId is required', 400);

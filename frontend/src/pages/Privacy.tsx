@@ -4,8 +4,11 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
 import SEOHead from "@/components/SEOHead";
+import { usePublicPlatformSettings } from "@/hooks/usePublicPlatformSettings";
 
 const Privacy = () => {
+  const settings = usePublicPlatformSettings();
+
   return (
     <>
     <SEOHead title="Privacy Policy" description="HostHaven's privacy policy — how we collect, use, and protect your personal information when booking hotels and travel services in Andhra Pradesh." />
@@ -204,8 +207,8 @@ const Privacy = () => {
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
                   If you have questions about this Privacy Policy or our data practices, please contact us at{" "}
-                  <a href="mailto:privacy@hosthaven.com" className="text-primary hover:underline">
-                    privacy@hosthaven.com
+                  <a href={`mailto:${settings.contact.supportEmail}`} className="text-primary hover:underline">
+                    {settings.contact.supportEmail}
                   </a>
                 </p>
               </section>

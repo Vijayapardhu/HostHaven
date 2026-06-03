@@ -4,7 +4,7 @@ import { Home, Hotel, House, Landmark, Wrench } from "lucide-react";
 const categories = [
   { name: "Home", path: "/", icon: Home },
   { name: "Hotels", path: "/hotels", icon: Hotel },
-  { name: "Homes", path: "/homes", icon: House },
+  { name: "Homestays", path: "/homes", icon: House },
   { name: "Temples", path: "/temples", icon: Landmark },
   { name: "Services", path: "/services", icon: Wrench },
 ];

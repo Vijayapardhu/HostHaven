@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import {
   MessageSquare, X, User2, Send, RefreshCw,
-  CheckCircle, XCircle, ChevronRight, StickyNote, Mail
+  CheckCircle, ChevronRight, StickyNote, Mail
 } from 'lucide-react'
 import { supportService, type SupportTicket } from '../lib/support'
 import { FiltersBar } from '../components/ui/FiltersBar'
@@ -17,10 +17,10 @@ import { PageLoader } from '../components/ui/PageLoader'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
-type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+type TicketStatus = 'open' | 'in_progress' | 'resolved'
 
-const statusLabels: Record<TicketStatus, string> = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed' }
-const statusVariants: Record<TicketStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = { open: 'danger', in_progress: 'info', resolved: 'success', closed: 'neutral' }
+const statusLabels: Record<TicketStatus, string> = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved' }
+const statusVariants: Record<TicketStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = { open: 'danger', in_progress: 'info', resolved: 'success' }
 
 export default function Support() {
   const [tickets, setTickets] = useState<SupportTicket[]>([])
@@ -37,7 +37,7 @@ export default function Support() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [noteSending, setNoteSending] = useState(false)
-  const [confirmAction, setConfirmAction] = useState<{ ticketId: string; action: 'resolve' | 'close' | 'reopen' } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ ticketId: string; action: 'resolve' | 'reopen' } | null>(null)
 
   const fetchTickets = async () => {
     setIsLoading(true); setError(null)
@@ -59,15 +59,17 @@ export default function Support() {
     try {
       const full = await supportService.getTicketById(ticket.id)
       setSelectedTicket(full ?? null)
-    } catch { /* keep the list version */ }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Unable to load ticket details.')
+    }
     finally { setDetailLoading(false) }
   }
 
   const handleStatusChange = async (ticketId: string, status: TicketStatus) => {
     try {
-      await supportService.updateTicketStatus(ticketId, status)
-      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status } : t))
-      if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, status } : prev)
+      const updated = await supportService.updateTicketStatus(ticketId, status)
+      setTickets(prev => prev.map(t => t.id === ticketId ? updated : t))
+      if (selectedTicket?.id === ticketId) setSelectedTicket(updated)
       toast.success('Status updated.')
     } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to update status.') }
   }
@@ -88,13 +90,12 @@ export default function Support() {
     if (!confirmAction) return
     const { ticketId, action } = confirmAction
     try {
-      if (action === 'resolve') { await supportService.updateTicketStatus(ticketId, 'resolved') }
-      else if (action === 'close') { await supportService.closeTicket(ticketId) }
-      else if (action === 'reopen') { await supportService.reopenTicket(ticketId) }
-      const newStatus = action === 'reopen' ? 'open' : 'resolved'
-      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus as TicketStatus } : t))
-      if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, status: newStatus as TicketStatus } : prev)
-      toast.success(`Ticket ${action === 'reopen' ? 'reopened' : action === 'resolve' ? 'resolved' : 'closed'}.`)
+      const updated = action === 'resolve'
+        ? await supportService.updateTicketStatus(ticketId, 'resolved')
+        : await supportService.reopenTicket(ticketId)
+      setTickets(prev => prev.map(t => t.id === ticketId ? updated : t))
+      if (selectedTicket?.id === ticketId) setSelectedTicket(updated)
+      toast.success(`Ticket ${action === 'reopen' ? 'reopened' : 'resolved'}.`)
     } catch (err: any) { toast.error('Action failed.') }
     finally { setConfirmAction(null) }
   }
@@ -115,7 +116,6 @@ export default function Support() {
             <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
             <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
           </select>
         </div>
       </FiltersBar>
@@ -261,19 +261,14 @@ export default function Support() {
                     {/* Actions */}
                     <div className="border-t border-slate-100 pt-4 space-y-2">
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Quick Actions</p>
-                      {selectedTicket.status !== 'resolved' && selectedTicket.status !== 'closed' && (
+                      {selectedTicket.status !== 'resolved' && (
                         <button type="button" onClick={() => setConfirmAction({ ticketId: selectedTicket.id, action: 'resolve' })} className="flex w-full items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition">
                           <CheckCircle className="h-4 w-4" /> Mark as Resolved
                         </button>
                       )}
-                      {(selectedTicket.status === 'resolved' || selectedTicket.status === 'closed') && (
+                      {selectedTicket.status === 'resolved' && (
                         <button type="button" onClick={() => setConfirmAction({ ticketId: selectedTicket.id, action: 'reopen' })} className="flex w-full items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-sm font-semibold text-amber-600 hover:bg-amber-50 transition">
                           <RefreshCw className="h-4 w-4" /> Reopen Ticket
-                        </button>
-                      )}
-                      {selectedTicket.status !== 'closed' && (
-                        <button type="button" onClick={() => setConfirmAction({ ticketId: selectedTicket.id, action: 'close' })} className="flex w-full items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition">
-                          <XCircle className="h-4 w-4" /> Close Ticket
                         </button>
                       )}
                     </div>
@@ -289,10 +284,10 @@ export default function Support() {
       <ConfirmDialog
         open={Boolean(confirmAction)}
         onOpenChange={open => { if (!open) setConfirmAction(null) }}
-        title={confirmAction?.action === 'resolve' ? 'Resolve this ticket?' : confirmAction?.action === 'reopen' ? 'Reopen this ticket?' : 'Close this ticket?'}
-        description={confirmAction?.action === 'resolve' ? 'The ticket will be marked as resolved.' : confirmAction?.action === 'reopen' ? 'The ticket will be reopened for further action.' : 'This will permanently close the ticket.'}
-        confirmText={confirmAction?.action === 'resolve' ? 'Resolve' : confirmAction?.action === 'reopen' ? 'Reopen' : 'Close'}
-        variant={confirmAction?.action === 'close' ? 'danger' : 'default'}
+        title={confirmAction?.action === 'resolve' ? 'Resolve this ticket?' : 'Reopen this ticket?'}
+        description={confirmAction?.action === 'resolve' ? 'The ticket will be marked as resolved.' : 'The ticket will be reopened for further action.'}
+        confirmText={confirmAction?.action === 'resolve' ? 'Resolve' : 'Reopen'}
+        variant='default'
         onConfirm={handleConfirmAction}
       />
     </div>

@@ -51,9 +51,28 @@ export const generateTokens = (payload: TokenPayload) => {
   const accessToken = generateAccessToken(payload);
   const refreshToken = generateRefreshToken(payload);
 
+  const accessExpSeconds = parseExpiresIn(config.jwt.accessExpires);
+  const refreshExpSeconds = parseExpiresIn(config.jwt.refreshExpires);
+
   return {
     accessToken,
     refreshToken,
-    expiresIn: 15 * 60, // 15 minutes in seconds
+    expiresIn: refreshExpSeconds,
   };
+};
+
+export const parseExpiresIn = (expiresIn: string): number => {
+  const match = expiresIn.match(/^(\d+)d$/);
+  if (match) {
+    return parseInt(match[1], 10) * 24 * 60 * 60;
+  }
+  const hourMatch = expiresIn.match(/^(\d+)h$/);
+  if (hourMatch) {
+    return parseInt(hourMatch[1], 10) * 60 * 60;
+  }
+  const minMatch = expiresIn.match(/^(\d+)m$/);
+  if (minMatch) {
+    return parseInt(minMatch[1], 10) * 60;
+  }
+  return 365 * 24 * 60 * 60;
 };

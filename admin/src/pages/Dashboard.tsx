@@ -1,76 +1,126 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { 
-  Calendar, DollarSign, Users, Building2, Truck, 
-  Ticket, TrendingUp, ArrowRight,
-  CheckCircle, AlertCircle,
-  CreditCard, MapPin, Home, Package, Bell, Settings, Boxes, LifeBuoy
+  Calendar, DollarSign, Users, Building2,
+  Ticket, TrendingUp, ArrowRight, Eye,
+  Home, Package, CreditCard, MapPin, CheckCircle
 } from 'lucide-react'
-import { dashboardService, type DashboardStats, type RecentBooking, type PendingApproval } from '../lib/dashboard'
-import { PageLoader } from '../components/ui/PageLoader'
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts'
+import { 
+  dashboardService, 
+  type DashboardStats, 
+  type RecentBooking, 
+  type PendingApproval,
+  type RevenueData 
+} from '../lib/dashboard'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { Skeleton } from '../components/ui/Skeleton'
+
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 
 const statCards = [
-  { label: 'Total Bookings', key: 'totalBookings', icon: Calendar, color: 'blue', href: '/bookings' },
-  { label: 'Total Revenue', key: 'totalRevenue', icon: DollarSign, color: 'green', href: '/payments' },
-  { label: 'Total Users', key: 'totalUsers', icon: Users, color: 'purple', href: '/users' },
-  { label: 'Active Vendors', key: 'totalActiveVendors', icon: Building2, color: 'orange', href: '/vendors' },
-  { label: 'Properties', key: 'totalProperties', icon: Home, color: 'teal', href: '/properties' },
-  { label: 'Service Bookings', key: 'totalServiceBookings', icon: Truck, color: 'indigo', href: '/service-bookings' },
-  { label: 'Support Tickets', key: 'totalSupportTickets', icon: Ticket, color: 'pink', href: '/support' },
-  { label: 'Open Tickets', key: 'openTickets', icon: AlertCircle, color: 'red', href: '/support' },
+  { label: 'Total Users', key: 'totalUsers', icon: Users, color: 'blue', href: '/users', desc: 'Registered users' },
+  { label: 'Active Vendors', key: 'totalActiveVendors', icon: Building2, color: 'orange', href: '/vendors', desc: 'Approved vendors' },
+  { label: 'Properties', key: 'totalProperties', icon: Home, color: 'teal', href: '/properties', desc: 'All listings' },
+  { label: 'Total Bookings', key: 'totalBookings', icon: Calendar, color: 'indigo', href: '/bookings', desc: 'All reservations' },
+  { label: 'Total Revenue', key: 'totalRevenue', icon: DollarSign, color: 'green', href: '/payments', desc: 'Total earnings' },
+  { label: 'Pending Approvals', key: 'pendingApprovals', icon: Ticket, color: 'amber', href: '/vendors', desc: 'Awaiting review' },
 ]
 
 const moduleCards = [
-  { label: 'Vendors', desc: 'Onboarding and approvals', icon: Building2, href: '/vendors', color: 'text-orange-600' },
-  { label: 'Properties', desc: 'Listings and approvals', icon: Home, href: '/properties', color: 'text-teal-600' },
-  { label: 'Temples', desc: 'Temple stay inventory', icon: MapPin, href: '/temples', color: 'text-rose-600' },
-  { label: 'Bookings', desc: 'Manage reservations', icon: Calendar, href: '/bookings', color: 'text-blue-600' },
-  { label: 'Services', desc: 'Catalog and requests', icon: Package, href: '/services', color: 'text-indigo-600' },
-  { label: 'Inventory', desc: 'Availability controls', icon: Boxes, href: '/inventory', color: 'text-amber-600' },
-  { label: 'Payments', desc: 'Transactions and payouts', icon: CreditCard, href: '/payments', color: 'text-emerald-600' },
-  { label: 'Users', desc: 'Accounts and access', icon: Users, href: '/users', color: 'text-purple-600' },
-  { label: 'Notifications', desc: 'Delivery and campaigns', icon: Bell, href: '/notifications', color: 'text-pink-600' },
-  { label: 'Support', desc: 'Tickets and resolutions', icon: LifeBuoy, href: '/support', color: 'text-cyan-600' },
-  { label: 'Analytics', desc: 'Reports and trends', icon: TrendingUp, href: '/analytics', color: 'text-sky-600' },
-  { label: 'Settings', desc: 'System configuration', icon: Settings, href: '/settings', color: 'text-slate-600' },
+  { label: 'Vendors', desc: 'Onboarding & approvals', icon: Building2, href: '/vendors', color: 'orange' },
+  { label: 'Properties', desc: 'Listings & approvals', icon: Home, href: '/properties', color: 'teal' },
+  { label: 'Temples', desc: 'Temple stay inventory', icon: MapPin, href: '/temples', color: 'rose' },
+  { label: 'Bookings', desc: 'Manage reservations', icon: Calendar, href: '/bookings', color: 'blue' },
+  { label: 'Services', desc: 'Catalog & requests', icon: Package, href: '/services', color: 'indigo' },
+  { label: 'Payments', desc: 'Transactions & payouts', icon: CreditCard, href: '/payments', color: 'emerald' },
 ]
 
-const colorMap: Record<string, string> = {
-  blue: 'bg-blue-50 text-blue-600',
-  green: 'bg-emerald-50 text-emerald-600',
-  purple: 'bg-purple-50 text-purple-600',
-  orange: 'bg-orange-50 text-orange-600',
-  teal: 'bg-teal-50 text-teal-600',
-  indigo: 'bg-indigo-50 text-indigo-600',
-  pink: 'bg-pink-50 text-pink-600',
-  red: 'bg-red-50 text-red-600',
+const defaultColors = { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-100', iconBg: 'bg-gray-500' }
+
+const getColors = (color: string) => colorMap[color] || defaultColors
+
+const colorMap: Record<string, { bg: string; text: string; border: string; iconBg: string }> = {
+  blue: { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100', iconBg: 'bg-blue-500' },
+  green: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', iconBg: 'bg-emerald-500' },
+  orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100', iconBg: 'bg-orange-500' },
+  teal: { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-100', iconBg: 'bg-teal-500' },
+  indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100', iconBg: 'bg-indigo-500' },
+  amber: { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100', iconBg: 'bg-amber-500' },
+  rose: { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100', iconBg: 'bg-rose-500' },
+  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', iconBg: 'bg-emerald-500' },
 }
 
 function formatValue(key: string, value: number): string {
   if (key === 'totalRevenue') {
-    return `₹${value >= 10000000 ? `${(value / 10000000).toFixed(1)}M` : value >= 100000 ? `${(value / 100000).toFixed(1)}L` : value.toLocaleString()}`
+    if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}M`
+    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`
+    return `₹${value.toLocaleString()}`
   }
   return value.toLocaleString()
 }
+
+function formatCompact(value: number): string {
+  if (value >= 10000000) return `${(value / 10000000).toFixed(1)}M`
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+  return value.toString()
+}
+
+const SkeletonCard = () => (
+  <div className="bg-white rounded-2xl p-6 border border-gray-100">
+    <Skeleton className="w-12 h-12 rounded-xl mb-4" />
+    <Skeleton className="w-20 h-8 rounded mb-2" />
+    <Skeleton className="w-24 h-4 rounded" />
+  </div>
+)
+
+const SkeletonChart = () => (
+  <div className="bg-white rounded-2xl p-6 border border-gray-100">
+    <Skeleton className="w-32 h-6 rounded mb-4" />
+    <Skeleton className="w-full h-64 rounded" />
+  </div>
+)
+
+const SkeletonTable = () => (
+  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div className="p-4 border-b border-gray-100">
+      <Skeleton className="w-40 h-6 rounded" />
+    </div>
+    {[...Array(5)].map((_, i) => (
+      <div key={i} className="p-4 border-b border-gray-50 flex items-center gap-4">
+        <Skeleton className="w-10 h-10 rounded-full" />
+        <Skeleton className="flex-1 h-4 rounded" />
+        <Skeleton className="w-20 h-4 rounded" />
+      </div>
+    ))}
+  </div>
+)
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([])
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([])
+  const [revenueData, setRevenueData] = useState<RevenueData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const hasFetched = useRef(false)
 
   const fetchDashboard = async () => {
     setIsLoading(true)
     try {
-      const [statsData, bookingsData, approvalsData] = await Promise.all([
+      const [statsData, bookingsData, approvalsData, revenue] = await Promise.all([
         dashboardService.getStats(),
         dashboardService.getRecentBookings(8),
         dashboardService.getPendingApprovals(6),
+        dashboardService.getRevenueData(30),
       ])
       setStats(statsData)
       setRecentBookings(bookingsData)
       setPendingApprovals(approvalsData)
+      setRevenueData(revenue)
     } catch (err) {
       console.error('Dashboard fetch error:', err)
     } finally {
@@ -79,12 +129,10 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    if (hasFetched.current) return
+    hasFetched.current = true
     fetchDashboard()
   }, [])
-
-  if (isLoading) {
-    return <PageLoader rows={10} />
-  }
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -97,185 +145,293 @@ export default function Dashboard() {
     }
   }
 
-  const getApprovalVariant = (type: string) => {
-    return type === 'vendor' ? 'info' : 'warning'
+  const revenueChartData = (() => {
+    if (revenueData?.monthly && revenueData.monthly.length > 0) {
+      return revenueData.monthly.map((item) => item)
+    }
+    if (revenueData?.daily && revenueData.daily.length > 0) {
+      return revenueData.daily.slice(-14).map((day) => ({
+        date: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        revenue: day.revenue,
+        bookings: day.bookings,
+      }))
+    }
+    // Return empty data instead of sample data
+    return []
+  })()
+
+  const bookingsByStatus = (() => {
+    if (!recentBookings || recentBookings.length === 0) return []
+    
+    const statusCounts: Record<string, number> = {}
+    recentBookings.forEach(booking => {
+      const status = booking.status || 'UNKNOWN'
+      statusCounts[status] = (statusCounts[status] || 0) + 1
+    })
+    
+    return Object.entries(statusCounts).map(([name, value]) => ({
+      name: name.replace(/_/g, ' '),
+      value
+    })).filter(item => item.value > 0)
+  })()
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="w-48 h-8" />
+          <Skeleton className="w-24 h-10 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SkeletonChart />
+          <SkeletonChart />
+          <SkeletonTable />
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Dashboard</h1>
-          <p className="text-neutral-500 mt-1">Welcome back! Here's what's happening today.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 mt-1">Welcome back! Here's what's happening with your platform.</p>
         </div>
         <button
           onClick={fetchDashboard}
-          className="px-4 py-2 text-sm font-medium text-neutral-600 bg-white border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
         >
+          <TrendingUp className="w-4 h-4" />
           Refresh
         </button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {statCards.map((card) => {
           const Icon = card.icon
           const value = stats ? (stats as any)[card.key] : 0
+          const colors = getColors(card.color)
           return (
             <Link
               key={card.key}
               to={card.href}
-              className="group bg-white rounded-2xl p-4 border border-neutral-100 hover:border-neutral-200 hover:shadow-lg transition-all duration-200"
+              className="group bg-white rounded-2xl p-5 border border-gray-100 hover:border-gray-200 hover:shadow-lg hover:shadow-gray-100/50 transition-all duration-200"
             >
-              <div className={`w-10 h-10 rounded-xl ${colorMap[card.color]} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                <Icon className="w-5 h-5" />
+              <div className={`w-11 h-11 rounded-xl ${colors.iconBg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200`}>
+                <Icon className="w-5 h-5 text-white" />
               </div>
-              <p className="text-2xl font-bold text-neutral-900">{formatValue(card.key, value)}</p>
-              <p className="text-xs text-neutral-500 mt-1">{card.label}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatValue(card.key, value)}</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">{card.label}</p>
             </Link>
           )
         })}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Revenue Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-lg font-semibold">Revenue & Bookings</CardTitle>
+            <span className="text-sm text-gray-500">Last 14 days</span>
+          </CardHeader>
+          <CardContent>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false} 
+                    tickLine={false}
+                    tick={{ fill: '#6B7280', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false}
+                    tick={{ fill: '#6B7280', fontSize: 12 }}
+                    tickFormatter={(value) => `₹${formatCompact(value)}`}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    }}
+                    formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Revenue']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#3B82F6" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorRevenue)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bookings by Status */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold">Bookings Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-56 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={bookingsByStatus}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {bookingsByStatus.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px'
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3 mt-2">
+              {bookingsByStatus.map((entry, index) => (
+                <div key={entry.name} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                  <span className="text-xs text-gray-600">{entry.name}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Module Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {moduleCards.map((card) => {
+          const Icon = card.icon
+          const colors = getColors(card.color)
+          return (
+            <Link
+              key={card.label}
+              to={card.href}
+              className="group bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200"
+            >
+              <div className={`w-10 h-10 rounded-lg ${colors.bg} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform`}>
+                <Icon className={`w-5 h-5 ${colors.text}`} />
+              </div>
+              <p className="font-medium text-gray-900 text-sm">{card.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{card.desc}</p>
+            </Link>
+          )
+        })}
+      </div>
+
+      {/* Recent Bookings & Pending Approvals */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Bookings */}
-        <div className="xl:col-span-2 bg-white rounded-2xl border border-neutral-100 overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-neutral-100">
-            <h2 className="font-semibold text-neutral-900">Recent Bookings</h2>
-            <Link to="/bookings" className="text-sm text-neutral-500 hover:text-neutral-700 flex items-center gap-1">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg font-semibold">Recent Bookings</CardTitle>
+            <Link to="/bookings" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
               View all <ArrowRight className="w-4 h-4" />
             </Link>
-          </div>
-          <div className="divide-y divide-neutral-50">
-            {recentBookings.length === 0 ? (
-              <div className="p-8 text-center text-neutral-400">No bookings yet</div>
-            ) : (
-              recentBookings.map((booking) => (
-                <Link
-                  key={booking.id}
-                  to={`/bookings/${booking.id}`}
-                  className="flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                      <Calendar className="w-5 h-5" />
+          </CardHeader>
+          <CardContent className="p-0">
+            {recentBookings.length > 0 ? (
+              <div className="divide-y divide-gray-50">
+                {recentBookings.slice(0, 6).map((booking) => (
+                  <div key={booking.id} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium text-sm">
+                        {(booking.userName || 'G')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">{booking.propertyName}</p>
+                        <p className="text-xs text-gray-500">{booking.userName || 'Guest'}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-neutral-900">{booking.propertyName}</p>
-                      <p className="text-sm text-neutral-500">{booking.userName}</p>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">₹{booking.amount.toLocaleString()}</p>
+                      <StatusBadge label={booking.status} variant={getStatusVariant(booking.status)} className="mt-1" />
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-neutral-900">₹{booking.amount.toLocaleString()}</p>
-                    <StatusBadge label={booking.status} variant={getStatusVariant(booking.status) as any} />
-                  </div>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Pending Approvals */}
-        <div className="bg-white rounded-2xl border border-neutral-100 overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-neutral-100">
-            <h2 className="font-semibold text-neutral-900">Pending Approvals</h2>
-            <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded-full">
-              {pendingApprovals.length}
-            </span>
-          </div>
-          <div className="divide-y divide-neutral-50">
-            {pendingApprovals.length === 0 ? (
-              <div className="p-8 text-center text-neutral-400">
-                <CheckCircle className="w-12 h-12 mx-auto mb-2 text-emerald-400" />
-                <p>All caught up!</p>
+                ))}
               </div>
             ) : (
-              pendingApprovals.map((approval) => (
-                <Link
-                  key={`${approval.type}-${approval.id}`}
-                  to={approval.type === 'vendor' ? `/vendors/${approval.id}` : `/properties/${approval.id}`}
-                  className="flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${approval.type === 'vendor' ? 'bg-purple-50 text-purple-600' : 'bg-orange-50 text-orange-600'}`}>
-                      {approval.type === 'vendor' ? <Building2 className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
-                    </div>
-                    <div>
-                      <p className="font-medium text-neutral-900">{approval.name}</p>
-                      <p className="text-xs text-neutral-500">{approval.submittedBy || approval.description}</p>
-                    </div>
-                  </div>
-                  <StatusBadge label={approval.type} variant={getApprovalVariant(approval.type) as any} />
-                </Link>
-              ))
+              <div className="p-8 text-center">
+                <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No bookings yet</p>
+              </div>
             )}
-          </div>
-          {pendingApprovals.length > 0 && (
-            <div className="p-4 border-t border-neutral-100">
-              <Link
-                to="/vendors/approval"
-                className="flex items-center justify-center gap-2 w-full py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-xl transition-colors"
-              >
-                View all approvals <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
+          </CardContent>
+        </Card>
 
-      {/* Module Hub */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-neutral-900">Admin Modules</h2>
-          <span className="text-xs text-neutral-500">Aligned with enterprise panel structure</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          {moduleCards.map((module) => (
-            <Link
-              key={module.label}
-              to={module.href}
-              className="bg-white rounded-xl p-4 border border-neutral-100 hover:border-neutral-200 hover:shadow-md transition-all group"
-            >
-              <module.icon className={`w-6 h-6 mb-2 group-hover:scale-110 transition-transform ${module.color}`} />
-              <p className="font-medium text-neutral-900">{module.label}</p>
-              <p className="text-xs text-neutral-500">{module.desc}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <DollarSign className="w-8 h-8 opacity-80" />
-            <TrendingUp className="w-5 h-5 opacity-80" />
-          </div>
-          <p className="text-emerald-100 text-sm">Total Revenue</p>
-          <p className="text-3xl font-bold mt-1">₹{(stats?.totalRevenue ?? 0).toLocaleString()}</p>
-          <p className="text-emerald-200 text-sm mt-2">Across all bookings</p>
-        </div>
-        
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <Calendar className="w-8 h-8 opacity-80" />
-            <TrendingUp className="w-5 h-5 opacity-80" />
-          </div>
-          <p className="text-blue-100 text-sm">Total Bookings</p>
-          <p className="text-3xl font-bold mt-1">{(stats?.totalBookings ?? 0).toLocaleString()}</p>
-          <p className="text-blue-200 text-sm mt-2">{stats?.newBookingsToday ?? 0} new today</p>
-        </div>
-        
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <Users className="w-8 h-8 opacity-80" />
-            <TrendingUp className="w-5 h-5 opacity-80" />
-          </div>
-          <p className="text-purple-100 text-sm">Total Users</p>
-          <p className="text-3xl font-bold mt-1">{(stats?.totalUsers ?? 0).toLocaleString()}</p>
-          <p className="text-purple-200 text-sm mt-2">Registered users</p>
-        </div>
+        {/* Pending Approvals */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg font-semibold">Pending Approvals</CardTitle>
+            <span className="text-sm text-gray-500">{pendingApprovals.length} pending</span>
+          </CardHeader>
+          <CardContent className="p-0">
+            {pendingApprovals.length > 0 ? (
+              <div className="divide-y divide-gray-50">
+                {pendingApprovals.slice(0, 6).map((approval) => (
+                  <div key={approval.id} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        approval.type === 'vendor' ? 'bg-orange-100 text-orange-600' : 'bg-teal-100 text-teal-600'
+                      }`}>
+                        {approval.type === 'vendor' ? <Building2 className="w-5 h-5" /> : <Home className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">{approval.name}</p>
+                        <p className="text-xs text-gray-500 capitalize">{approval.type} approval</p>
+                      </div>
+                    </div>
+                    <Link
+                      to={approval.type === 'vendor' ? `/vendors/${approval.id}` : `/properties/${approval.slug}`}
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-3" />
+                <p className="text-gray-500">All caught up!</p>
+                <p className="text-xs text-gray-400 mt-1">No pending approvals</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

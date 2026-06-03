@@ -14,8 +14,8 @@ interface EditVendorModalProps {
 export function EditVendorModal({ vendor, isOpen, onClose, onSuccess }: EditVendorModalProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        name: vendor.user?.name || "",
-        email: vendor.user?.email || "",
+        name: vendor.user?.name || vendor.name || "",
+        email: vendor.user?.email || vendor.email || "",
         phone: vendor.phone || "",
         businessName: vendor.businessName || "",
         businessAddress: vendor.businessAddress || "",
@@ -39,16 +39,15 @@ export function EditVendorModal({ vendor, isOpen, onClose, onSuccess }: EditVend
         setIsSubmitting(true);
 
         try {
-            const payload: any = {
-                name: formData.name,
-                email: formData.email,
-                phone: formData.phone,
-                businessName: formData.businessName,
-                businessAddress: formData.businessAddress,
-                gstNumber: formData.gstNumber,
-                panNumber: formData.panNumber,
-                aadhaarNumber: formData.aadhaarNumber,
-            };
+            const payload: any = {};
+            if (formData.name.trim()) payload.name = formData.name.trim();
+            if (formData.email.trim()) payload.email = formData.email.trim();
+            if (formData.phone.trim()) payload.phone = formData.phone.trim();
+            if (formData.businessName.trim()) payload.businessName = formData.businessName.trim();
+            if (formData.businessAddress.trim()) payload.businessAddress = formData.businessAddress.trim();
+            if (formData.gstNumber.trim()) payload.gstNumber = formData.gstNumber.trim().toUpperCase();
+            if (formData.panNumber.trim()) payload.panNumber = formData.panNumber.trim().toUpperCase();
+            if (formData.aadhaarNumber.trim()) payload.aadhaarNumber = formData.aadhaarNumber.trim();
 
             if (passportPhoto.length > 0 && passportPhoto[0].url) {
                 payload.passportPhoto = passportPhoto[0].url;
@@ -64,7 +63,7 @@ export function EditVendorModal({ vendor, isOpen, onClose, onSuccess }: EditVend
             onSuccess({
                 ...vendor,
                 ...payload,
-                user: { ...vendor.user, name: payload.name, email: payload.email },
+                user: { ...(vendor.user || {}), name: payload.name, email: payload.email },
             });
         } catch (error: any) {
             toast.error(error?.response?.data?.message || "Failed to update vendor details");

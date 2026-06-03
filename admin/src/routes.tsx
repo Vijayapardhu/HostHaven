@@ -5,11 +5,7 @@ import {
   AuthLayout,
   BlankLayout,
 } from "./components/layout/Layouts";
-import {
-  ProtectedRoute,
-  GuestRoute,
-  PermissionGuard,
-} from "./components/ProtectedRoute";
+import { ProtectedRoute, GuestRoute } from "./components/ProtectedRoute";
 import LoadingPage from "./pages/LoadingPage";
 import ErrorPage from "./pages/ErrorPage";
 
@@ -46,6 +42,7 @@ const VendorApproval = PageLoader(lazy(() => import("./pages/VendorApproval")));
 const Users = PageLoader(lazy(() => import("./pages/Users")));
 const UserDetails = PageLoader(lazy(() => import("./pages/UserDetails")));
 const Payments = PageLoader(lazy(() => import("./pages/Payments")));
+const PaymentDetails = PageLoader(lazy(() => import("./pages/PaymentDetails")));
 const Services = PageLoader(lazy(() => import("./pages/Services")));
 const ServiceDetails = PageLoader(lazy(() => import("./pages/ServiceDetails")));
 const AddService = PageLoader(lazy(() => import("./pages/AddService")));
@@ -55,6 +52,9 @@ const Analytics = PageLoader(lazy(() => import("./pages/Analytics")));
 const Settings = PageLoader(lazy(() => import("./pages/Settings")));
 const Support = PageLoader(lazy(() => import("./pages/Support")));
 const Inventory = PageLoader(lazy(() => import("./pages/Inventory")));
+const RoomInventoryControl = PageLoader(
+  lazy(() => import("./pages/RoomInventoryControl")),
+);
 const AdminLogin = PageLoader(lazy(() => import("./pages/AdminLogin")));
 const Temples = PageLoader(lazy(() => import("./pages/Temples")));
 const TempleDetails = PageLoader(lazy(() => import("./pages/TempleDetails")));
@@ -68,15 +68,16 @@ const ServiceBookingDetails = PageLoader(
 const HomepageEditor = PageLoader(
   lazy(() => import("./pages/HomepageEditor")),
 );
+const CmsPages = PageLoader(lazy(() => import("./pages/CmsPages")));
 const Success = PageLoader(lazy(() => import("./pages/Success")));
+const PayoutDetails = PageLoader(lazy(() => import("./pages/PayoutDetails")));
+const VendorEarnings = PageLoader(lazy(() => import("./pages/VendorEarnings")));
+const Amenities = PageLoader(lazy(() => import("./pages/Amenities")));
+const Cities = PageLoader(lazy(() => import("./pages/Cities")));
 
 const routes = [
   {
-    element: (
-      <ProtectedRoute>
-        <AdminLayout />
-      </ProtectedRoute>
-    ),
+    element: <ProtectedRoute><AdminLayout /></ProtectedRoute>,
     children: [
       {
         path: "/",
@@ -99,7 +100,7 @@ const routes = [
         element: <Properties />,
       },
       {
-        path: "/properties/:id",
+        path: "/properties/:slug",
         element: <PropertyDetails />,
       },
       {
@@ -111,7 +112,15 @@ const routes = [
         element: <AddProperty />,
       },
       {
-        path: "/properties/:id/edit",
+        path: "/properties/add-hotel",
+        element: <AddProperty />,
+      },
+      {
+        path: "/properties/add-house",
+        element: <AddProperty />,
+      },
+      {
+        path: "/properties/:slug/edit",
         element: <AddProperty />,
       },
       {
@@ -141,6 +150,18 @@ const routes = [
       {
         path: "/payments",
         element: <Payments />,
+      },
+      {
+        path: "/payments/:id",
+        element: <PaymentDetails />,
+      },
+      {
+        path: "/payouts/:id",
+        element: <PayoutDetails />,
+      },
+      {
+        path: "/finance/earnings",
+        element: <VendorEarnings />,
       },
       {
         path: "/services",
@@ -183,11 +204,15 @@ const routes = [
         element: <Inventory />,
       },
       {
+        path: "/rooms/:roomId/inventory",
+        element: <RoomInventoryControl />,
+      },
+      {
         path: "/temples",
         element: <Temples />,
       },
       {
-        path: "/temples/:id",
+        path: "/temples/:slug",
         element: <TempleDetails />,
       },
       {
@@ -195,7 +220,7 @@ const routes = [
         element: <AddTemple />,
       },
       {
-        path: "/temples/:id/edit",
+        path: "/temples/:slug/edit",
         element: <AddTemple />,
       },
       {
@@ -210,18 +235,26 @@ const routes = [
         path: "/homepage-editor",
         element: <HomepageEditor />,
       },
+      {
+        path: "/cms",
+        element: <CmsPages />,
+      },
+      {
+        path: "/settings/amenities",
+        element: <Amenities />,
+      },
+      {
+        path: "/settings/cities",
+        element: <Cities />,
+      },
     ],
   },
   {
-    element: (
-      <GuestRoute>
-        <AuthLayout />
-      </GuestRoute>
-    ),
+    element: <AuthLayout />,
     children: [
       {
-        path: "/auth/login",
-        element: <AdminLogin />,
+        path: "/login",
+        element: <GuestRoute><AdminLogin /></GuestRoute>,
       },
       {
         path: "/success",

@@ -24,6 +24,7 @@ import {
   Truck,
   Boxes,
   IndianRupee,
+  FileCode2,
 } from "lucide-react";
 
 interface NavItem {
@@ -192,6 +193,13 @@ const navigationConfig: NavItem[] = [
     permission: "users:full",
   },
   {
+    name: "CMS Pages",
+    href: "/cms",
+    icon: FileCode2,
+    section: "system",
+    permission: "settings:full",
+  },
+  {
     name: "Settings",
     href: "/settings",
     icon: Settings,
@@ -257,12 +265,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = () => {
     logout();
-    navigate("/auth/login");
+    navigate("/login");
   };
 
   const isActive = (href: string) => {
     if (href === "/dashboard") {
       return location.pathname === "/dashboard";
+    }
+    if (href === "/bookings") {
+      return location.pathname.startsWith("/bookings") || location.pathname.startsWith("/service-bookings");
     }
     return location.pathname.startsWith(href);
   };

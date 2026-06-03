@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Headphones, Plus, Search, Clock, CheckCircle, MessageSquare } from "lucide-react";
+import { Headphones, Plus, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

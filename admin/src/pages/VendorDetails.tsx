@@ -88,9 +88,10 @@ export default function VendorDetails() {
   const [commissionRate, setCommissionRate] = useState("");
   const [commissionLoading, setCommissionLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<
-    "suspended" | "approved" | "deleted" | null
+    "suspended" | "approved" | "rejected" | "deleted" | null
   >(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const fetchVendor = async () => {
     if (!id) return;
@@ -145,15 +146,28 @@ export default function VendorDetails() {
     try {
       if (confirmAction === "suspended") {
         await vendorsService.suspendVendor(vendor.id);
-        setVendor({ ...vendor, status: "suspended" });
+        setVendor({ ...vendor, status: "suspended", applicationStatus: "SUSPENDED" });
         toast.success("Vendor suspended successfully.");
+      } else if (confirmAction === "rejected") {
+        if (!rejectReason || rejectReason.trim().length < 10) {
+          toast.error("Please provide a detailed rejection reason.");
+          return;
+        }
+        await vendorsService.rejectVendor(vendor.id, rejectReason);
+        setVendor({
+          ...vendor,
+          status: "rejected",
+          applicationStatus: "REJECTED",
+          rejectionReason: rejectReason,
+        });
+        toast.success("Vendor rejected successfully.");
       } else if (confirmAction === "deleted") {
         await vendorsService.deleteVendor(vendor.id);
         toast.success("Vendor soft deleted successfully.");
         navigate("/vendors");
       } else {
         await vendorsService.activateVendor(vendor.id);
-        setVendor({ ...vendor, status: "approved" });
+        setVendor({ ...vendor, status: "approved", applicationStatus: "APPROVED", rejectionReason: undefined });
         toast.success("Vendor reactivated successfully.");
       }
     } catch (err: any) {
@@ -162,6 +176,7 @@ export default function VendorDetails() {
       );
     } finally {
       setConfirmAction(null);
+      setRejectReason("");
     }
   };
 
@@ -396,6 +411,59 @@ export default function VendorDetails() {
             </CardContent>
           </Card>
 
+          {(vendor.businessDocuments?.gstCertificate || vendor.businessDocuments?.panCard || vendor.businessDocuments?.aadhaarCard || vendor.businessDocuments?.bankPassbook || vendor.businessDocuments?.businessProof) && (
+            <Card className="border-slate-200/60 bg-white/95 shadow-sm backdrop-blur-xl">
+              <CardHeader className="border-b border-slate-100 pb-3">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Shield className="h-4 w-4 text-blue-500" />
+                  Business Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {vendor.businessDocuments?.gstCertificate && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-500">GST Certificate</p>
+                    <a href={vendor.businessDocuments.gstCertificate} target="_blank" rel="noopener noreferrer" className="block rounded-lg border border-slate-200 p-2 hover:bg-slate-50 transition">
+                      <img src={vendor.businessDocuments.gstCertificate} alt="GST Certificate" className="h-20 w-full object-cover rounded" />
+                    </a>
+                  </div>
+                )}
+                {vendor.businessDocuments?.panCard && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-500">PAN Card</p>
+                    <a href={vendor.businessDocuments.panCard} target="_blank" rel="noopener noreferrer" className="block rounded-lg border border-slate-200 p-2 hover:bg-slate-50 transition">
+                      <img src={vendor.businessDocuments.panCard} alt="PAN Card" className="h-20 w-full object-cover rounded" />
+                    </a>
+                  </div>
+                )}
+                {vendor.businessDocuments?.aadhaarCard && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-500">Aadhaar Card</p>
+                    <a href={vendor.businessDocuments.aadhaarCard} target="_blank" rel="noopener noreferrer" className="block rounded-lg border border-slate-200 p-2 hover:bg-slate-50 transition">
+                      <img src={vendor.businessDocuments.aadhaarCard} alt="Aadhaar Card" className="h-20 w-full object-cover rounded" />
+                    </a>
+                  </div>
+                )}
+                {vendor.businessDocuments?.bankPassbook && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-500">Bank Passbook</p>
+                    <a href={vendor.businessDocuments.bankPassbook} target="_blank" rel="noopener noreferrer" className="block rounded-lg border border-slate-200 p-2 hover:bg-slate-50 transition">
+                      <img src={vendor.businessDocuments.bankPassbook} alt="Bank Passbook" className="h-20 w-full object-cover rounded" />
+                    </a>
+                  </div>
+                )}
+                {vendor.businessDocuments?.businessProof && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-500">Business Proof</p>
+                    <a href={vendor.businessDocuments.businessProof} target="_blank" rel="noopener noreferrer" className="block rounded-lg border border-slate-200 p-2 hover:bg-slate-50 transition">
+                      <img src={vendor.businessDocuments.businessProof} alt="Business Proof" className="h-20 w-full object-cover rounded" />
+                    </a>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-slate-200/60 bg-white/95 shadow-sm backdrop-blur-xl">
             <CardHeader className="border-b border-slate-100 pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -482,13 +550,29 @@ export default function VendorDetails() {
                     Reactivate Account
                   </button>
                 ) : vendor.status === "pending" || vendor.status === "rejected" ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction("approved")}
-                    className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-4 py-2 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-100 mb-2"
-                  >
-                    Approve Vendor
-                  </button>
+                  <div className="mb-2 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmAction("approved")}
+                      className="w-full rounded-lg border border-emerald-200 bg-emerald-50/50 px-4 py-2 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-100"
+                    >
+                      Approve Vendor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmAction("rejected")}
+                      className="w-full rounded-lg border border-rose-200 bg-rose-50/50 px-4 py-2 text-sm font-semibold text-rose-600 transition-all hover:bg-rose-100"
+                    >
+                      Reject Vendor
+                    </button>
+                  </div>
+                ) : null}
+
+                {vendor.rejectionReason ? (
+                  <div className="mb-3 rounded-lg border border-rose-100 bg-rose-50 p-3 text-xs text-rose-700">
+                    <p className="font-semibold">Latest rejection reason</p>
+                    <p className="mt-1">{vendor.rejectionReason}</p>
+                  </div>
                 ) : null}
 
                 <button
@@ -535,7 +619,7 @@ export default function VendorDetails() {
                   </TableHeader>
                   <TableBody>
                     {properties.map((property) => (
-                      <TableRow key={property.id} className="cursor-pointer hover:bg-slate-50/50 transition-colors" onClick={() => navigate(`/properties/${property.id}`)}>
+                      <TableRow key={property.id} className="cursor-pointer hover:bg-slate-50/50 transition-colors" onClick={() => navigate(`/properties/${property.slug}`)}>
                         <TableCell>
                           <div>
                             <p className="font-semibold text-slate-900">{property.name}</p>
@@ -729,19 +813,39 @@ export default function VendorDetails() {
 
       <ConfirmDialog
         open={confirmAction !== null}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title={confirmAction === "suspended" ? "Suspend Vendor" : confirmAction === "deleted" ? "Delete Vendor" : "Approve/Reactivate Vendor"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmAction(null)
+            setRejectReason("")
+          }
+        }}
+        title={confirmAction === "suspended" ? "Suspend Vendor" : confirmAction === "deleted" ? "Delete Vendor" : confirmAction === "rejected" ? "Reject Vendor" : "Approve/Reactivate Vendor"}
         description={
           confirmAction === "suspended"
             ? "Are you sure you want to suspend this vendor? They will not be able to log in or manage properties."
             : confirmAction === "deleted"
               ? "Are you sure you want to soft delete this vendor? This will suspend all properties and block logins."
+              : confirmAction === "rejected"
+                ? "Are you sure you want to reject this vendor? A rejection reason will be saved for follow-up."
               : "Are you sure you want to approve and reactivate this vendor? They will gain access to their account."
         }
-        confirmText={confirmAction === "suspended" ? "Suspend" : confirmAction === "deleted" ? "Delete" : "Approve"}
+        confirmText={confirmAction === "suspended" ? "Suspend" : confirmAction === "deleted" ? "Delete" : confirmAction === "rejected" ? "Reject" : "Approve"}
         onConfirm={confirmStatusChange}
-        variant={confirmAction === "suspended" || confirmAction === "deleted" ? "danger" : "default"}
-      />
+        variant={confirmAction === "suspended" || confirmAction === "deleted" || confirmAction === "rejected" ? "danger" : "default"}
+      >
+        {confirmAction === "rejected" ? (
+          <div className="mt-4 space-y-2">
+            <label className="text-sm font-medium text-slate-700">Rejection Reason</label>
+            <textarea
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder="Explain why this vendor is being rejected..."
+              rows={4}
+              className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:border-rose-500 focus:outline-none"
+            />
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </motion.div>
   );
 }

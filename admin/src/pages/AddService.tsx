@@ -2,12 +2,48 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { servicesService, type Service } from '../lib/services'
+import { servicesService, type CreateServiceRequest, type Service } from '../lib/services'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { PageLoader } from '../components/ui/PageLoader'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ImageUpload, type UploadedImage } from '../components/ui/ImageUpload'
+
+const SERVICE_FORM_STORAGE_KEY = 'service_form_autosave'
+
+const loadSavedServiceForm = (): Partial<ServiceFormValues> | null => {
+  try {
+    const saved = localStorage.getItem(SERVICE_FORM_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (parsed && parsed.savedAt && Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
+        return parsed.values
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load saved service form:', e)
+  }
+  return null
+}
+
+const saveServiceFormToStorage = (values: ServiceFormValues) => {
+  try {
+    localStorage.setItem(SERVICE_FORM_STORAGE_KEY, JSON.stringify({
+      values,
+      savedAt: Date.now()
+    }))
+  } catch (e) {
+    console.error('Failed to save service form:', e)
+  }
+}
+
+const clearSavedServiceForm = () => {
+  try {
+    localStorage.removeItem(SERVICE_FORM_STORAGE_KEY)
+  } catch (e) {
+    console.error('Failed to clear saved service form:', e)
+  }
+}
 
 const serviceSchema = z.object({
   name: z.string().min(2, 'Service name is required.'),
@@ -28,7 +64,7 @@ export default function AddService() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formValues, setFormValues] = useState<ServiceFormValues>({
+  const getInitialValues = (): ServiceFormValues => ({
     name: '',
     category: 'transport',
     description: '',
@@ -38,12 +74,29 @@ export default function AddService() {
     active: true,
     images: [],
   })
+  const [formValues, setFormValues] = useState<ServiceFormValues>(() => {
+    const saved = loadSavedServiceForm()
+    return saved ? { ...getInitialValues(), ...saved } : getInitialValues()
+  })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [serviceImages, setServiceImages] = useState<UploadedImage[]>([
     { url: '', alt: '', isPrimary: true },
     { url: '', alt: '', isPrimary: false },
     { url: '', alt: '', isPrimary: false },
   ])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveServiceFormToStorage(formValues)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [formValues])
+
+  useEffect(() => {
+    if (id) {
+      clearSavedServiceForm()
+    }
+  }, [id])
 
   const loadService = async () => {
     if (!id) return
@@ -100,6 +153,17 @@ export default function AddService() {
       if (key) errors[key.toString()] = issue.message
     })
     setFieldErrors(errors)
+
+    const errorMessages = Object.keys(errors).map(field => {
+      const fieldName = field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')
+      return fieldName
+    })
+    
+    if (errorMessages.length === 1) {
+      toast.error(`Missing: ${errorMessages[0]}`)
+    } else {
+      toast.error(`Missing ${errorMessages.length} fields: ${errorMessages.slice(0, 3).join(', ')}${errorMessages.length > 3 ? '...' : ''}`)
+    }
     return false
   }
 
@@ -113,8 +177,14 @@ export default function AddService() {
         .filter(img => img.url.trim().length > 0)
         .map(img => img.url)
 
-      const payload = {
-        ...formValues,
+      const payload: CreateServiceRequest = {
+        name: formValues.name,
+        category: formValues.category,
+        description: formValues.description,
+        basePrice: formValues.basePrice,
+        advanceType: formValues.advanceType,
+        advanceValue: formValues.advanceValue,
+        active: formValues.active,
         images: imageUrls,
       }
 
@@ -125,6 +195,7 @@ export default function AddService() {
         await servicesService.createService(payload)
         toast.success('Service created successfully.')
       }
+      clearSavedServiceForm()
       navigate('/services')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Unable to save service.')

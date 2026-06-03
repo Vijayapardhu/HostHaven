@@ -5,6 +5,9 @@ import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import WishlistButton from "@/components/WishlistButton";
+import SEOHead from "@/components/SEOHead";
+import { formatCity } from "@/lib/utils";
 
 interface Temple {
   id: string;
@@ -17,15 +20,6 @@ interface Temple {
   templeType?: string;
   images?: Array<string | { url?: string; isPrimary?: boolean }>;
 }
-
-const formatCity = (city?: string) => {
-  if (!city) return "";
-  return city
-    .toLowerCase()
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
 
 const asImageUrl = (image: string | { url?: string; isPrimary?: boolean }) =>
   typeof image === "string" ? image : image?.url;
@@ -65,7 +59,15 @@ const Temples = () => {
 
   const filteredTemples = useMemo(() => {
     return temples.filter((temple) => {
-      const cityMatch = selectedCity === "ALL" || temple.city === selectedCity;
+      const normalizeCityForFilter = (c: string) => {
+        const upper = c?.toUpperCase() || '';
+        if (upper.includes('VETLAPAL')) return 'VETLAPAL';
+        if (upper.includes('NANDIYAL') || upper.includes('NANDYAL')) return 'NANDIYAL';
+        return upper;
+      };
+      const templeCityNorm = normalizeCityForFilter(temple.city);
+      const selectedCityNorm = normalizeCityForFilter(selectedCity);
+      const cityMatch = selectedCity === "ALL" || templeCityNorm === selectedCityNorm;
       if (!cityMatch) return false;
 
       if (!searchQuery.trim()) return true;
@@ -77,13 +79,26 @@ const Temples = () => {
     });
   }, [temples, selectedCity, searchQuery]);
 
+  const selectedCityLabel = selectedCity === "ALL" ? "Andhra Pradesh" : formatCity(selectedCity);
+  const seoTitle = selectedCity === "ALL" ? "Sacred Temples in Andhra Pradesh" : `Temples in ${selectedCityLabel}`;
+  const seoDescription = selectedCity === "ALL"
+    ? "Discover sacred temples across Andhra Pradesh on HostHaven with timings, facilities, and travel guidance."
+    : `Explore popular temples in ${selectedCityLabel} with darshan timings and visitor information on HostHaven.`;
+  const canonicalPath = selectedCity === "ALL" ? "/temples" : `/temples?city=${selectedCity.toLowerCase()}`;
+
   return (
     <Layout>
+      <SEOHead
+        title={seoTitle}
+        description={seoDescription}
+        keywords={`temples in ${selectedCityLabel.toLowerCase()}, ${selectedCityLabel.toLowerCase()} darshan timings, HostHaven temples`}
+        canonical={`https://hosthaven.in${canonicalPath}`}
+      />
       <div className="py-6 md:py-8">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="text-center mb-8">
+          <div className="mb-8">
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">Sacred Temples</h1>
-            <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
+            <p className="text-muted-foreground mt-2 max-w-2xl">
               Find temples by name, deity, and city.
             </p>
           </div>
@@ -135,6 +150,16 @@ const Temples = () => {
                       src={getTempleImage(temple)}
                       alt={temple.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <WishlistButton
+                      variant="card"
+                      item={{
+                        id: temple.id,
+                        type: "temple",
+                        name: temple.name,
+                        location: formatCity(temple.city),
+                        image: getTempleImage(temple),
+                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/90 via-heritage-brown/20 to-transparent" />
                     <div className="absolute bottom-4 left-4 right-4">

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Star, MapPin, Search } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import WishlistButton from "@/components/WishlistButton";
+import SEOHead from "@/components/SEOHead";
 import { api } from "@/lib/api";
+import { formatCity } from "@/lib/utils";
 import {
   Pagination,
   PaginationContent,
@@ -17,6 +19,7 @@ import {
 
 interface Hotel {
   id: string;
+  slug?: string;
   name: string;
   city: string;
   basePrice: number;
@@ -26,12 +29,65 @@ interface Hotel {
   amenities: string[];
 }
 
+interface CityData {
+  city: string;
+  state: string;
+  count: number;
+}
+
 const Hotels = () => {
+  const { city: citySlug } = useParams<{ city?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const destinationParam = searchParams.get("destination");
+  const checkInParam = searchParams.get("checkIn");
+  const checkOutParam = searchParams.get("checkOut");
+  const roomsParam = searchParams.get("rooms");
+  const guestsParam = searchParams.get("guests");
+  
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("all");
+  const [selectedLocation, setSelectedLocation] = useState(() => {
+    if (citySlug) {
+      return citySlug.toUpperCase();
+    }
+    if (destinationParam) {
+      const normalized = destinationParam.toUpperCase();
+      return normalized;
+    }
+    return "all";
+  });
+  const [locations, setLocations] = useState<string[]>(["all"]);
+
+  useEffect(() => {
+    if (citySlug) {
+      setSelectedLocation(citySlug.toUpperCase());
+      return;
+    }
+
+    if (destinationParam) {
+      const normalized = destinationParam.toUpperCase();
+      setSelectedLocation(normalized);
+    }
+  }, [citySlug, destinationParam]);
+
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const cities = await api.properties.getCities();
+        if (cities && Array.isArray(cities)) {
+          const cityNames = cities.map((c: CityData) => c.city.toUpperCase());
+          setLocations(["all", ...cityNames]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch cities:", err);
+        setLocations(["all"]);
+      }
+    };
+    fetchCities();
+  }, []);
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [sortBy, setSortBy] = useState("popularity");
@@ -63,12 +119,30 @@ const Hotels = () => {
     fetchHotels();
   }, [page, searchQuery, selectedLocation, sortBy]);
 
-  const locations = useMemo(() => {
-    const uniqueCities = new Set(hotels.map((hotel) => hotel.city));
-    return ["all", ...Array.from(uniqueCities)];
-  }, [hotels]);
-
   const filteredHotels = useMemo(() => hotels, [hotels]);
+
+  const selectedCityLabel = selectedLocation === "all"
+    ? "Andhra Pradesh"
+    : formatCity(selectedLocation);
+
+  const seoTitle =
+    selectedLocation === "all"
+      ? "Hotels in Andhra Pradesh"
+      : `Hotels in ${selectedCityLabel}`;
+
+  const seoDescription =
+    selectedLocation === "all"
+      ? "Discover verified hotels across Andhra Pradesh on HostHaven. Compare prices, amenities, and guest ratings before booking."
+      : `Find the best hotels in ${selectedCityLabel} on HostHaven with verified listings, latest prices, and guest ratings.`;
+
+  const seoKeywords =
+    selectedLocation === "all"
+      ? "HostHaven hotels, Andhra Pradesh hotels, hotel booking Andhra Pradesh"
+      : `hotels in ${selectedCityLabel.toLowerCase()}, ${selectedCityLabel.toLowerCase()} hotel booking, HostHaven ${selectedCityLabel.toLowerCase()} hotels`;
+
+  const canonicalPath = selectedLocation === "all"
+    ? "/hotels"
+    : `/hotels-in/${selectedLocation.toLowerCase()}`;
 
   const getHotelImage = (images: Hotel["images"]) => {
     if (!images?.length) return "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800";
@@ -80,6 +154,12 @@ const Hotels = () => {
 
   return (
     <Layout>
+      <SEOHead
+        title={seoTitle}
+        description={seoDescription}
+        keywords={seoKeywords}
+        canonical={`https://hosthaven.in${canonicalPath}`}
+      />
       <div className="py-8">
         <div className="container mx-auto px-4">
           {/* Header */}
@@ -90,6 +170,14 @@ const Hotels = () => {
             <p className="text-muted-foreground mt-2">
               Find the perfect stay for your journey
             </p>
+            {(checkInParam || checkOutParam || roomsParam || guestsParam) && (
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {checkInParam && <span className="px-3 py-1 rounded-full bg-muted">Check In: {checkInParam}</span>}
+                {checkOutParam && <span className="px-3 py-1 rounded-full bg-muted">Check Out: {checkOutParam}</span>}
+                {roomsParam && <span className="px-3 py-1 rounded-full bg-muted">Rooms: {roomsParam}</span>}
+                {guestsParam && <span className="px-3 py-1 rounded-full bg-muted">Guests: {guestsParam}</span>}
+              </div>
+            )}
           </div>
 
           {/* Filters */}
@@ -110,6 +198,8 @@ const Hotels = () => {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <select
+                  title="Sort hotels"
+                  aria-label="Sort hotels"
                   value={sortBy}
                   onChange={(event) => {
                     setPage(1);
@@ -129,14 +219,20 @@ const Hotels = () => {
                     onClick={() => {
                       setPage(1);
                       setSelectedLocation(loc);
+                      const newParams = new URLSearchParams(searchParams);
+                      if (loc === "all") {
+                        newParams.delete("destination");
+                      } else {
+                        newParams.set("destination", loc.toLowerCase());
+                      }
+                      setSearchParams(newParams);
                     }}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                      selectedLocation === loc
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedLocation === loc
                         ? "gradient-gold text-primary-foreground shadow-gold"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                      }`}
                   >
-                    {loc === "all" ? "All Locations" : loc}
+                    {loc === "all" ? "All Locations" : formatCity(loc)}
                   </button>
                 ))}
               </div>
@@ -157,10 +253,19 @@ const Hotels = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredHotels.map((hotel) => {
                 const image = getHotelImage(hotel.images);
+                
+                // Build URL params for details page
+                const detailParams = new URLSearchParams();
+                if (checkInParam) detailParams.set("checkIn", checkInParam);
+                if (checkOutParam) detailParams.set("checkOut", checkOutParam);
+                if (guestsParam) detailParams.set("guests", guestsParam);
+                if (roomsParam) detailParams.set("rooms", roomsParam);
+                const detailQuery = detailParams.toString();
+                
                 return (
                   <Link
                     key={hotel.id}
-                    to={`/hotels/${hotel.id}`}
+                    to={`/hotels/${hotel.slug || hotel.id}${detailQuery ? `?${detailQuery}` : ''}`}
                     className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
                   >
                     <div className="relative h-52 overflow-hidden">
@@ -175,7 +280,7 @@ const Hotels = () => {
                           id: hotel.id,
                           type: "hotel",
                           name: hotel.name,
-                          location: hotel.city,
+                          location: formatCity(hotel.city),
                           image: image,
                           price: hotel.basePrice,
                           rating: hotel.rating,
@@ -193,7 +298,7 @@ const Hotels = () => {
                       </h3>
                       <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
                         <MapPin className="w-4 h-4" />
-                        {hotel.city}
+                        {formatCity(hotel.city)}
                       </div>
                       <div className="flex flex-wrap gap-2 mt-3">
                         {hotel.amenities.slice(0, 3).map((amenity) => (
@@ -209,7 +314,7 @@ const Hotels = () => {
                         <div>
                           <p className="text-sm text-muted-foreground">Starting from</p>
                           <p className="text-xl font-semibold text-foreground">
-                            ₹{hotel.basePrice.toLocaleString()}
+                            ₹{(hotel.basePrice || 0).toLocaleString()}
                             <span className="text-muted-foreground font-normal text-sm">/night</span>
                           </p>
                         </div>

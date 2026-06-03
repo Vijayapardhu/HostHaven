@@ -42,10 +42,10 @@ const VendorRoomsIndex = () => {
 
 	const fetchProperties = async () => {
 		const response = await vendorService.getProperties();
-		const list = (response?.data || response || []).map((property: any) => ({
+		const list = Array.isArray(response) ? response.map((property: any) => ({
 			id: property.id,
 			name: property.name,
-		}));
+		})) : [];
 		setProperties(list);
 
 		if (!selectedPropertyId && list.length > 0) {
@@ -123,7 +123,7 @@ const VendorRoomsIndex = () => {
 					<h1 className="text-3xl font-serif font-bold text-foreground">Room Management</h1>
 					<p className="text-muted-foreground mt-1">Create, update and manage room types</p>
 				</div>
-				<Button onClick={() => navigate("/vendor/rooms/add")} className="gap-2">
+				<Button onClick={() => navigate("/rooms/add")} className="gap-2">
 					<Plus className="w-4 h-4" />
 					Add Room
 				</Button>
@@ -195,7 +195,7 @@ const VendorRoomsIndex = () => {
 								</div>
 
 								<div className="pt-2 flex gap-2">
-									<Button variant="outline" className="flex-1 gap-2" onClick={() => navigate(`/vendor/rooms/${room.id}/edit`)}>
+									<Button variant="outline" className="flex-1 gap-2" onClick={() => navigate(`/rooms/${room.id}/edit`)}>
 										<Edit className="w-4 h-4" />
 										Edit
 									</Button>

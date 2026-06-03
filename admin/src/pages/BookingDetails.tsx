@@ -22,6 +22,9 @@ export default function BookingDetails() {
   const [confirmRefund, setConfirmRefund] = useState(false)
   const [paymentDetails, setPaymentDetails] = useState<any>(null)
   const [isChangingStatus, setIsChangingStatus] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [refundReason, setRefundReason] = useState('')
+  const [refundAmount, setRefundAmount] = useState('')
 
   const fetchBooking = async () => {
     if (!id) return
@@ -66,12 +69,12 @@ export default function BookingDetails() {
     return 'danger' as const
   }, [booking])
 
-  const handleStatusChange = async (newStatus: BookingStatus) => {
+  const handleStatusChange = async (newStatus: BookingStatus, reason?: string) => {
     if (!booking) return
     setIsChangingStatus(true)
     try {
-      await bookingsService.updateBookingStatus(booking.id, newStatus.toUpperCase())
-      setBooking({ ...booking, status: newStatus })
+      await bookingsService.updateBookingStatus(booking.id, newStatus.toUpperCase(), reason)
+      setBooking({ ...booking, status: newStatus, ...(reason ? { cancellationReason: reason } : {}) })
       toast.success(`Booking status successfully updated to ${newStatus}.`)
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Unable to update booking status.')
@@ -84,13 +87,26 @@ export default function BookingDetails() {
   const handleRefund = async () => {
     if (!booking) return
     try {
-      await bookingsService.processRefund(booking.id, booking.amountPaid ?? booking.totalAmount)
-      setBooking({ ...booking, paymentStatus: 'refunded', status: 'cancelled' })
+      const amount = refundAmount ? parseFloat(refundAmount) : undefined
+      if (!refundReason.trim() || refundReason.trim().length < 5) {
+        toast.error('Please provide a refund reason of at least 5 characters.')
+        return
+      }
+      await bookingsService.processRefund(booking.id, amount, refundReason.trim())
+      setBooking({
+        ...booking,
+        paymentStatus: 'refunded',
+        status: 'refunded',
+        amountRefunded: amount ?? booking.amountPaid ?? booking.totalAmount,
+        cancellationNotes: refundReason.trim(),
+      })
       toast.success('Refund processed successfully.')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Unable to process refund.')
     } finally {
       setConfirmRefund(false)
+      setRefundReason('')
+      setRefundAmount('')
     }
   }
 
@@ -253,7 +269,11 @@ export default function BookingDetails() {
                 {booking.paymentStatus === 'completed' && booking.status !== 'cancelled' ? (
                   <button
                     type="button"
-                    onClick={() => setConfirmRefund(true)}
+                    onClick={() => {
+                      setRefundReason('')
+                      setRefundAmount(String(booking.amountPaid ?? booking.totalAmount ?? ''))
+                      setConfirmRefund(true)
+                    }}
                     className="w-full rounded-lg border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-600 hover:bg-amber-50"
                   >
                     Issue refund
@@ -279,7 +299,7 @@ export default function BookingDetails() {
                 <div className="pt-2">
                   <button
                     type="button"
-                    onClick={() => navigate(`/properties/${booking.propertyId}`)}
+                    onClick={() => navigate(`/properties/${booking.property?.slug}`)}
                     className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     View property
@@ -310,11 +330,6 @@ export default function BookingDetails() {
                       <p className="mt-1">{paymentDetails.errorDesc}</p>
                     </div>
                   )}
-                  {paymentDetails.refundId && (
-                    <div className="mt-2 text-slate-600">
-                      Refund ID: <span className="font-semibold">{paymentDetails.refundId}</span>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -329,8 +344,19 @@ export default function BookingDetails() {
         description="The booking will be cancelled and the guest will be notified."
         confirmText="Cancel booking"
         variant="danger"
-        onConfirm={() => handleStatusChange('cancelled')}
-      />
+        onConfirm={() => handleStatusChange('cancelled', cancelReason.trim() || undefined)}
+      >
+        <div className="mt-4 space-y-2">
+          <label className="text-sm font-medium text-slate-700">Cancellation Reason</label>
+          <textarea
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+            placeholder="Explain why this booking is being cancelled"
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 p-3 text-sm"
+          />
+        </div>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={confirmRefund}
@@ -340,7 +366,31 @@ export default function BookingDetails() {
         confirmText="Process refund"
         variant="danger"
         onConfirm={handleRefund}
-      />
+      >
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="text-sm font-medium text-slate-700">Refund Amount</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={refundAmount}
+              onChange={(event) => setRefundAmount(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-slate-700">Refund Reason</label>
+            <textarea
+              value={refundReason}
+              onChange={(event) => setRefundReason(event.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              placeholder="Describe why this refund is being issued"
+            />
+          </div>
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

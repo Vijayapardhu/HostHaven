@@ -66,7 +66,7 @@ export default function ServiceBookings() {
         limit: pageSize,
         status: statusFilter === 'all' ? undefined : statusFilter,
       })
-      const source = data.data ?? data.serviceBookings ?? data.bookings ?? []
+      const source = data.data ?? []
       const filtered = searchTerm
         ? source.filter((booking: ServiceBooking) => {
             const haystack = [
@@ -83,7 +83,7 @@ export default function ServiceBookings() {
           })
         : source
       setBookings(filtered)
-      setTotal(data.pagination?.total ?? data.total ?? 0)
+      setTotal(data.pagination?.total ?? 0)
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to load service bookings.')
     } finally {

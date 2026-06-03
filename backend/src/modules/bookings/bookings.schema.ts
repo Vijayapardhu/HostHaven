@@ -16,6 +16,7 @@ export const createBookingSchema = z.object({
     gender: z.enum(['male', 'female', 'other']),
     idProof: z.string().optional(),
   })).optional(),
+  guestPhone: z.string().regex(/^\d{10}$/).optional(),
 });
 
 export const cancelBookingSchema = z.object({
@@ -23,9 +24,17 @@ export const cancelBookingSchema = z.object({
 });
 
 export const bookingFilterSchema = paginationSchema.extend({
-  status: z.enum(['PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED', 'REFUNDED']).optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  status: z.enum([
+    'PENDING',
+    'CONFIRMED',
+    'CHECKED_IN',
+    'CHECKED_OUT',
+    'CANCELLED',
+    'NO_SHOW',
+    'REFUNDED'
+  ]).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z)?)?$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z)?)?$/).optional(),
 });
 
 export const bookingIdSchema = z.object({

@@ -9,10 +9,30 @@ export interface Payment {
   amount: number
   currency: string
   method: 'card' | 'upi' | 'netbanking' | 'wallet'
-  status: 'pending' | 'completed' | 'failed' | 'refunded'
+  status: 'pending' | 'completed' | 'failed' | 'refunded' | 'processing' | 'partially_refunded'
   refundReason?: string
+  refundableBalance?: number
+  razorpayPaymentId?: string
+  razorpayOrderId?: string
+  errorCode?: string
+  errorDesc?: string
+  bookingNumber?: string
+  propertyName?: string
+  user?: { name?: string; email?: string; phone?: string }
+  refunds?: Array<{ id: string; amount: number; reason?: string; status: string; createdAt: string }>
   createdAt: string
   updatedAt: string
+}
+
+export interface RefundItem {
+  id: string
+  paymentId: string
+  amount: number
+  reason?: string
+  status: string
+  razorpayRefundId?: string
+  bookingNumber?: string
+  createdAt: string
 }
 
 export interface Payout {
@@ -20,7 +40,7 @@ export interface Payout {
   vendorId: string
   vendorName: string
   amount: number
-  status: 'pending' | 'processing' | 'completed' | 'failed'
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'paid' | 'approved' | 'rejected'
   upiId?: string
   bankAccount?: string
   bankName?: string
@@ -32,10 +52,53 @@ export interface Payout {
 const normalizePayoutStatus = (status?: string): Payout['status'] => {
   if (!status) return 'pending'
   const value = status.toLowerCase()
+  if (value === 'approved') return 'approved'
+  if (value === 'paid') return 'paid'
+  if (value === 'rejected') return 'rejected'
   if (value === 'completed') return 'completed'
   if (value === 'processing') return 'processing'
-  if (value === 'failed' || value === 'rejected') return 'failed'
+  if (value === 'failed') return 'failed'
   return 'pending'
+}
+
+const mapPayment = (payment: any): Payment => ({
+  id: payment.id,
+  transactionId: payment.transactionId ?? payment.razorpayPaymentId ?? payment.id,
+  bookingId: payment.bookingId ?? payment.booking?.id,
+  serviceBookingId: payment.serviceBookingId,
+  vendorId: payment.vendorId ?? payment.vendor?.id,
+  amount: Number(payment.amount ?? 0),
+  currency: payment.currency ?? 'INR',
+  method: payment.method ?? payment.paymentMethod ?? 'upi',
+  status: (payment.status?.toLowerCase() ?? 'pending') as Payment['status'],
+  refundReason: payment.refundReason,
+  refundableBalance: payment.refundableBalance,
+  razorpayPaymentId: payment.razorpayPaymentId,
+  razorpayOrderId: payment.razorpayOrderId,
+  errorCode: payment.errorCode,
+  errorDesc: payment.errorDesc,
+  bookingNumber: payment.bookingNumber ?? payment.booking?.bookingNumber,
+  propertyName: payment.propertyName ?? payment.booking?.property?.name,
+  user: payment.user,
+  refunds: payment.refunds,
+  createdAt: payment.createdAt,
+  updatedAt: payment.updatedAt ?? payment.createdAt,
+})
+
+const normalizePaymentsList = (payload: any) => {
+  const data = payload?.data ?? payload?.payments ?? []
+  const meta = payload?.meta ?? payload?.pagination
+  return {
+    data: Array.isArray(data) ? data.map(mapPayment) : [],
+    pagination: meta
+      ? {
+          total: meta.total ?? 0,
+          page: meta.page ?? 1,
+          limit: meta.limit ?? 10,
+          totalPages: meta.totalPages ?? meta.pages ?? 1,
+        }
+      : { total: 0, page: 1, limit: 10, totalPages: 1 },
+  }
 }
 
 const mapPayout = (payout: any): Payout => ({
@@ -81,22 +144,22 @@ export const paymentsService = {
     status?: string
     bookingId?: string
     vendorId?: string
+    startDate?: string
+    endDate?: string
   }) => {
-    const response = await api.get('/v1/admin/payments', { params })
-    const payload = response.data?.data ?? response.data
-    const data = payload?.payments ?? payload?.data ?? []
-    const meta = payload?.meta ?? payload?.pagination
-    return {
-      data: Array.isArray(data) ? data : [],
-      pagination: meta
-        ? {
-            total: meta.total ?? 0,
-            page: meta.page ?? 1,
-            limit: meta.limit ?? 10,
-            totalPages: meta.totalPages ?? meta.pages ?? 1,
-          }
-        : { total: 0, page: 1, limit: 10, totalPages: 1 },
-    }
+    const response = await api.get('/v1/admin/payments', { 
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search || undefined,
+        status: params?.status || undefined,
+        bookingId: params?.bookingId || undefined,
+        vendorId: params?.vendorId || undefined,
+        startDate: params?.startDate || undefined,
+        endDate: params?.endDate || undefined,
+      }
+    })
+    return normalizePaymentsList(response.data)
   },
 
   getPaymentById: async (id: string) => {
@@ -104,8 +167,11 @@ export const paymentsService = {
     return response.data?.data ?? response.data
   },
 
-  refundPayment: async (paymentId: string, reason: string) => {
-    const response = await api.put(`/v1/admin/payments/${paymentId}/refund`, { reason })
+  refundPayment: async (paymentId: string, amount?: number, reason?: string) => {
+    const response = await api.put(`/v1/admin/payments/${paymentId}/refund`, {
+      ...(amount !== undefined && amount > 0 && { amount }),
+      reason,
+    })
     return response.data?.data ?? response.data
   },
 
@@ -115,13 +181,25 @@ export const paymentsService = {
     search?: string
     status?: string
     vendorId?: string
+    startDate?: string
+    endDate?: string
   }) => {
-    const response = await api.get('/v1/admin/payouts', { params })
+    const response = await api.get('/v1/admin/payouts', { 
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search || undefined,
+        status: params?.status || undefined,
+        vendorId: params?.vendorId || undefined,
+        startDate: params?.startDate || undefined,
+        endDate: params?.endDate || undefined,
+      }
+    })
     return normalizeList(response.data)
   },
 
   getPayoutById: async (id: string) => {
-    const response = await api.get('/v1/admin/payouts', { params: { page: 1, limit: 50 } })
+    const response = await api.get('/v1/admin/payouts', { params: { page: 1, limit: 100 } })
     const normalized = normalizeList(response.data)
     return normalized.data.find((item: Payout) => item.id === id)
   },
@@ -157,12 +235,12 @@ export const paymentsService = {
     return response.data?.data ?? response.data
   },
 
-  getVendorEarnings: async (params?: { vendorId?: string }) => {
+  getVendorEarnings: async (params?: { vendorId?: string; search?: string }) => {
     const response = await api.get('/v1/admin/payouts/earnings', { params })
     return response.data?.data ?? response.data
   },
 
-  getRefunds: async (params?: { page?: number; limit?: number }) => {
+  getRefunds: async (params?: { page?: number; limit?: number; search?: string; status?: string; startDate?: string; endDate?: string }) => {
     const response = await api.get('/v1/admin/refunds', { params })
     const payload = response.data?.data ?? response.data
     const data = payload?.refunds ?? payload?.data ?? []

@@ -1,4 +1,6 @@
 // Razorpay Type Definitions
+import { handleError } from './errorHandler';
+
 declare global {
   interface Window {
     Razorpay: any;
@@ -39,17 +41,39 @@ export interface RazorpayResponse {
 // Razorpay Key — used only as fallback when backend does not return keyId
 const RAZORPAY_KEY_FALLBACK = import.meta.env.VITE_RAZORPAY_KEY || "";
 
+let cachedKeyId: string | null = null;
+
 /**
  * Opens the Razorpay payment modal.
  * Prefer passing `keyId` from the backend createOrder response so the key
  * is never hard-coded in the frontend. VITE_RAZORPAY_KEY is a local fallback.
  */
-export const initiatePayment = (
+export const initiatePayment = async (
   options: Partial<RazorpayOptions> & { keyId?: string }
 ) => {
-  return new Promise((resolve, reject) => {
-    const razorpayKey = options.keyId || RAZORPAY_KEY_FALLBACK;
+  let razorpayKey = options.keyId || cachedKeyId;
 
+  // If no key provided, try to fetch from backend config
+  if (!razorpayKey) {
+    try {
+      const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+      const response = await fetch(`${BASE_URL}/v1/config/payment-key`);
+      if (response.ok) {
+        const result = await response.json();
+        razorpayKey = result?.data?.keyId || result?.keyId;
+        if (razorpayKey) cachedKeyId = razorpayKey;
+      }
+    } catch (error) {
+      handleError(error, 'payment');
+    }
+  }
+
+  // Final fallback to env variable
+  if (!razorpayKey) {
+    razorpayKey = RAZORPAY_KEY_FALLBACK;
+  }
+
+  return new Promise((resolve, reject) => {
     if (!razorpayKey) {
       alert(
         "Razorpay API key not configured!\n\n" +

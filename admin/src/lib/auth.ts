@@ -25,12 +25,30 @@ export interface ResetPasswordRequest {
   password: string
 }
 
+const TOKEN_KEY = 'admin_access_token'
+const REFRESH_TOKEN_KEY = 'admin_refresh_token'
+const USER_KEY = 'admin_user'
+
 export const authService = {
   login: async (data: AuthLoginRequest) => {
     const response = await api.post('/v1/auth/login', data)
     const payload = response.data?.data
+
+    const accessToken = payload?.tokens?.accessToken
+    const refreshToken = payload?.tokens?.refreshToken
+
+    if (accessToken) {
+      localStorage.setItem(TOKEN_KEY, accessToken)
+    }
+    if (refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
+    }
+    if (payload?.user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(payload.user))
+    }
+
     return {
-      accessToken: payload?.tokens?.accessToken,
+      accessToken,
       user: payload?.user,
     } as AuthLoginResponse
   },
@@ -46,7 +64,8 @@ export const authService = {
   },
 
   logout: () => {
-    localStorage.removeItem('admin_token')
-    localStorage.removeItem('admin_data')
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(REFRESH_TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
   },
 }

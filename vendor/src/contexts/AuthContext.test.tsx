@@ -12,6 +12,9 @@ vi.mock("@/services/tokenService", () => ({
   getAccessToken: vi.fn(),
   setAccessToken: vi.fn(),
   clearTokens: vi.fn(),
+  checkAndClearExpiredToken: vi.fn(() => false),
+  setTokens: vi.fn(),
+  getRefreshToken: vi.fn(),
 }));
 
 vi.mock("@/lib/vendor", () => ({

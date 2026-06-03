@@ -42,6 +42,12 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
     VendorController.getPayoutHistory
   );
 
+  fastify.post(
+    '/earnings/payouts',
+    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
+    VendorController.requestPayout
+  );
+
   // Vendor inventory management
   fastify.post(
     '/inventory/block-date',

@@ -3,19 +3,17 @@ import { motion } from "framer-motion";
 import {
   FileText,
   Download,
-  Calendar,
   DollarSign,
   CreditCard,
   Banknote,
   Smartphone,
   Search,
-  Filter,
   ChevronLeft,
   ChevronRight,
   Printer,
   Eye,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -81,34 +79,58 @@ const VendorPOSHistory = () => {
   const fetchInvoices = async () => {
     setIsLoading(true);
     try {
-      const params: Record<string, string> = {
-        page: currentPage.toString(),
-        limit: "10",
-        date: selectedDate,
-      };
-      if (paymentFilter !== "all") {
-        params.paymentMethod = paymentFilter;
+      let bookings: any[] = [];
+      
+      // Try bookings API first
+      try {
+        const params: Record<string, string> = {
+          page: currentPage.toString(),
+          limit: "20",
+        };
+        if (paymentFilter !== "all") {
+          params.paymentMethod = paymentFilter;
+        }
+        const response = await bookingsService.getBookings(params);
+        bookings = response?.data || [];
+      } catch (e) {
+        console.log("Bookings API error");
       }
-      const response = await bookingsService.getBookings(params);
-      const bookings = response.data || response || [];
-      const invoiceData: Invoice[] = bookings.map((b: any) => ({
+      
+      // If empty, get from dashboard
+      if (bookings.length === 0) {
+        try {
+          const { vendorService } = await import("@/lib/vendor");
+          const dashboard = await vendorService.getDashboard();
+          if (dashboard?.recentBookings) {
+            bookings = dashboard.recentBookings;
+          }
+        } catch (e) {
+          console.log("Dashboard API error");
+        }
+      }
+      
+      console.log("POS History fetchInvoices bookings:", bookings);
+
+      const invoiceData = bookings.map((b: any) => ({
         id: b.id,
-        invoiceNumber: `INV-${b.bookingNumber}`,
-        bookingNumber: b.bookingNumber,
-        guestName: b.user?.name || "Guest",
+        invoiceNumber: `INV-${b.bookingNumber || b.id.slice(0, 8)}`,
+        bookingNumber: b.bookingNumber || b.id.slice(0, 8),
+        guestName: b.user?.name || b.guestName || "Guest",
         propertyName: b.property?.name || "",
         roomName: b.room?.name || "Room",
         checkInDate: b.checkInDate,
         checkOutDate: b.checkOutDate,
-        totalAmount: b.totalAmount,
-        paymentMethod: b.paymentMethod || "CASH",
-        paymentStatus: b.paymentStatus,
+        totalAmount: b.totalAmount || b.pricing?.totalAmount || 0,
+        paymentMethod: b.payment?.method || b.paymentMethod || "CASH",
+        paymentStatus: b.payment?.status || b.paymentStatus || "PENDING",
         createdAt: b.createdAt,
       }));
+
       setInvoices(invoiceData);
-      setTotalPages(response.meta?.totalPages || 1);
+      setTotalPages(Math.ceil(invoiceData.length / 10) || 1);
     } catch (error) {
       console.error("Failed to fetch invoices:", error);
+      setInvoices([]);
     } finally {
       setIsLoading(false);
     }
@@ -118,13 +140,36 @@ const VendorPOSHistory = () => {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 30);
-      const response = await bookingsService.getBookings({
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: new Date().toISOString().split("T")[0],
-      });
+      
+      // First try bookings API
+      let bookings: any[] = [];
+      try {
+        const response = await bookingsService.getBookings({
+          startDate: startDate.toISOString().split("T")[0],
+          endDate: new Date().toISOString().split("T")[0],
+          limit: "100",
+        });
+        bookings = response?.data || [];
+      } catch (e) {
+        console.log("Bookings API failed, trying dashboard");
+      }
+      
+      // If empty, get from dashboard
+      if (bookings.length === 0) {
+        try {
+          const { vendorService } = await import("@/lib/vendor");
+          const dashboard = await vendorService.getDashboard();
+          if (dashboard?.recentBookings) {
+            bookings = dashboard.recentBookings;
+          }
+        } catch (e) {
+          console.log("Dashboard API failed");
+        }
+      }
+      
+      console.log("POS History bookings:", bookings);
       
       const summary: Record<string, DailySummary> = {};
-      const bookings = response.data || response || [];
       
       bookings.forEach((b: any) => {
         const date = new Date(b.createdAt).toISOString().split("T")[0];
@@ -140,12 +185,14 @@ const VendorPOSHistory = () => {
           };
         }
         summary[date].totalBookings++;
-        summary[date].totalRevenue += b.totalAmount;
-        const method = b.paymentMethod?.toUpperCase() || "CASH";
-        if (method === "CASH") summary[date].cashPayments += b.totalAmount;
-        else if (method === "CARD") summary[date].cardPayments += b.totalAmount;
-        else if (method === "UPI") summary[date].upiPayments += b.totalAmount;
-        else summary[date].onlinePayments += b.totalAmount;
+        summary[date].totalRevenue += b.totalAmount || 0;
+        const method = b.payment?.method?.toUpperCase() || b.paymentMethod?.toUpperCase() || "CASH";
+        const amount = b.totalAmount || 0;
+        if (method === "CASH") summary[date].cashPayments += amount;
+        else if (method === "CARD") summary[date].cardPayments += amount;
+        else if (method === "UPI") summary[date].upiPayments += amount;
+        else if (method === "RAZORPAY" || method === "ONLINE") summary[date].onlinePayments += amount;
+        else summary[date].cashPayments += amount;
       });
       
       setDailySummary(Object.values(summary).sort((a, b) => b.date.localeCompare(a.date)));
@@ -262,7 +309,7 @@ const VendorPOSHistory = () => {
               <SelectItem value="CASH">Cash</SelectItem>
               <SelectItem value="CARD">Card</SelectItem>
               <SelectItem value="UPI">UPI</SelectItem>
-              <SelectItem value="ONLINE">Online</SelectItem>
+              <SelectItem value="RAZORPAY">Online</SelectItem>
             </SelectContent>
           </Select>
         </div>

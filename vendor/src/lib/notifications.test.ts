@@ -40,11 +40,11 @@ describe("notificationsService", () => {
   describe("markRead", () => {
     it("should mark a notification as read", async () => {
       const mockResponse = { data: { id: "1", isRead: true } };
-      vi.mocked(api.patch).mockResolvedValue(mockResponse);
+      vi.mocked(api.put).mockResolvedValue(mockResponse);
 
       const result = await notificationsService.markRead("notif-1");
 
-      expect(api.patch).toHaveBeenCalledWith("/v1/vendor/notifications/notif-1/read");
+      expect(api.put).toHaveBeenCalledWith("/v1/vendor/notifications/notif-1/read");
       expect(result).toEqual(mockResponse.data);
     });
   });
@@ -52,11 +52,11 @@ describe("notificationsService", () => {
   describe("markAllRead", () => {
     it("should mark all notifications as read", async () => {
       const mockResponse = { data: { success: true } };
-      vi.mocked(api.patch).mockResolvedValue(mockResponse);
+      vi.mocked(api.put).mockResolvedValue(mockResponse);
 
       const result = await notificationsService.markAllRead();
 
-      expect(api.patch).toHaveBeenCalledWith("/v1/vendor/notifications/read-all");
+      expect(api.put).toHaveBeenCalledWith("/v1/vendor/notifications/read-all");
       expect(result).toEqual(mockResponse.data);
     });
   });

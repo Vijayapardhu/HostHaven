@@ -6,8 +6,8 @@ export default async function notificationsRoutes(fastify: FastifyInstance) {
 
   fastify.get('/', NotificationsController.getAll);
   fastify.get('/:id', NotificationsController.getById);
-  fastify.put('/:id/read', NotificationsController.markAsRead);
   fastify.put('/read-all', NotificationsController.markAllAsRead);
+  fastify.put('/:id/read', NotificationsController.markAsRead);
   fastify.delete('/:id', NotificationsController.delete);
   fastify.delete('/', NotificationsController.deleteAll);
 }

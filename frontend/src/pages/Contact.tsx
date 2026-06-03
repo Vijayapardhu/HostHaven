@@ -1,15 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Phone, Mail, MapPin, Clock, MessageCircle, Loader2, CheckCircle2 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import SEOHead from "@/components/SEOHead";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePublicPlatformSettings } from "@/hooks/usePublicPlatformSettings";
+
+const CONTACT_DRAFT_KEY = "hosthaven_contact_draft";
 
 const Contact = () => {
-  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
+  const settings = usePublicPlatformSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,26 +37,79 @@ const Contact = () => {
       return;
     }
 
+    if (!isAuthenticated) {
+      localStorage.setItem(CONTACT_DRAFT_KEY, JSON.stringify(form));
+      navigate("/login", { state: { from: location.pathname + location.search, contactRedirect: true } });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      if (isAuthenticated) {
-        await api.support.create({
-          category: form.subject,
-          message: `Contact Form\nName: ${form.name}\nEmail: ${form.email}\nPhone: ${form.phone}\n\n${form.message}`,
-        });
-      } else {
-        // For unauthenticated users, store locally
-        setIsSuccess(true);
-        return;
-      }
+      await api.support.create({
+        category: form.subject,
+        message: `Contact Form\nName: ${form.name}\nEmail: ${form.email}\nPhone: ${form.phone}\n\n${form.message}`,
+      });
       setIsSuccess(true);
       setForm({ name: "", email: "", phone: "", subject: "", message: "" });
+      localStorage.removeItem(CONTACT_DRAFT_KEY);
     } catch (err: any) {
       setError(err?.message || "Failed to send message. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    const storedDraft = localStorage.getItem(CONTACT_DRAFT_KEY);
+    if (!storedDraft) return;
+
+    try {
+      const draft = JSON.parse(storedDraft);
+      setForm({
+        name: draft.name || "",
+        email: draft.email || "",
+        phone: draft.phone || "",
+        subject: draft.subject || "",
+        message: draft.message || "",
+      });
+    } catch {
+      localStorage.removeItem(CONTACT_DRAFT_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    const shouldAutoSubmit = (location.state as { contactRedirect?: boolean } | null)?.contactRedirect;
+    const storedDraft = localStorage.getItem(CONTACT_DRAFT_KEY);
+    if (!shouldAutoSubmit || !storedDraft || !isAuthenticated || isLoading || isSubmitting || isSuccess) {
+      return;
+    }
+
+    const submitDraft = async () => {
+      try {
+        const draft = JSON.parse(storedDraft);
+        if (!draft?.name || !draft?.email || !draft?.subject || !draft?.message) {
+          return;
+        }
+
+        setError(null);
+        setIsSubmitting(true);
+        await api.support.create({
+          category: draft.subject,
+          message: `Contact Form\nName: ${draft.name}\nEmail: ${draft.email}\nPhone: ${draft.phone || ""}\n\n${draft.message}`,
+        });
+        setIsSuccess(true);
+        setForm({ name: "", email: "", phone: "", subject: "", message: "" });
+        localStorage.removeItem(CONTACT_DRAFT_KEY);
+        navigate(location.pathname, { replace: true, state: {} });
+      } catch (err: any) {
+        setError(err?.message || "Failed to send message. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    void submitDraft();
+  }, [isAuthenticated, isLoading, isSubmitting, isSuccess, location.pathname, location.state, navigate]);
 
   return (
     <>
@@ -72,7 +132,7 @@ const Contact = () => {
               addressRegion: "Andhra Pradesh",
               addressCountry: "IN",
             },
-            email: "info@hosthaven.in",
+            email: settings.contact.supportEmail,
           },
         }}
       />
@@ -103,7 +163,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <p className="font-semibold text-foreground">Phone</p>
-                      <p className="text-muted-foreground text-sm">Available via support tickets</p>
+                        <p className="text-muted-foreground text-sm">{settings.contact.supportPhone}</p>
                     </div>
                   </div>
 
@@ -113,7 +173,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <p className="font-semibold text-foreground">Email</p>
-                      <p className="text-muted-foreground text-sm">Send us a message using the form</p>
+                        <p className="text-muted-foreground text-sm">{settings.contact.supportEmail}</p>
                     </div>
                   </div>
 
@@ -124,8 +184,8 @@ const Contact = () => {
                     <div>
                       <p className="font-semibold text-foreground">Address</p>
                       <p className="text-muted-foreground text-sm">
-                        HostHaven Travels Pvt. Ltd.<br />
-                        Andhra Pradesh, India
+                        {settings.contact.supportCompanyName}<br />
+                        {settings.contact.supportAddress}
                       </p>
                     </div>
                   </div>
@@ -137,8 +197,7 @@ const Contact = () => {
                     <div>
                       <p className="font-semibold text-foreground">Working Hours</p>
                       <p className="text-muted-foreground text-sm">
-                        Monday - Sunday<br />
-                        24/7 Customer Support
+                        {settings.contact.supportHours}
                       </p>
                     </div>
                   </div>
@@ -191,10 +250,12 @@ const Contact = () => {
                   <label className="text-sm font-medium text-foreground mb-2 block">Phone Number</label>
                   <Input
                     type="tel"
-                    placeholder="Enter your phone number"
+                    placeholder="9876543210"
                     className="h-12 bg-muted border-0 rounded-xl"
                     value={form.phone}
-                    onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                    inputMode="numeric"
+                    maxLength={10}
                   />
                 </div>
                 <div>

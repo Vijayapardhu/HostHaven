@@ -1,24 +1,13 @@
 import { z } from 'zod';
 import { paginationSchema } from '../../utils/validators.util';
-
-const dbCityEnum = z.enum(['VIJAYAWADA', 'NANDIYALA', 'VETLAPALEM', 'TIRUPATI']);
+import { getActiveCities } from '../../utils/cities.util';
 
 const normalizeCityValue = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
-
-  const normalized = value.trim().toLowerCase().replace(/[_\s-]+/g, '');
-  const cityMap: Record<string, z.infer<typeof dbCityEnum>> = {
-    vijayawada: 'VIJAYAWADA',
-    nandiyala: 'NANDIYALA',
-    nandyal: 'NANDIYALA',
-    vetlapalem: 'VETLAPALEM',
-    tirupati: 'TIRUPATI',
-  };
-
-  return cityMap[normalized] ?? value;
+  return value.trim().toUpperCase();
 };
 
-export const allowedCitySchema = z.preprocess(normalizeCityValue, dbCityEnum);
+export const allowedCitySchema = z.preprocess(normalizeCityValue, z.string().min(1));
 
 export const createPropertySchema = z.object({
   type: z.enum(['HOTEL', 'HOME', 'TEMPLE']),
@@ -28,14 +17,17 @@ export const createPropertySchema = z.object({
   address: z.string().min(5).max(500),
   city: allowedCitySchema,
   state: z.string().min(2).max(100),
-  pincode: z.string().regex(/^[1-9][0-9]{5}$/),
+  pincode: z.union([
+    z.string().regex(/^[1-9][0-9]{5}$/, "Must be a valid 6-digit PIN code"),
+    z.number().int().positive().refine(n => n >= 100000 && n <= 999999, "Must be a valid 6-digit PIN code")
+  ]).transform(val => String(val)),
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
   images: z.array(z.object({
     url: z.string().url(),
     alt: z.string().optional(),
     isPrimary: z.boolean().optional(),
-  })).min(1).max(20),
+  })).min(1),
   amenities: z.array(z.string()).min(1).max(50),
   highlights: z.array(z.string()).optional(),
   basePrice: z.coerce.number().positive(),
@@ -43,7 +35,13 @@ export const createPropertySchema = z.object({
   metaDesc: z.string().max(200).optional(),
 });
 
-export const updatePropertySchema = createPropertySchema.partial();
+export const updatePropertySchema = createPropertySchema.partial().extend({
+  images: z.array(z.object({
+    url: z.string().url(),
+    alt: z.string().optional(),
+    isPrimary: z.boolean().optional(),
+  })).optional(),
+});
 
 export const propertyFilterSchema = paginationSchema.extend({
   type: z.enum(['HOTEL', 'HOME', 'TEMPLE']).optional(),
@@ -63,13 +61,17 @@ export const propertyFilterSchema = paginationSchema.extend({
 });
 
 export const propertyIdSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
 });
 
 export const availabilitySchema = z.object({
   checkIn: z.string().datetime(),
   checkOut: z.string().datetime(),
   roomId: z.string().uuid().optional(),
+});
+
+export const amenityNameSchema = z.object({
+  name: z.string().min(1).max(80),
 });
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;

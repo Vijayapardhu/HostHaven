@@ -281,12 +281,28 @@ export const templesService = {
     city?: string;
     active?: boolean;
   }) => {
-    const response = await api.get("/v1/temples", { params });
+    const response = await api.get("/v1/temples", { 
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search || undefined,
+        city: params?.city || undefined,
+        active: params?.active,
+      }
+    });
     return normalizeList(response.data);
   },
 
   getTempleById: async (id: string) => {
+    console.log("Fetching temple with ID/slug:", id);
     const response = await api.get(`/v1/temples/${id}`);
+    console.log("Temple response:", response.data);
+    const payload = response.data?.data ?? response.data;
+    return mapTemple(payload);
+  },
+
+  getTempleBySlug: async (slug: string) => {
+    const response = await api.get(`/v1/temples/${encodeURIComponent(slug)}`);
     const payload = response.data?.data ?? response.data;
     return mapTemple(payload);
   },
@@ -297,7 +313,9 @@ export const templesService = {
   },
 
   updateTemple: async (id: string, data: Partial<CreateTempleRequest>) => {
+    console.log("Updating temple:", id, data);
     const response = await api.put(`/v1/temples/${id}`, data);
+    console.log("Update response:", response.data);
     return mapTemple(response.data.data ?? response.data);
   },
 

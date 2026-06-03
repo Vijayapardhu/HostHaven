@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import { logger } from '../utils/logger.util';
 import prisma from '../config/database';
+import { config } from '../config';
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BAIN_yNFBud4AQ1M9BUCKwuQnNxVIwnznWXcl7JmUKF84JR0TWRBWY0LJxl-bGW8arLqX1ysiByMZaEk6Ti5m3E';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'RUE9sFbe8Wx504JSGaujwutJMCcfGZHBVYjsodSG48o';
@@ -24,10 +25,21 @@ export interface PushNotificationPayload {
   title: string;
   body: string;
   icon?: string;
+  image?: string;
   badge?: string;
   tag?: string;
   data?: Record<string, any>;
 }
+
+const getNotificationIcon = (_type?: string): string => {
+  const baseUrl = config.app.frontendUrl || 'https://hosthaven.in';
+  return `${baseUrl}/logo.png`;
+};
+
+const getNotificationBadge = (): string => {
+  const baseUrl = config.app.frontendUrl || 'https://hosthaven.in';
+  return `${baseUrl}/logo.png`;
+};
 
 class WebPushService {
   async getVapidPublicKey(): Promise<string> {
@@ -68,12 +80,15 @@ class WebPushService {
       return;
     }
 
+    const notificationType = payload.data?.type as string | undefined;
+    const imageUrl = typeof payload.data?.imageUrl === 'string' ? payload.data.imageUrl : undefined;
     const pushPayload = JSON.stringify({
       notification: {
         title: payload.title,
         body: payload.body,
-        icon: payload.icon || '/icon-192x192.png',
-        badge: payload.badge || '/badge-72x72.png',
+        icon: payload.icon || imageUrl || getNotificationIcon(notificationType),
+        image: payload.image || imageUrl,
+        badge: payload.badge || getNotificationBadge(),
         tag: payload.tag || 'hosthaven-notification',
         data: payload.data,
       },

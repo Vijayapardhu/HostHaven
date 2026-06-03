@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DollarSign, TrendingUp, Banknote, Download } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { earningsService } from "@/lib/earnings";
@@ -33,10 +33,10 @@ const VendorEarningsIndex = () => {
   }, [dateRange]);
 
   const stats = {
-    totalEarnings: summary?.totalEarnings || 0,
-    thisMonth: summary?.thisMonth || 0,
-    pendingPayouts: summary?.pendingPayouts || 0,
-    commission: summary?.commission || 0,
+    totalEarnings: summary?.totalRevenue || 0,
+    thisMonth: summary?.totalRevenue || 0,
+    pendingPayouts: summary?.pendingPayouts?.amount || 0,
+    commission: summary?.pendingCommissions?.commissionAmount || 0,
   };
 
   return (
@@ -47,7 +47,7 @@ const VendorEarningsIndex = () => {
           <p className="text-muted-foreground mt-1">Track your revenue and payouts</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate("/vendor/earnings/payout-history")}>
+          <Button variant="outline" onClick={() => navigate("/earnings/payout-history")}>
             Payout History
           </Button>
           <Select value={dateRange} onValueChange={setDateRange}>

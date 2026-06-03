@@ -30,25 +30,34 @@ export interface AnalyticsData {
     rate: number;
     byReason: { reason: string; count: number }[];
   };
+  bookingStatusBreakdown?: { status: string; count: number }[];
+  paymentMethodBreakdown?: { method: string; count: number }[];
 }
 
 export const analyticsService = {
   getAnalytics: async (range: "7d" | "30d" | "3m") => {
-    const response = await api.get<AnalyticsData>("/v1/admin/analytics", {
+    const response = await api.get("/v1/admin/analytics", {
       params: { range },
     });
-    return response.data?.data ?? response.data;
+    return (response.data?.data ?? response.data) as AnalyticsData;
   },
 
   exportReport: async (
     type: "bookings" | "revenue" | "vendors" | "cancellations",
     range: "7d" | "30d" | "3m",
   ) => {
-    const response = await api.get(`/v1/admin/analytics/export`, {
-      params: { type, range },
+    const exportEntityMap: Record<typeof type, string> = {
+      bookings: "bookings",
+      revenue: "payments",
+      vendors: "vendors",
+      cancellations: "refunds",
+    };
+
+    const response = await api.get(`/v1/admin/export/${exportEntityMap[type]}`, {
+      params: { range },
       responseType: "blob",
     });
-    const blob = new Blob([response as unknown as BlobPart], {
+    const blob = new Blob([response.data as BlobPart], {
       type: "text/csv",
     });
     const url = window.URL.createObjectURL(blob);

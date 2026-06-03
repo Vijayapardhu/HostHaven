@@ -43,11 +43,13 @@ const statusLabels: Record<string, string> = {
   approved: "Approved",
   pending: "Pending",
   hidden: "Hidden",
+  rejected: "Hidden",
 };
 const statusVariants: Record<string, "success" | "warning" | "neutral"> = {
   approved: "success",
   pending: "warning",
   hidden: "neutral",
+  rejected: "neutral",
 };
 
 export default function Reviews() {
@@ -82,7 +84,7 @@ export default function Reviews() {
         page,
         limit: pageSize,
         search: searchTerm || undefined,
-        status: statusFilter,
+        status: statusFilter === "all" ? undefined : statusFilter,
       });
       setReviews(data.data ?? []);
       setTotal(data.pagination?.total ?? 0);

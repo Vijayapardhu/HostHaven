@@ -23,6 +23,14 @@ export interface NotificationsResponse {
   unreadCount?: number
 }
 
+export interface SendPushNotificationRequest {
+  title: string
+  message: string
+  type?: string
+  target?: 'all' | 'users' | 'vendors' | 'admins'
+  imageUrl?: string
+}
+
 const normalizeList = (payload: any) => {
   const data = payload?.data ?? payload?.notifications ?? []
   const meta = payload?.meta ?? payload?.pagination
@@ -45,7 +53,13 @@ export const notificationsService = {
     limit?: number
     isRead?: boolean
   }) => {
-    const response = await api.get('/v1/admin/notifications', { params })
+    const response = await api.get('/v1/admin/notifications', { 
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        isRead: params?.isRead,
+      }
+    })
     return normalizeList(response.data)
   },
 
@@ -55,7 +69,18 @@ export const notificationsService = {
   },
 
   markAllAsRead: async () => {
-    const response = await api.put('/v1/admin/notifications/read-all')
+    const response = await api.put('/v1/admin/notifications/read-all', {})
+    return response.data?.data ?? response.data
+  },
+
+  sendPushNotification: async (payload: SendPushNotificationRequest) => {
+    const response = await api.post('/v1/admin/notifications/push', {
+      type: payload.type ?? 'admin_announcement',
+      target: payload.target ?? 'all',
+      title: payload.title,
+      message: payload.message,
+      data: payload.imageUrl ? { imageUrl: payload.imageUrl } : undefined,
+    })
     return response.data?.data ?? response.data
   },
 }

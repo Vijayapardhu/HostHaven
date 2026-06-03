@@ -46,6 +46,7 @@ export default function Users() {
         limit: pageSize,
         search: searchTerm || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
+        role: 'USER',
       })
       setUsers(data.data)
       setTotal(data.pagination.total)

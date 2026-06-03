@@ -68,3 +68,30 @@ export const hasValidAccessToken = (): boolean => {
   const token = getAccessToken();
   return !!token && !isTokenExpired(token);
 };
+
+export const checkAndClearExpiredToken = (): boolean => {
+  const token = getAccessToken();
+  if (token && isTokenExpired(token)) {
+    clearTokens();
+    window.dispatchEvent(new CustomEvent("vendor:unauthorized"));
+    return true;
+  }
+  return false;
+};
+
+export const getTokenExpiryDate = (): Date | null => {
+  const token = getAccessToken();
+  if (!token) return null;
+  
+  const payload = parseJwtPayload(token);
+  if (!payload?.exp) return null;
+  
+  return new Date(payload.exp * 1000);
+};
+
+export const getTimeUntilExpiry = (): number | null => {
+  const expiryDate = getTokenExpiryDate();
+  if (!expiryDate) return null;
+  
+  return expiryDate.getTime() - Date.now();
+};

@@ -5,6 +5,8 @@ export interface AuthUser {
   email: string;
   role: 'USER' | 'VENDOR' | 'ADMIN';
   vendorId?: string;
+  isApproved?: boolean;
+  applicationStatus?: string;
 }
 
 declare module 'fastify' {

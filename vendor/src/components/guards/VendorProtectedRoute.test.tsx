@@ -3,12 +3,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import VendorProtectedRoute from "@/components/guards/VendorProtectedRoute";
 
-const renderRoutes = (initialPath = "/vendor/dashboard") => {
+const renderRoutes = (initialPath = "/dashboard") => {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
-        <Route path="/vendor/login" element={<div>Login Page</div>} />
-        <Route path="/vendor" element={<VendorProtectedRoute />}>
+        <Route path="/login" element={<div>Login Page</div>} />
+        <Route path="/" element={<VendorProtectedRoute />}>
           <Route path="dashboard" element={<div>Protected Page</div>} />
         </Route>
       </Routes>

@@ -11,6 +11,21 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://hosthaven.in/hotels-in/vijayawada</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://hosthaven.in/hotels-in/vetlapalem</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hosthaven.in/hotels-in/nandiyala</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://hosthaven.in/homes</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
@@ -46,12 +61,12 @@
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://hosthaven.in/vendor/login</loc>
+    <loc>https://vendor.hosthaven.in/vendor/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://hosthaven.in/vendor/signup</loc>
+    <loc>https://vendor.hosthaven.in/vendor/signup</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

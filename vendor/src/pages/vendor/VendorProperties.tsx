@@ -7,13 +7,12 @@ import {
   Search,
   Edit,
   Trash2,
-  Image,
   MapPin,
   Star,
   Upload,
   X,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -93,7 +92,7 @@ const VendorProperties = () => {
     setErrorMessage(null);
     try {
       const response = await vendorService.getProperties();
-      setProperties(response.data || response || []);
+      setProperties(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error("Failed to fetch properties:", error);
       setErrorMessage("Failed to load hotel properties. Please try again.");
@@ -128,15 +127,21 @@ const VendorProperties = () => {
           return {
             url: result.url,
             alt: file.name,
-            isPrimary: formData.images.length === 0,
+            isPrimary: false,
           };
         })
       );
 
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, ...uploadedImages],
-      }));
+      setFormData((prev) => {
+        const hasPrimary = prev.images.some(img => img.isPrimary);
+        if (!hasPrimary && uploadedImages.length > 0) {
+          uploadedImages[0].isPrimary = true;
+        }
+        return {
+          ...prev,
+          images: [...prev.images, ...uploadedImages],
+        };
+      });
 
       toast({
         title: "Images uploaded",
@@ -154,10 +159,13 @@ const VendorProperties = () => {
   };
 
   const handleRemoveImage = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => {
+      const newImages = prev.images.filter((_, i) => i !== index);
+      if (prev.images[index]?.isPrimary && newImages.length > 0) {
+        newImages[0].isPrimary = true;
+      }
+      return { ...prev, images: newImages };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -520,7 +528,7 @@ const VendorProperties = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="absolute bottom-3 left-3 right-3 flex gap-2">
                       <Button size="sm" variant="secondary" asChild>
-                        <Link to={`/vendor/properties/${property.id}/edit`}>
+                        <Link to={`/properties/${property.id}/edit`}>
                           <Edit className="w-4 h-4 mr-1" />
                           Edit
                         </Link>

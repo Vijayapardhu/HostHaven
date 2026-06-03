@@ -11,6 +11,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { PageLoader } from '../components/ui/PageLoader'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { getUserFriendlyError } from '../lib/errorUtils'
 
 type VendorStatus = 'pending' | 'approved' | 'rejected' | 'suspended'
 
@@ -101,7 +102,7 @@ export default function Vendors() {
         )
       )
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Unable to update vendor status.')
+      toast.error(getUserFriendlyError(err))
     } finally {
       setConfirmAction(null)
     }
@@ -284,7 +285,7 @@ export default function Vendors() {
                   </div>
                   <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
                     <p className="text-xs text-slate-500">Bookings</p>
-                    <p className="text-sm font-semibold text-slate-900">—</p>
+                    <p className="text-sm font-semibold text-slate-900">{vendor.bookingsCount ?? 0}</p>
                   </div>
                 </div>
 

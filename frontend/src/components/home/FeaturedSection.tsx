@@ -142,8 +142,8 @@ export const FeaturedHomes = () => {
 
   return (
     <FeaturedSection
-      title="Featured Homes"
-      subtitle="Authentic home stays for a local experience"
+      title="Featured Homestays"
+      subtitle="Authentic homestays for a local experience"
       items={items}
       viewAllLink="/homes"
     />

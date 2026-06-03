@@ -2,30 +2,79 @@ import api from './api'
 
 export interface Property {
   id: string
+  slug?: string
   name: string
   type: 'hotel' | 'home' | 'temple'
   city: string
+  state?: string
+  pincode?: string
   address: string
   description?: string
+  shortDesc?: string
+  searchText?: string
   amenities?: string[]
-  images?: string[]
+  highlights?: string[]
+  images?: any[]
   video?: string
+  videos?: any[]
+  virtualTourUrl?: string
   mapLocation?: { lat: number; lng: number }
+  latitude?: number
+  longitude?: number
   pricing?: {
     basePrice: number
     weekendPrice?: number
   }
-  status: 'pending' | 'approved' | 'inactive' | 'rejected'
+  basePrice?: number
+  currency?: string
+  status: 'pending' | 'approved' | 'inactive' | 'rejected' | 'draft'
   vendorId?: string
   rating?: number
   reviewCount?: number
+  bookingCount?: number
+  bookingsCount?: number
+  viewCount?: number
+  isFeatured?: boolean
+  isVerified?: boolean
+  metaTitle?: string
+  metaDesc?: string
+  featureFlags?: Record<string, unknown>
+  houseDetails?: Record<string, unknown>
+  cancellationPolicy?: any
+  rooms?: any[]
+  rejectionReason?: string
+  templeDetails?: any
   createdAt: string
   updatedAt: string
+}
+
+export interface PropertyMedia {
+  url: string
+  alt?: string
+  isPrimary?: boolean
+  type?: string
+}
+
+export interface PropertyRoom {
+  id?: string
+  name: string
+  description?: string
+  type: string
+  capacity: number
+  extraBedCapacity?: number
+  pricePerNight: number
+  weekendPrice?: number
+  totalRooms: number
+  availableRooms?: number
+  amenities?: string[]
+  images?: string[]
+  video?: string
 }
 
 const normalizeStatus = (status?: string): Property['status'] => {
   if (!status) return 'pending'
   const value = status.toUpperCase()
+  if (value === 'DRAFT') return 'draft'
   if (value === 'ACTIVE') return 'approved'
   if (value === 'INACTIVE') return 'inactive'
   if (value === 'REJECTED') return 'rejected'
@@ -42,6 +91,7 @@ const normalizeType = (type?: string): Property['type'] => {
 
 const mapStatusToApi = (status?: string) => {
   if (!status) return undefined
+  if (status === 'draft') return 'DRAFT'
   if (status === 'approved') return 'ACTIVE'
   if (status === 'inactive') return 'INACTIVE'
   if (status === 'rejected') return 'REJECTED'
@@ -57,20 +107,42 @@ const mapTypeToApi = (type?: string) => {
 
 const mapProperty = (property: any): Property => ({
   id: property.id,
+  slug: property.slug,
   name: property.name,
   type: normalizeType(property.type),
   city: property.city ?? property.state ?? '',
+  state: property.state,
+  pincode: property.pincode,
   address: property.address ?? '',
   description: property.description,
+  shortDesc: property.shortDesc,
   amenities: property.amenities,
-  images: property.images, // Returns the exact JSON representation instead of trying to map it exclusively to strings
+  highlights: property.highlights,
+  images: property.images,
   video: property.video || property.videos?.[0],
+  videos: property.videos,
+  virtualTourUrl: property.virtualTourUrl,
   mapLocation: property.mapLocation || { lat: property.latitude, lng: property.longitude },
+  latitude: property.latitude,
+  longitude: property.longitude,
   pricing: property.pricing || { basePrice: property.basePrice, weekendPrice: property.weekendPrice },
+  basePrice: property.basePrice,
+  currency: property.currency,
   status: normalizeStatus(property.status),
   vendorId: property.vendor?.id ?? property.vendorId,
   rating: property.rating,
   reviewCount: property.reviewCount,
+  bookingCount: property.bookingCount,
+  viewCount: property.viewCount,
+  isFeatured: property.isFeatured,
+  isVerified: property.isVerified,
+  metaTitle: property.metaTitle,
+  metaDesc: property.metaDesc,
+  featureFlags: property.featureFlags,
+  cancellationPolicy: property.cancellationPolicy,
+  rooms: property.rooms,
+  rejectionReason: property.rejectionReason,
+  templeDetails: property.templeDetails,
   createdAt: property.createdAt,
   updatedAt: property.updatedAt ?? property.createdAt,
 })
@@ -99,22 +171,30 @@ export const propertiesService = {
     type?: string
     status?: string
     city?: string
+    vendorId?: string
   }) => {
     const response = await api.get('/v1/admin/properties', {
       params: {
         page: params?.page,
         limit: params?.limit,
-        search: params?.search,
+        search: params?.search || undefined,
         status: mapStatusToApi(params?.status),
         type: mapTypeToApi(params?.type),
-        city: params?.city,
+        city: params?.city || undefined,
+        vendorId: params?.vendorId || undefined,
       },
     })
     return normalizeList(response.data)
   },
 
   getPropertyById: async (id: string) => {
-    const response = await api.get(`/v1/properties/${id}`)
+    const response = await api.get(`/v1/admin/properties/${id}`)
+    const payload = response.data?.data ?? response.data
+    return mapProperty(payload)
+  },
+
+  getPropertyBySlug: async (slug: string) => {
+    const response = await api.get(`/v1/admin/properties/${encodeURIComponent(slug)}`)
     const payload = response.data?.data ?? response.data
     return mapProperty(payload)
   },
@@ -142,14 +222,29 @@ export const propertiesService = {
     return response.data?.data ?? response.data
   },
 
-  updateProperty: async (propertyId: string, data: Partial<Property>) => {
-    if (data.status) {
-      const response = await api.put(`/v1/admin/properties/${propertyId}/status`, {
-        status: mapStatusToApi(data.status),
-      })
-      return response.data?.data ?? response.data
+  updateProperty: async (propertyId: string, data: any) => {
+    const { status, ...rest } = data
+
+    let result
+    if (Object.keys(rest).length > 0) {
+      const response = await api.put(`/v1/admin/properties/${propertyId}`, rest)
+      result = response.data?.data ?? response.data
     }
-    const response = await api.put(`/v1/properties/${propertyId}`, data)
+
+    if (status) {
+      const response = await api.put(`/v1/admin/properties/${propertyId}/status`, {
+        status: mapStatusToApi(status),
+      })
+      result = response.data?.data ?? response.data
+    }
+
+    return result
+  },
+
+  setCancellationPolicy: async (propertyId: string, policyType: string) => {
+    const response = await api.put(`/v1/admin/properties/${propertyId}/cancellation-policy`, {
+      cancellationPolicy: policyType,
+    })
     return response.data?.data ?? response.data
   },
 
@@ -163,8 +258,58 @@ export const propertiesService = {
     return response.data?.data ?? response.data
   },
 
-  createProperty: async (data: Partial<Property>) => {
+  getCityNames: async () => {
+    const response = await api.get('/v1/properties/cities/list')
+    return response.data?.data ?? response.data ?? []
+  },
+
+  getAmenityNames: async () => {
+    const response = await api.get('/v1/properties/amenities')
+    return response.data?.data ?? response.data ?? []
+  },
+
+  createAmenity: async (name: string) => {
+    const response = await api.post('/v1/properties/amenities', { name })
+    return response.data?.data ?? response.data
+  },
+
+  createProperty: async (data: any) => {
     const response = await api.post('/v1/admin/properties', data)
+    return response.data?.data ?? response.data
+  },
+
+  updateRoom: async (roomId: string, data: { pricePerNight?: number; weekendPrice?: number; availableRooms?: number; images?: string[]; video?: string }) => {
+    const response = await api.put(`/v1/admin/rooms/${roomId}`, data)
+    return response.data?.data ?? response.data
+  },
+
+  blockRoomDates: async (roomId: string, data: { checkInDate: string; checkOutDate: string; quantity?: number }) => {
+    const response = await api.post(`/v1/admin/rooms/${roomId}/block`, data)
+    return response.data?.data ?? response.data
+  },
+
+  getAllAmenities: async () => {
+    const response = await api.get('/v1/admin/amenities')
+    return response.data?.data ?? response.data ?? []
+  },
+
+  toggleAmenity: async (name: string, isActive: boolean) => {
+    const response = await api.put('/v1/admin/amenities/toggle', { name, isActive })
+    return response.data?.data ?? response.data
+  },
+
+  getAllCities: async () => {
+    const response = await api.get('/v1/admin/cities')
+    return response.data?.data ?? response.data ?? []
+  },
+
+  toggleCity: async (name: string, isActive: boolean) => {
+    const response = await api.put('/v1/admin/cities/toggle', { name, isActive })
+    return response.data?.data ?? response.data
+  },
+
+  createCity: async (name: string) => {
+    const response = await api.post('/v1/admin/cities', { name })
     return response.data?.data ?? response.data
   },
 }

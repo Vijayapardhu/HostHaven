@@ -1,25 +1,36 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { User, Building2, CreditCard, Bell, Shield, Save, Loader2, Camera, Mail, Phone, MapPin } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  User, CreditCard, Bell, Shield, 
+  Save, Loader2, Eye, EyeOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { useVendor } from "@/contexts/VendorContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth";
 import { vendorService } from "@/lib/vendor";
 
+const sections = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "bank", label: "Bank", icon: CreditCard },
+  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "security", label: "Security", icon: Shield },
+];
+
 const VendorSettings = () => {
   const { vendor, refreshVendor } = useVendor();
   const { subscription, subscribe, unsubscribe, requestPermission, isSupported } = usePushNotifications();
   const { toast } = useToast();
   
+  const [activeSection, setActiveSection] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   
   const [profileData, setProfileData] = useState({
     businessName: "",
@@ -76,7 +87,7 @@ const VendorSettings = () => {
     } else {
       const permission = await requestPermission();
       if (permission !== 'granted') {
-        toast({ title: "Permission denied", description: "Please enable notifications in your browser settings", variant: "destructive" });
+        toast({ title: "Permission denied", variant: "destructive" });
         return;
       }
       const success = await subscribe();
@@ -89,15 +100,38 @@ const VendorSettings = () => {
     }
   };
 
-  const handleProfileSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     setIsLoading(true);
     try {
-      await vendorService.updateProfile(profileData);
+      const hasBankDetails = [
+        profileData.bankName,
+        profileData.accountNumber,
+        profileData.ifscCode,
+        profileData.accountHolderName,
+      ].some((value) => value.trim().length > 0);
+
+      const payload = {
+        businessName: profileData.businessName.trim(),
+        businessAddress: profileData.businessAddress.trim(),
+        gstNumber: profileData.gstNumber.trim() || undefined,
+        panNumber: profileData.panNumber.trim() || undefined,
+        aadhaarNumber: profileData.aadhaarNumber.trim() || undefined,
+        bankAccount: hasBankDetails
+          ? {
+              bankName: profileData.bankName.trim(),
+              accountNumber: profileData.accountNumber.trim(),
+              ifscCode: profileData.ifscCode.trim(),
+              accountHolderName: profileData.accountHolderName.trim(),
+            }
+          : undefined,
+      };
+
+      await vendorService.updateProfile(payload);
       await refreshVendor();
-      toast({ title: "Profile updated successfully" });
+      toast({ title: "Saved successfully" });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      const message = error?.response?.data?.error?.message || error?.message || "Failed to save settings";
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -106,17 +140,13 @@ const VendorSettings = () => {
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
-      return;
-    }
-    if (passwordData.newPassword.length < 6) {
-      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      toast({ title: "Passwords do not match", variant: "destructive" });
       return;
     }
     setIsLoading(true);
     try {
       await authService.changePassword(passwordData.currentPassword, passwordData.newPassword);
-      toast({ title: "Password updated successfully" });
+      toast({ title: "Password updated" });
       setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -126,316 +156,291 @@ const VendorSettings = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-serif font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage your account and preferences</p>
-      </div>
+    <div className="min-h-screen bg-background -mx-8 -mt-8 p-8">
+      <div className="mx-auto max-w-7xl">
+        <h1 className="text-3xl font-bold mb-10"> Settings</h1>
+        
+        <div className="flex gap-12">
+          {/* Sidebar */}
+          <div className="w-64 shrink-0">
+            <nav className="flex flex-col gap-2">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  className={`
+                    flex items-center gap-4 px-6 py-4 rounded-2xl text-left text-lg transition-all
+                    ${activeSection === section.id 
+                      ? "bg-primary text-primary-foreground font-semibold shadow-lg" 
+                      : "hover:bg-muted"
+                    }
+                  `}
+                >
+                  <section.icon className="w-6 h-6" />
+                  <span>{section.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="profile" className="gap-2"><User className="w-4 h-4" />Profile</TabsTrigger>
-          <TabsTrigger value="business" className="gap-2"><Building2 className="w-4 h-4" />Business</TabsTrigger>
-          <TabsTrigger value="bank" className="gap-2"><CreditCard className="w-4 h-4" />Bank Details</TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2"><Bell className="w-4 h-4" />Notifications</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="profile">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal information</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-6 mb-8">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                    {vendor?.user?.avatar ? (
-                      <img src={vendor.user.avatar} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-10 h-10 text-muted-foreground" />
-                    )}
-                  </div>
-                  <button
-                    className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
-                    aria-label="Upload profile picture"
-                  >
-                    <Camera className="w-4 h-4" />
-                  </button>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">{vendor?.user?.name}</h3>
-                  <p className="text-muted-foreground">{vendor?.user?.email}</p>
-                  <p className="text-sm text-muted-foreground mt-1">Vendor ID: {vendor?.id}</p>
-                </div>
-              </div>
-
-              <form onSubmit={handleProfileSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" value={vendor?.user?.name || ""} disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" value={vendor?.user?.email || ""} disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="businessName">Business Name</Label>
-                    <Input 
-                      id="businessName" 
-                      value={profileData.businessName}
-                      onChange={(e) => setProfileData({ ...profileData, businessName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gstNumber">GST Number</Label>
-                    <Input 
-                      id="gstNumber" 
-                      value={profileData.gstNumber}
-                      onChange={(e) => setProfileData({ ...profileData, gstNumber: e.target.value })}
-                      placeholder="22AAAAA0000A1Z5"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="panNumber">PAN Number</Label>
-                    <Input 
-                      id="panNumber" 
-                      value={profileData.panNumber}
-                      onChange={(e) => setProfileData({ ...profileData, panNumber: e.target.value })}
-                      placeholder="AAAAA0000A"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="aadhaarNumber">Aadhaar Number</Label>
-                    <Input 
-                      id="aadhaarNumber" 
-                      value={profileData.aadhaarNumber}
-                      onChange={(e) => setProfileData({ ...profileData, aadhaarNumber: e.target.value })}
-                      placeholder="1234 5678 9012"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="businessAddress">Business Address</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                      id="businessAddress" 
-                      className="pl-10"
-                      value={profileData.businessAddress}
-                      onChange={(e) => setProfileData({ ...profileData, businessAddress: e.target.value })}
-                      placeholder="Enter your business address"
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={isLoading} className="gap-2">
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Save Changes
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="business">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Business Information</CardTitle>
-              <CardDescription>Details about your hotel business</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Label className="text-muted-foreground">Business Name</Label>
-                  <p className="text-lg font-semibold mt-1">{vendor?.businessName || "Not set"}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Label className="text-muted-foreground">GST Number</Label>
-                  <p className="text-lg font-semibold mt-1">{vendor?.gstNumber || "Not set"}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Label className="text-muted-foreground">PAN Number</Label>
-                  <p className="text-lg font-semibold mt-1">{vendor?.panNumber || "Not set"}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Label className="text-muted-foreground">Commission Rate</Label>
-                  <p className="text-lg font-semibold mt-1">{vendor?.commissionRate}%</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Label className="text-muted-foreground">Approval Status</Label>
-                  <p className={`text-lg font-semibold mt-1 ${vendor?.isApproved ? "text-green-600" : "text-amber-600"}`}>
-                    {vendor?.isApproved ? "Approved" : "Pending Approval"}
-                  </p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <Label className="text-muted-foreground">Approved On</Label>
-                  <p className="text-lg font-semibold mt-1">
-                    {vendor?.approvedAt ? new Date(vendor.approvedAt).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="bank">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Bank Details</CardTitle>
-              <CardDescription>Your payout will be transferred to this account</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleProfileSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bankName">Bank Name</Label>
-                    <Input 
-                      id="bankName" 
-                      value={profileData.bankName}
-                      onChange={(e) => setProfileData({ ...profileData, bankName: e.target.value })}
-                      placeholder="State Bank of India"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="accountHolderName">Account Holder Name</Label>
-                    <Input 
-                      id="accountHolderName" 
-                      value={profileData.accountHolderName}
-                      onChange={(e) => setProfileData({ ...profileData, accountHolderName: e.target.value })}
-                      placeholder="As per bank records"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="accountNumber">Account Number</Label>
-                    <Input 
-                      id="accountNumber" 
-                      value={profileData.accountNumber}
-                      onChange={(e) => setProfileData({ ...profileData, accountNumber: e.target.value })}
-                      placeholder="1234567890"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ifscCode">IFSC Code</Label>
-                    <Input 
-                      id="ifscCode" 
-                      value={profileData.ifscCode}
-                      onChange={(e) => setProfileData({ ...profileData, ifscCode: e.target.value })}
-                      placeholder="SBIN0001234"
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={isLoading} className="gap-2">
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Save Bank Details
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Manage how you receive notifications</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Bell className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Push Notifications</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {isSupported 
-                        ? "Receive instant notifications in your browser" 
-                        : "Your browser does not support push notifications"}
-                    </p>
-                  </div>
-                </div>
-                <Switch 
-                  checked={pushEnabled}
-                  onCheckedChange={handlePushToggle}
-                  disabled={!isSupported}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold">In-App Notifications</h3>
-                <div className="space-y-3">
-                  {[
-                    { id: "booking", label: "New Bookings", description: "Get notified when a guest books a room" },
-                    { id: "checkin", label: "Check-ins", description: "Guest check-in notifications" },
-                    { id: "checkout", label: "Check-outs", description: "Guest check-out notifications" },
-                    { id: "payment", label: "Payments", description: "Payment received notifications" },
-                    { id: "review", label: "Reviews", description: "New review notifications" },
-                  ].map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                      <div>
-                        <p className="font-medium">{item.label}</p>
-                        <p className="text-sm text-muted-foreground">{item.description}</p>
-                      </div>
-                      <Switch defaultChecked />
+          {/* Content */}
+          <div className="flex-1">
+            <AnimatePresence mode="wait">
+              {activeSection === "profile" && (
+                <motion.div
+                  key="profile"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-8"
+                >
+                  {/* Profile Header */}
+                  <div className="flex items-center gap-6 p-6 rounded-2xl bg-gradient-to-r from-primary/5 to-primary/10 border">
+                    <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center">
+                      <User className="w-12 h-12 text-primary" />
                     </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    <div className="flex-1">
+                      <p className="text-2xl font-bold">{vendor?.user?.name}</p>
+                      <p className="text-lg text-muted-foreground">{vendor?.user?.email}</p>
+                      <p className="text-base text-muted-foreground">{vendor?.user?.phone}</p>
+                    </div>
+                    <Badge variant={vendor?.isApproved ? "default" : "secondary"} className="text-base px-4 py-1">
+                      {vendor?.isApproved ? "Verified" : "Pending"}
+                    </Badge>
+                  </div>
 
-          <Card className="border-0 shadow-lg mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Security
-              </CardTitle>
-              <CardDescription>Change your password</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input 
-                    id="currentPassword" 
-                    type="password"
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input 
-                      id="newPassword" 
-                      type="password"
-                      value={passwordData.newPassword}
-                      onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                    />
+                  {/* Form Fields */}
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">Business Name</Label>
+                        <Input 
+                          value={profileData.businessName}
+                          onChange={(e) => setProfileData({ ...profileData, businessName: e.target.value })}
+                          className="h-14 text-lg"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">GST Number</Label>
+                        <Input 
+                          value={profileData.gstNumber}
+                          onChange={(e) => setProfileData({ ...profileData, gstNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) })}
+                          className="h-14 text-lg uppercase"
+                          maxLength={15}
+                          placeholder="22AAAAA0000A1Z5"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-lg text-muted-foreground mb-3 block">Business Address</Label>
+                      <Input 
+                        value={profileData.businessAddress}
+                        onChange={(e) => setProfileData({ ...profileData, businessAddress: e.target.value })}
+                        className="h-14 text-lg"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">PAN Number</Label>
+                        <Input 
+                          value={profileData.panNumber}
+                          onChange={(e) => setProfileData({ ...profileData, panNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) })}
+                          className="h-14 text-lg uppercase"
+                          maxLength={10}
+                          placeholder="AAAAA0000A"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">Aadhaar Number</Label>
+                        <Input 
+                          value={profileData.aadhaarNumber}
+                          onChange={(e) => setProfileData({ ...profileData, aadhaarNumber: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                          className="h-14 text-lg"
+                          maxLength={12}
+                          inputMode="numeric"
+                          placeholder="123456789012"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                    <Input 
-                      id="confirmPassword" 
-                      type="password"
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    />
+
+                  <Button onClick={handleSave} disabled={isLoading} className="h-14 text-lg gap-3 px-8">
+                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Save className="w-6 h-6" />}
+                    Save Changes
+                  </Button>
+                </motion.div>
+              )}
+
+              {activeSection === "bank" && (
+                <motion.div
+                  key="bank"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-8"
+                >
+                  <h2 className="text-2xl font-bold">Bank Details</h2>
+                  
+                  <div className="p-6 rounded-2xl bg-gradient-to-r from-green-50 to-blue-50 border">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                        <CreditCard className="w-6 h-6 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold">Payout Account</p>
+                        <p className="text-muted-foreground">
+                          {profileData.bankName ? `${profileData.bankName} •••• ${profileData.accountNumber?.slice(-4)}` : "No bank added"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <Button type="submit" disabled={isLoading} className="gap-2">
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
-                  Update Password
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">Bank Name</Label>
+                        <Input 
+                          value={profileData.bankName}
+                          onChange={(e) => setProfileData({ ...profileData, bankName: e.target.value })}
+                          className="h-14 text-lg"
+                          placeholder="State Bank of India"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">Account Holder Name</Label>
+                        <Input 
+                          value={profileData.accountHolderName}
+                          onChange={(e) => setProfileData({ ...profileData, accountHolderName: e.target.value })}
+                          className="h-14 text-lg"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">Account Number</Label>
+                        <Input 
+                          type="password"
+                          value={profileData.accountNumber}
+                          onChange={(e) => setProfileData({ ...profileData, accountNumber: e.target.value.replace(/\D/g, '').slice(0, 18) })}
+                          className="h-14 text-lg"
+                          maxLength={18}
+                          inputMode="numeric"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">IFSC Code</Label>
+                        <Input 
+                          value={profileData.ifscCode}
+                          onChange={(e) => setProfileData({ ...profileData, ifscCode: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11) })}
+                          className="h-14 text-lg uppercase"
+                          maxLength={11}
+                          placeholder="SBIN0001234"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button onClick={handleSave} disabled={isLoading} className="h-14 text-lg gap-3 px-8">
+                    {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Save className="w-6 h-6" />}
+                    Save Bank Details
+                  </Button>
+                </motion.div>
+              )}
+
+              {activeSection === "notifications" && (
+                <motion.div
+                  key="notifications"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-6"
+                >
+                  <h2 className="text-2xl font-bold">Notifications</h2>
+                  
+                  <div className="space-y-4">
+                    {[
+                      { id: "push", label: "Push Notifications", sub: "Receive browser notifications", checked: pushEnabled, onChange: handlePushToggle, disabled: !isSupported },
+                      { id: "booking", label: "New Bookings", sub: "When a guest books a room", checked: true, onChange: () => {} },
+                      { id: "checkin", label: "Check-ins", sub: "Guest arrival alerts", checked: true, onChange: () => {} },
+                      { id: "payment", label: "Payments", sub: "Payment received notifications", checked: true, onChange: () => {} },
+                    ].map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-6 rounded-2xl border bg-card">
+                        <div>
+                          <p className="text-xl font-medium">{item.label}</p>
+                          <p className="text-lg text-muted-foreground">{item.sub}</p>
+                        </div>
+                        <Switch 
+                          checked={item.checked}
+                          onCheckedChange={item.onChange}
+                          disabled={item.disabled}
+                          className="w-14 h-8"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {activeSection === "security" && (
+                <motion.div
+                  key="security"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-8"
+                >
+                  <h2 className="text-2xl font-bold">Security</h2>
+                  
+                  <form onSubmit={handlePasswordSubmit} className="space-y-6 max-w-xl">
+                    <div>
+                      <Label className="text-lg text-muted-foreground mb-3 block">Current Password</Label>
+                      <div className="relative">
+                        <Input 
+                          type={showPasswords ? "text" : "password"}
+                          value={passwordData.currentPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                          className="h-14 text-lg pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords(!showPasswords)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2"
+                        >
+                          {showPasswords ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">New Password</Label>
+                        <Input 
+                          type={showPasswords ? "text" : "password"}
+                          value={passwordData.newPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                          className="h-14 text-lg"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-lg text-muted-foreground mb-3 block">Confirm Password</Label>
+                        <Input 
+                          type={showPasswords ? "text" : "password"}
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                          className="h-14 text-lg"
+                        />
+                      </div>
+                    </div>
+                    <Button type="submit" disabled={isLoading} className="h-14 text-lg gap-3 px-8">
+                      {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Shield className="w-6 h-6" />}
+                      Update Password
+                    </Button>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

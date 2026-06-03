@@ -4,12 +4,35 @@ export interface Vendor {
   id: string
   email: string
   phone: string
+  name?: string
   businessName: string
   businessType: string
   status: 'pending' | 'approved' | 'rejected' | 'suspended'
+  applicationStatus?: string
   isApproved: boolean
   commissionRate: number
   propertiesCount?: number
+  bookingsCount?: number
+  businessAddress?: string
+  gstNumber?: string
+  panNumber?: string
+  aadhaarNumber?: string
+  passportPhoto?: string
+  companyLogo?: string
+  rejectionReason?: string
+  totalEarnings?: number
+  user?: {
+    name?: string
+    email?: string
+    phone?: string
+  }
+  bankAccount?: {
+    bankName: string
+    accountNumber: string
+    ifscCode: string
+    accountHolderName: string
+  }
+  payouts?: any[]
   payoutDetails?: {
     upiId?: string
     bankAccount?: string
@@ -37,7 +60,7 @@ export interface AdminVendorOnboardingPayload {
   }
   businessInfo: {
     businessAddress: string
-    city: 'VIJAYAWADA' | 'NANDIYALA' | 'VETLAPALEM' | 'TIRUPATI'
+    city: string
     state: string
     pincode: string
     gstNumber?: string
@@ -92,17 +115,41 @@ export interface AdminVendorOnboardingPayload {
 }
 
 const mapVendor = (vendor: any): Vendor => {
-  const isApproved = Boolean(vendor.isApproved)
+  const rawStatus = String(vendor.applicationStatus ?? vendor.status ?? '').toUpperCase()
+  const status: Vendor['status'] =
+    rawStatus === 'APPROVED'
+      ? 'approved'
+      : rawStatus === 'REJECTED'
+      ? 'rejected'
+      : rawStatus === 'SUSPENDED'
+      ? 'suspended'
+      : 'pending'
+
+  const isApproved = status === 'approved' || Boolean(vendor.isApproved)
   return {
     id: vendor.id,
     email: vendor.user?.email ?? vendor.email ?? '',
     phone: vendor.user?.phone ?? vendor.phone ?? '',
+    name: vendor.user?.name ?? vendor.name,
     businessName: vendor.businessName ?? 'Vendor',
     businessType: vendor.businessType ?? 'Business',
-    status: isApproved ? 'approved' : 'pending',
+    status,
+    applicationStatus: vendor.applicationStatus ?? vendor.status,
     isApproved,
     commissionRate: Number(vendor.commissionRate ?? 0),
     propertiesCount: Number(vendor.propertiesCount ?? vendor._count?.properties ?? 0),
+    bookingsCount: Number(vendor.bookingsCount ?? vendor._count?.bookings ?? 0),
+    businessAddress: vendor.businessAddress,
+    gstNumber: vendor.gstNumber,
+    panNumber: vendor.panNumber,
+    aadhaarNumber: vendor.aadhaarNumber,
+    passportPhoto: vendor.passportPhoto,
+    companyLogo: vendor.companyLogo,
+    rejectionReason: vendor.rejectionReason,
+    totalEarnings: vendor.totalEarnings,
+    user: vendor.user ? { name: vendor.user.name, email: vendor.user.email, phone: vendor.user.phone } : undefined,
+    bankAccount: vendor.bankAccount,
+    payouts: vendor.payouts,
     payoutDetails: vendor.payoutDetails,
     hotelId: vendor.hotelId,
     createdAt: vendor.createdAt,
@@ -136,8 +183,8 @@ export const vendorsService = {
     const response = await api.get('/v1/admin/vendors', { params: {
       page: params?.page,
       limit: params?.limit,
-      search: params?.search,
-      status: params?.status?.toUpperCase(),
+      search: params?.search || undefined,
+      status: params?.status?.toUpperCase() || undefined,
     } })
     return normalizeListResponse(response.data)
   },

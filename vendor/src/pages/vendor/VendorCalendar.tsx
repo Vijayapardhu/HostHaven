@@ -1,18 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   BedDouble,
-  UserCheck,
   UserX,
-  CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -43,7 +38,6 @@ const VendorCalendar = () => {
   const [availability, setAvailability] = useState<DayAvailability[]>([]);
   const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchProperties();
@@ -69,7 +63,6 @@ const VendorCalendar = () => {
   };
 
   const fetchAvailability = async () => {
-    setIsLoading(true);
     try {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
@@ -98,8 +91,6 @@ const VendorCalendar = () => {
       setAvailability(days);
     } catch (error) {
       console.error("Failed to fetch availability:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -153,7 +144,7 @@ const VendorCalendar = () => {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => navigate("/vendor/calendar/block-dates")}>Block Dates</Button>
+          <Button onClick={() => navigate("/calendar/block-dates")}>Block Dates</Button>
         </div>
       </div>
 

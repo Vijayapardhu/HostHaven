@@ -6,13 +6,17 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  GripVertical,
   Image,
   Type,
   Link2,
   MapPin,
+  Database,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { ImageUpload, type UploadedImage } from "../components/ui/ImageUpload";
+import { DatabaseItemPicker } from "../components/ui/DatabaseItemPicker";
+import { handleError } from "../lib/errorHandler";
 import {
   settingsService,
   type HomepageConfig,
@@ -32,16 +36,18 @@ import {
 } from "../components/ui/Card";
 
 const defaultConfig: HomepageConfig = {
+  pageBackground: "",
   sections: {
     banner: { isVisible: true, order: 0 },
     hero: { isVisible: true, order: 1 },
-    promoBanner: { isVisible: true, order: 2 },
-    features: { isVisible: true, order: 3 },
-    destinations: { isVisible: true, order: 4 },
-    recommendations: { isVisible: true, order: 5 },
-    temples: { isVisible: true, order: 6 },
-    services: { isVisible: true, order: 7 },
-    becomePartner: { isVisible: true, order: 8 },
+    search: { isVisible: true, order: 2 },
+    promoBanner: { isVisible: true, order: 3 },
+    features: { isVisible: true, order: 4 },
+    destinations: { isVisible: true, order: 5 },
+    recommendations: { isVisible: true, order: 6 },
+    temples: { isVisible: true, order: 7 },
+    services: { isVisible: true, order: 8 },
+    becomePartner: { isVisible: true, order: 9 },
   },
   bannerSlides: [],
   destinations: [],
@@ -65,6 +71,7 @@ const defaultConfig: HomepageConfig = {
 const SECTION_LABELS: Record<string, string> = {
   banner: "Banner Carousel",
   hero: "Search Hero",
+  search: "Search Bar",
   promoBanner: "Promo Banner",
   features: "Feature Cards",
   destinations: "Top Destinations",
@@ -103,6 +110,20 @@ export default function HomepageEditor() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("sections");
 
+  const [pickerState, setPickerState] = useState<{
+    isOpen: boolean;
+    type: "property" | "temple" | "service";
+    onSelect: (item: any) => void;
+  }>({
+    isOpen: false,
+    type: "property",
+    onSelect: () => { },
+  });
+
+  const openPicker = (type: "property" | "temple" | "service", onSelect: (item: any) => void) => {
+    setPickerState({ isOpen: true, type, onSelect });
+  };
+
   const fetchConfig = async () => {
     setIsLoading(true);
     setError(null);
@@ -112,7 +133,8 @@ export default function HomepageEditor() {
         setConfig({ ...defaultConfig, ...data });
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Unable to load homepage config.");
+      handleError(err, 'api');
+      setError(err?.response?.data?.message || err?.message || "Unable to load homepage config.");
     } finally {
       setIsLoading(false);
     }
@@ -127,7 +149,9 @@ export default function HomepageEditor() {
     try {
       await settingsService.updateHomepageConfig(config);
       toast.success("Homepage configuration saved successfully.");
+      fetchConfig();
     } catch (err: any) {
+      handleError(err, 'api');
       toast.error(err?.response?.data?.message || err?.message || "Failed to save homepage config.");
     } finally {
       setIsSaving(false);
@@ -144,7 +168,46 @@ export default function HomepageEditor() {
     }));
   };
 
+  const getOrderedSections = () => {
+    const keys = Object.keys(SECTION_LABELS);
+    return keys.sort((a, b) => {
+      const orderA = config.sections[a]?.order ?? 99;
+      const orderB = config.sections[b]?.order ?? 99;
+      return orderA - orderB;
+    });
+  };
+
+  const moveSection = (key: string, direction: number) => {
+    const orderedKeys = getOrderedSections();
+    const currentIndex = orderedKeys.indexOf(key);
+    const newIndex = currentIndex + direction;
+    
+    if (newIndex < 0 || newIndex >= orderedKeys.length) return;
+    
+    setConfig((prev) => {
+      const newSections = { ...prev.sections };
+      const reorderedKeys = [...orderedKeys];
+      const [movedKey] = reorderedKeys.splice(currentIndex, 1);
+      reorderedKeys.splice(newIndex, 0, movedKey);
+      
+      reorderedKeys.forEach((k, idx) => {
+        newSections[k] = { ...newSections[k], order: idx };
+      });
+      
+      return { ...prev, sections: newSections };
+    });
+  };
+
+  const handleMoveUp = (key: string) => {
+    moveSection(key, -1);
+  };
+
+  const handleMoveDown = (key: string) => {
+    moveSection(key, 1);
+  };
+
   const tabs = [
+    { id: "appearance", label: "Appearance" },
     { id: "sections", label: "Sections" },
     { id: "banners", label: "Banners" },
     { id: "promo", label: "Promo Banner" },
@@ -215,37 +278,83 @@ export default function HomepageEditor() {
         ))}
       </div>
 
+      {/* Appearance Tab */}
+      {activeTab === "appearance" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Type className="h-4 w-4 text-slate-500" />
+              Homepage Appearance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-w-md">
+              <InputField
+                label="Homepage Background"
+                value={config.pageBackground || ""}
+                onChange={(v) => setConfig((prev) => ({ ...prev, pageBackground: v }))}
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Use any valid CSS background value, like `#ffffff`, `hsl(var(--background))`, or a gradient.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Sections Tab */}
       {activeTab === "sections" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-slate-500" />
-              Section Visibility
+              Section Visibility & Order
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-slate-500">
-              Toggle sections on or off. Hidden sections won't appear on the homepage.
+              Toggle sections on or off. Use arrows to reorder sections. Higher order = appears lower on page.
             </p>
-            <div className="space-y-3">
-              {Object.entries(SECTION_LABELS).map(([key, label]) => (
+            <div className="space-y-2">
+              {getOrderedSections().map((key, index, arr) => (
                 <div key={key} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
                   <div className="flex items-center gap-3">
-                    <GripVertical className="h-4 w-4 text-slate-300" />
-                    <span className="text-sm font-medium text-slate-700">{label}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); handleMoveUp(key); }}
+                        disabled={index === 0}
+                        className="p-2 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded hover:bg-slate-100 cursor-pointer"
+                        title="Move up"
+                      >
+                        <ChevronUp className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); handleMoveDown(key); }}
+                        disabled={index === arr.length - 1}
+                        className="p-2 text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded hover:bg-slate-100 cursor-pointer"
+                        title="Move down"
+                      >
+                        <ChevronDown className="h-5 w-5" />
+                      </button>
+                    </div>
+                    <span className="text-sm font-medium text-slate-700">{SECTION_LABELS[key]}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(key)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.sections[key]?.isVisible ? "bg-indigo-600" : "bg-slate-200"
-                      }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.sections[key]?.isVisible ? "translate-x-6" : "translate-x-1"
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400">Order: {config.sections[key]?.order ?? 99}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(key)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.sections[key]?.isVisible ? "bg-indigo-600" : "bg-slate-200"
                         }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.sections[key]?.isVisible ? "translate-x-6" : "translate-x-1"
+                          }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -317,6 +426,20 @@ export default function HomepageEditor() {
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
+                    </div>
+                    <div className="flex justify-end pr-2">
+                      <button
+                        type="button"
+                        onClick={() => openPicker("property", (item) => {
+                          updateBannerField(idx, "title", item.name);
+                          updateBannerField(idx, "imageUrl", item.imageUrl);
+                          updateBannerField(idx, "ctaLink", item.link);
+                          updateBannerField(idx, "subtitle", item.subtitle);
+                        })}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded transition-colors"
+                      >
+                        <Database className="h-3 w-3" /> Pick from Database
+                      </button>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <InputField label="Title" value={slide.title} onChange={(v) => updateBannerField(idx, "title", v)} />
@@ -440,16 +563,31 @@ export default function HomepageEditor() {
               items={config.destinations}
               onUpdate={(items) => setConfig((prev) => ({ ...prev, destinations: items }))}
               renderFields={(item, idx) => (
-                <div className="grid grid-cols-2 gap-3">
-                  <InputField label="Name" value={item.name} onChange={(v) => updateListField("destinations", idx, "name", v)} />
-                  <InputField label="Link" value={item.link} onChange={(v) => updateListField("destinations", idx, "link", v)} />
-                  <div className="col-span-2">
-                    <ImageUpload
-                      label="Destination Image"
-                      maxImages={1}
-                      images={item.imageUrl ? [{ url: item.imageUrl, alt: item.name }] : []}
-                      onChange={(imgs: UploadedImage[]) => updateListField("destinations", idx, "imageUrl", imgs[0]?.url || "")}
-                    />
+                <div className="space-y-3">
+                  <div className="flex justify-end pr-2">
+                    <button
+                      type="button"
+                      onClick={() => openPicker("property", (item) => {
+                        updateListField("destinations", idx, "name", item.name);
+                        updateListField("destinations", idx, "imageUrl", item.imageUrl);
+                        updateListField("destinations", idx, "link", item.link);
+                      })}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded transition-colors"
+                    >
+                      <Database className="h-3 w-3" /> Pick from Database
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <InputField label="Name" value={item.name} onChange={(v) => updateListField("destinations", idx, "name", v)} />
+                    <InputField label="Link" value={item.link} onChange={(v) => updateListField("destinations", idx, "link", v)} />
+                    <div className="col-span-2">
+                      <ImageUpload
+                        label="Destination Image"
+                        maxImages={1}
+                        images={item.imageUrl ? [{ url: item.imageUrl, alt: item.name }] : []}
+                        onChange={(imgs: UploadedImage[]) => updateListField("destinations", idx, "imageUrl", imgs[0]?.url || "")}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -544,17 +682,33 @@ export default function HomepageEditor() {
               items={config.temples}
               onUpdate={(items) => setConfig((prev) => ({ ...prev, temples: items }))}
               renderFields={(item, idx) => (
-                <div className="grid grid-cols-2 gap-3">
-                  <InputField label="Name" value={(item as TempleItem).name} onChange={(v) => updateListField("temples", idx, "name", v)} />
-                  <InputField label="Location" value={(item as TempleItem).location} onChange={(v) => updateListField("temples", idx, "location", v)} />
-                  <InputField label="Link" value={(item as TempleItem).link} onChange={(v) => updateListField("temples", idx, "link", v)} />
-                  <div className="col-span-2">
-                    <ImageUpload
-                      label="Temple Image"
-                      maxImages={1}
-                      images={item.imageUrl || (item as TempleItem).imageUrl ? [{ url: item.imageUrl || (item as TempleItem).imageUrl, alt: (item as TempleItem).name }] : []}
-                      onChange={(imgs: UploadedImage[]) => updateListField("temples", idx, "imageUrl", imgs[0]?.url || "")}
-                    />
+                <div className="space-y-3">
+                  <div className="flex justify-end pr-2">
+                    <button
+                      type="button"
+                      onClick={() => openPicker("temple", (item) => {
+                        updateListField("temples", idx, "name", item.name);
+                        updateListField("temples", idx, "imageUrl", item.imageUrl);
+                        updateListField("temples", idx, "link", item.link);
+                        updateListField("temples", idx, "location", item.subtitle);
+                      })}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded transition-colors"
+                    >
+                      <Database className="h-3 w-3" /> Pick from Database
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <InputField label="Name" value={(item as TempleItem).name} onChange={(v) => updateListField("temples", idx, "name", v)} />
+                    <InputField label="Location" value={(item as TempleItem).location} onChange={(v) => updateListField("temples", idx, "location", v)} />
+                    <InputField label="Link" value={(item as TempleItem).link} onChange={(v) => updateListField("temples", idx, "link", v)} />
+                    <div className="col-span-2">
+                      <ImageUpload
+                        label="Temple Image"
+                        maxImages={1}
+                        images={item.imageUrl || (item as TempleItem).imageUrl ? [{ url: item.imageUrl || (item as TempleItem).imageUrl, alt: (item as TempleItem).name }] : []}
+                        onChange={(imgs: UploadedImage[]) => updateListField("temples", idx, "imageUrl", imgs[0]?.url || "")}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -594,22 +748,37 @@ export default function HomepageEditor() {
               items={config.serviceCards}
               onUpdate={(items) => setConfig((prev) => ({ ...prev, serviceCards: items }))}
               renderFields={(item, idx) => (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Icon</label>
-                    <select
-                      value={(item as ServiceCardItem).icon}
-                      onChange={(e) => updateListField("serviceCards", idx, "icon", e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                <div className="space-y-3">
+                  <div className="flex justify-end pr-2">
+                    <button
+                      type="button"
+                      onClick={() => openPicker("service", (item) => {
+                        updateListField("serviceCards", idx, "title", item.name);
+                        updateListField("serviceCards", idx, "description", item.subtitle);
+                        updateListField("serviceCards", idx, "link", item.link);
+                      })}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded transition-colors"
                     >
-                      {iconOptions.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                      <Database className="h-3 w-3" /> Pick from Database
+                    </button>
                   </div>
-                  <InputField label="Title" value={(item as ServiceCardItem).title} onChange={(v) => updateListField("serviceCards", idx, "title", v)} />
-                  <InputField label="Description" value={(item as ServiceCardItem).description} onChange={(v) => updateListField("serviceCards", idx, "description", v)} />
-                  <InputField label="Link" value={(item as ServiceCardItem).link} onChange={(v) => updateListField("serviceCards", idx, "link", v)} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Icon</label>
+                      <select
+                        value={(item as ServiceCardItem).icon}
+                        onChange={(e) => updateListField("serviceCards", idx, "icon", e.target.value)}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      >
+                        {iconOptions.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <InputField label="Title" value={(item as ServiceCardItem).title} onChange={(v) => updateListField("serviceCards", idx, "title", v)} />
+                    <InputField label="Description" value={(item as ServiceCardItem).description} onChange={(v) => updateListField("serviceCards", idx, "description", v)} />
+                    <InputField label="Link" value={(item as ServiceCardItem).link} onChange={(v) => updateListField("serviceCards", idx, "link", v)} />
+                  </div>
                 </div>
               )}
             />
@@ -652,6 +821,17 @@ export default function HomepageEditor() {
           </CardContent>
         </Card>
       )}
+
+      {pickerState.isOpen && (
+        <DatabaseItemPicker
+          type={pickerState.type}
+          onSelect={(item) => {
+            pickerState.onSelect(item);
+            setPickerState((prev) => ({ ...prev, isOpen: false }));
+          }}
+          onClose={() => setPickerState((prev) => ({ ...prev, isOpen: false }))}
+        />
+      )}
     </div>
   );
 
@@ -680,7 +860,7 @@ function InputField({ label, value, onChange }: { label: string; value: string; 
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:ring-1 focus:ring-indigo-300"
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:ring-1 focus:ring-indigo-300 transition-all outline-none"
       />
     </div>
   );
@@ -710,14 +890,15 @@ function ItemList<T extends { id: string; isActive: boolean }>({
                 onClick={() =>
                   onUpdate(items.map((i) => (i.id === item.id ? { ...i, isActive: !i.isActive } : i)))
                 }
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                title={item.isActive ? "Hide" : "Show"}
               >
                 {item.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
               </button>
               <button
                 type="button"
                 onClick={() => onUpdate(items.filter((i) => i.id !== item.id))}
-                className="text-red-400 hover:text-red-600"
+                className="text-red-400 hover:text-red-600 transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

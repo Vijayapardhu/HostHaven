@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 import authService from './auth.service';
 import { sendError, sendSuccess } from '../../utils/response.util';
 import { ERROR_CODES } from '../../constants/error-codes';
@@ -18,6 +19,17 @@ import { generateStateToken } from '../../utils/crypto.util';
 import { cacheService } from '../../services/cache.service';
 import { config } from '../../config';
 import { logger } from '../../utils/logger.util';
+import { parseExpiresIn } from '../../utils/token.util';
+
+const getZodErrorMessage = (error: any): string => {
+  if (error instanceof z.ZodError) {
+    const firstIssue = error.issues[0];
+    if (firstIssue) {
+      return firstIssue.message;
+    }
+  }
+  return error.message || 'Validation failed';
+};
 
 export const AuthController = {
   async register(request: FastifyRequest, reply: FastifyReply) {
@@ -46,6 +58,26 @@ export const AuthController = {
         ipAddress: request.ip,
         userAgent: request.headers['user-agent'] || '',
       });
+
+      // Set persistent cookies (365 days)
+      const cookieOptions = {
+        httpOnly: true,
+        secure: config.app.nodeEnv === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 365 days in milliseconds
+      };
+
+      // Set access token cookie
+      reply.setCookie('access_token', result.tokens.accessToken, cookieOptions);
+      
+      // Set refresh token cookie
+      reply.setCookie('refresh_token', result.tokens.refreshToken, {
+        ...cookieOptions,
+        path: '/v1/auth/refresh',
+      });
+
+      // Return tokens in response as well (for localStorage fallback)
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Login failed');
@@ -77,6 +109,22 @@ export const AuthController = {
         ipAddress: request.ip,
         userAgent: request.headers['user-agent'] || '',
       });
+
+      // Set persistent cookies (365 days)
+      const cookieOptions = {
+        httpOnly: true,
+        secure: config.app.nodeEnv === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      };
+
+      reply.setCookie('access_token', result.tokens.accessToken, cookieOptions);
+      reply.setCookie('refresh_token', result.tokens.refreshToken, {
+        ...cookieOptions,
+        path: '/v1/auth/refresh',
+      });
+
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Vendor login failed');
@@ -166,7 +214,11 @@ export const AuthController = {
   async linkGoogle(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { idToken } = googleIdTokenSchema.parse(request.body);
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
 
       const result = await authService.linkGoogleAccount(userId, idToken);
       return sendSuccess(reply, result);
@@ -180,7 +232,11 @@ export const AuthController = {
 
   async unlinkGoogle(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const result = await authService.unlinkGoogleAccount(userId);
       return sendSuccess(reply, result);
     } catch (error: any) {
@@ -244,7 +300,8 @@ export const AuthController = {
     } catch (error: any) {
       logger.error({ error }, 'Reset password failed');
       const statusCode = error.code === ERROR_CODES.INVALID_TOKEN ? 400 : 500;
-      return sendError(reply, error.code || ERROR_CODES.INTERNAL_ERROR, error.message, statusCode);
+      const message = error.code === ERROR_CODES.INVALID_TOKEN ? error.message : getZodErrorMessage(error);
+      return sendError(reply, error.code || ERROR_CODES.VALIDATION_ERROR, message, statusCode);
     }
   },
 
@@ -256,27 +313,86 @@ export const AuthController = {
     } catch (error: any) {
       logger.error({ error }, 'Vendor reset password failed');
       const statusCode = error.code === ERROR_CODES.INVALID_TOKEN ? 400 : 500;
-      return sendError(reply, error.code || ERROR_CODES.INTERNAL_ERROR, error.message, statusCode);
+      const message = error.code === ERROR_CODES.INVALID_TOKEN ? error.message : getZodErrorMessage(error);
+      return sendError(reply, error.code || ERROR_CODES.VALIDATION_ERROR, message, statusCode);
     }
   },
 
   async refresh(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { refreshToken } = refreshTokenSchema.parse(request.body);
+      // Support header, body, and cookie for refresh token
+      let refreshToken: string | undefined = request.headers['x-refresh-token'] as string | undefined;
+      
+      if (!refreshToken) {
+        const body = request.body as { refreshToken?: string };
+        refreshToken = body?.refreshToken;
+      }
+      
+      if (!refreshToken) {
+        refreshToken = request.cookies?.refresh_token;
+      }
+      
+      if (!refreshToken) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Refresh token is required', 400);
+      }
+      
+      const tokens = await authService.refreshTokens(refreshToken);
+      
+      // Update cookies on refresh
+      const cookieOptions = {
+        httpOnly: true,
+        secure: config.app.nodeEnv === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      };
+      
+      reply.setCookie('access_token', tokens.accessToken, cookieOptions);
+      reply.setCookie('refresh_token', tokens.refreshToken, {
+        ...cookieOptions,
+        path: '/v1/auth/refresh',
+      });
+      
+      return sendSuccess(reply, tokens);
+    } catch (error: any) {
+      logger.error({ error }, 'Token refresh failed');
+      const statusCode = error.code === ERROR_CODES.INVALID_TOKEN ? 401 : 500;
+      return sendError(reply, error.code || ERROR_CODES.INVALID_TOKEN, error.message, statusCode);
+    }
+  },
+
+  async refreshGet(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const query = request.query as { refreshToken?: string };
+      const refreshToken = query.refreshToken;
+      if (!refreshToken) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Refresh token is required', 400);
+      }
       const tokens = await authService.refreshTokens(refreshToken);
       return sendSuccess(reply, tokens);
     } catch (error: any) {
       logger.error({ error }, 'Token refresh failed');
-      return sendError(reply, error.code || ERROR_CODES.INVALID_TOKEN, error.message, 401);
+      const statusCode = error.code === ERROR_CODES.INVALID_TOKEN ? 401 : 500;
+      return sendError(reply, error.code || ERROR_CODES.INVALID_TOKEN, error.message, statusCode);
     }
   },
 
   async logout(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { refreshToken } = request.body as { refreshToken?: string };
-      if (refreshToken) {
-        await authService.logout(refreshToken);
+      
+      // Also try to get refreshToken from cookie
+      const cookieRefreshToken = request.cookies?.refresh_token;
+      const tokenToUse = refreshToken || cookieRefreshToken;
+      
+      if (tokenToUse) {
+        await authService.logout(tokenToUse);
       }
+      
+      // Clear cookies
+      reply.clearCookie('access_token', { path: '/' });
+      reply.clearCookie('refresh_token', { path: '/v1/auth/refresh' });
+      
       return sendSuccess(reply, { message: 'Logged out successfully' });
     } catch (error: any) {
       logger.error({ error }, 'Logout failed');
@@ -286,7 +402,11 @@ export const AuthController = {
 
   async logoutAll(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const result = await authService.logoutAll(userId);
       return sendSuccess(reply, result);
     } catch (error: any) {
@@ -297,18 +417,44 @@ export const AuthController = {
 
   async me(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
-      const user = await authService.getCurrentUser(userId);
-      return sendSuccess(reply, { user });
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
+      const currentUser = await authService.getCurrentUser(userId);
+      return sendSuccess(reply, { user: currentUser });
     } catch (error: any) {
       logger.error({ error }, 'Get current user failed');
       return sendError(reply, error.code || ERROR_CODES.USER_NOT_FOUND, error.message, 404);
     }
   },
 
+  async session(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
+      return sendSuccess(reply, {
+        authenticated: true,
+        userId,
+        expiresIn: parseExpiresIn(config.jwt.refreshExpires),
+      });
+    } catch (error: any) {
+      logger.error({ error }, 'Token refresh failed');
+      return sendError(reply, error.code || ERROR_CODES.INVALID_TOKEN, error.message, 401);
+    }
+  },
+
   async changePassword(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const { currentPassword, newPassword } = request.body as { currentPassword: string; newPassword: string };
 
       if (!currentPassword || !newPassword) {
@@ -333,13 +479,67 @@ export const AuthController = {
     }
   },
 
+  async setupTwoFactor(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const result = await authService.setupTwoFactor(user.id);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Setup 2FA failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to setup 2FA', 500);
+    }
+  },
+
+  async verifyTwoFactor(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const { code } = request.body as { code: string };
+      const result = await authService.verifyTwoFactor(user.id, code);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Verify 2FA failed');
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to verify 2FA', 500);
+    }
+  },
+
+  async disableTwoFactor(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const { code } = request.body as { code: string };
+      const result = await authService.disableTwoFactor(user.id, code);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Disable 2FA failed');
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to disable 2FA', 500);
+    }
+  },
+
   // ==========================================
   // PROFILE
   // ==========================================
 
   async updateProfile(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const data = request.body as { name?: string; avatar?: string; phone?: string };
       const result = await authService.updateProfile(userId, data);
       return sendSuccess(reply, result);
@@ -355,7 +555,11 @@ export const AuthController = {
 
   async getAddresses(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const addresses = await authService.getAddresses(userId);
       return sendSuccess(reply, { addresses });
     } catch (error: any) {
@@ -366,7 +570,11 @@ export const AuthController = {
 
   async addAddress(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const data = request.body as { label: string; address: string; city: string; state: string; pincode: string };
       const address = await authService.addAddress(userId, data);
       return sendSuccess(reply, { address }, 201);
@@ -378,7 +586,11 @@ export const AuthController = {
 
   async updateAddress(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const { id } = request.params as { id: string };
       const data = request.body as { label?: string; address?: string; city?: string; state?: string; pincode?: string };
       const address = await authService.updateAddress(userId, id, data);
@@ -394,7 +606,11 @@ export const AuthController = {
 
   async deleteAddress(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const userId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const userId = user.id;
       const { id } = request.params as { id: string };
       await authService.deleteAddress(userId, id);
       return sendSuccess(reply, { message: 'Address deleted successfully' });

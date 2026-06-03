@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Compass, Heart, User, LogIn, Landmark } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWishlist } from "@/contexts/WishlistContext";
@@ -39,8 +40,8 @@ const MobileBottomNav = () => {
   };
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-bottom">
-      <div className="flex items-center justify-around h-16 px-2">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-bottom shadow-lg">
+      <div className="flex items-center justify-around h-16 px-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path, item.activePaths);
@@ -52,18 +53,23 @@ const MobileBottomNav = () => {
                 }`}
             >
               <div className="relative">
-                <Icon className={`w-6 h-6 ${active ? "fill-primary/20" : ""}`} />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${active ? "bg-primary/10" : ""}`}>
+                  <Icon className={`w-5 h-5 ${active ? "text-primary" : ""}`} />
+                </div>
                 {item.badge && (
-                  <span className="absolute -top-1 -right-2 min-w-[18px] h-[18px] bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                  <span className="absolute -top-1 -right-2 min-w-[18px] h-[18px] bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
                     {item.badge > 99 ? "99+" : item.badge}
                   </span>
                 )}
               </div>
-              <span className={`text-[10px] font-medium mt-1 ${active ? "font-semibold" : ""}`}>
+              <span className={`text-[10px] font-medium mt-0.5 ${active ? "font-semibold" : ""}`}>
                 {item.name}
               </span>
               {active && (
-                <div className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-8 h-[3px] bg-primary rounded-t-full" />
+                <motion.div
+                  layoutId="bottomNavActive"
+                  className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-full"
+                />
               )}
             </Link>
           );

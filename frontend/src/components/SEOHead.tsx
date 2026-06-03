@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useSEO } from "@/contexts/SEOContext";
 
 interface SEOHeadProps {
   title?: string;
@@ -12,26 +13,37 @@ interface SEOHeadProps {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
 
-const SITE_NAME = "HostHaven";
-const DEFAULT_DESCRIPTION =
-  "Find and book hotels, homes, and unique stays in Andhra Pradesh. Explore sacred temples, travel services, and heritage destinations.";
 const DEFAULT_OG_IMAGE = "/logo.png";
-const SITE_URL = "https://hosthaven.in";
 
 const SEOHead = ({
   title,
-  description = DEFAULT_DESCRIPTION,
+  description,
   keywords,
-  ogImage = DEFAULT_OG_IMAGE,
+  ogImage,
   ogType = "website",
   canonical,
-  noindex = false,
+  noindex,
   jsonLd,
 }: SEOHeadProps) => {
   const { pathname } = useLocation();
+  const { settings } = useSEO();
 
-  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} - Book Hotels & Homes in Andhra Pradesh`;
-  const canonicalUrl = canonical || `${SITE_URL}${pathname}`;
+  // Use database settings as defaults, with props as overrides
+  const siteName = settings?.platformName || "HostHaven";
+  const siteUrl = settings?.seo?.canonicalBaseUrl || "https://hosthaven.in";
+  const defaultDescription = settings?.seo?.metaDescription || 
+    "Find and book hotels, homes, and unique stays in Andhra Pradesh. Explore sacred temples, travel services, and heritage destinations.";
+  const globalIndexable = settings?.seo?.indexable ?? true;
+
+  // Final values (props override database defaults)
+  const finalDescription = description || defaultDescription;
+  const finalOgImage = ogImage || DEFAULT_OG_IMAGE;
+  const finalNoindex = noindex !== undefined ? noindex : !globalIndexable;
+
+  const fullTitle = title 
+    ? `${title} | ${siteName}` 
+    : `${siteName} - Book Hotels & Homes in Andhra Pradesh`;
+  const canonicalUrl = canonical || `${siteUrl}${pathname}`;
 
   useEffect(() => {
     document.title = fullTitle;
@@ -46,9 +58,9 @@ const SEOHead = ({
       el.setAttribute("content", content);
     };
 
-    setMeta("name", "description", description);
+    setMeta("name", "description", finalDescription);
     if (keywords) setMeta("name", "keywords", keywords);
-    if (noindex) {
+    if (finalNoindex) {
       setMeta("name", "robots", "noindex, nofollow");
     } else {
       setMeta("name", "robots", "index, follow, max-image-preview:large, max-snippet:-1");
@@ -56,17 +68,17 @@ const SEOHead = ({
 
     // Open Graph
     setMeta("property", "og:title", fullTitle);
-    setMeta("property", "og:description", description);
+    setMeta("property", "og:description", finalDescription);
     setMeta("property", "og:type", ogType);
-    setMeta("property", "og:image", ogImage.startsWith("http") ? ogImage : `${SITE_URL}${ogImage}`);
+    setMeta("property", "og:image", finalOgImage.startsWith("http") ? finalOgImage : `${siteUrl}${finalOgImage}`);
     setMeta("property", "og:url", canonicalUrl);
-    setMeta("property", "og:site_name", SITE_NAME);
+    setMeta("property", "og:site_name", siteName);
     setMeta("property", "og:locale", "en_IN");
 
     // Twitter
     setMeta("name", "twitter:title", fullTitle);
-    setMeta("name", "twitter:description", description);
-    setMeta("name", "twitter:image", ogImage.startsWith("http") ? ogImage : `${SITE_URL}${ogImage}`);
+    setMeta("name", "twitter:description", finalDescription);
+    setMeta("name", "twitter:image", finalOgImage.startsWith("http") ? finalOgImage : `${siteUrl}${finalOgImage}`);
     setMeta("name", "twitter:card", "summary_large_image");
 
     // Canonical
@@ -97,7 +109,7 @@ const SEOHead = ({
       const scripts = document.querySelectorAll('script[data-seo-jsonld]');
       scripts.forEach((s) => s.remove());
     };
-  }, [fullTitle, description, keywords, ogImage, ogType, canonicalUrl, noindex, jsonLd]);
+  }, [fullTitle, finalDescription, keywords, finalOgImage, ogType, canonicalUrl, finalNoindex, jsonLd, siteName, siteUrl]);
 
   return null;
 };

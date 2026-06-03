@@ -19,7 +19,7 @@ describe("reviewsService", () => {
 
       const result = await reviewsService.getReviews();
 
-      expect(api.get).toHaveBeenCalledWith("/v1/vendor/reviews", { params: undefined });
+      expect(api.get).toHaveBeenCalledWith("/v1/reviews/vendor", { params: undefined });
       expect(result).toEqual(mockReviews);
     });
 
@@ -29,7 +29,7 @@ describe("reviewsService", () => {
 
       const result = await reviewsService.getReviews({ propertyId: "prop-1" });
 
-      expect(api.get).toHaveBeenCalledWith("/v1/vendor/reviews", {
+      expect(api.get).toHaveBeenCalledWith("/v1/reviews/vendor", {
         params: { propertyId: "prop-1" },
       });
       expect(result).toEqual(mockReviews);

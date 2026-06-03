@@ -76,20 +76,11 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /^https:\/\/images\.unsplash\.com\/.*/i,
-            handler: 'CacheFirst',
+            urlPattern: ({ url }: { url: URL }) => url.hostname.includes('api.'),
+            handler: 'NetworkOnly',
             options: {
-              cacheName: 'unsplash-images-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
-          {
-            urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/v1/admin/'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'admin-api-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 5 },
-              networkTimeoutSeconds: 10,
+              cacheName: 'api-cache',
+              expiration: { maxEntries: 0, maxAgeSeconds: 0 },
             },
           },
         ],

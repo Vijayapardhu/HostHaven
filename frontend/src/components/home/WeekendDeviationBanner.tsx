@@ -1,67 +1,27 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import bannerHotel from "@/assets/banner-hotel.jpg";
-import bannerHome from "@/assets/banner-home.jpg";
-import templeBanner from "@/assets/temple-banner-1.jpg";
 import type { BannerSlide } from "@/hooks/useHomepageConfig";
-
-const defaultSlides = [
-  {
-    image: bannerHotel,
-    title: "Planning a Weekend\nGetaway?",
-    subtitle: "Discover Premium Hotels",
-    tags: "· Luxury · Comfort · Service",
-    link: "/hotels",
-    cta: "Explore Hotels",
-  },
-  {
-    image: bannerHome,
-    title: "Looking for a\nCozy Stay?",
-    subtitle: "Find Perfect Homes",
-    tags: "· Spacious · Homely · Affordable",
-    link: "/homes",
-    cta: "Browse Homes",
-  },
-  {
-    image: templeBanner,
-    title: "Planning a Weekend\nDeviation?",
-    subtitle: "Discover Sacred Temples",
-    tags: "· Yaganti · Mahanandi · Ahobilam",
-    link: "/deviation-temples",
-    cta: "Know the route",
-  },
-];
-
-const localImages: Record<string, string> = {
-  "": "",
-  "banner-hotel": bannerHotel,
-  "banner-home": bannerHome,
-  "temple-banner": templeBanner,
-};
 
 interface Props {
   slides?: BannerSlide[];
 }
 
 const WeekendDeviationBanner = ({ slides: configSlides }: Props) => {
-  const activeSlides = configSlides?.filter((s) => s.isActive);
-  const useConfigSlides = activeSlides && activeSlides.length > 0;
-
-  const resolvedSlides = useConfigSlides
-    ? activeSlides.map((s, i) => ({
-        image: s.imageUrl || defaultSlides[i]?.image || bannerHotel,
-        title: s.title || defaultSlides[i]?.title || "",
-        subtitle: s.subtitle || defaultSlides[i]?.subtitle || "",
-        tags: s.tags || defaultSlides[i]?.tags || "",
-        link: s.ctaLink || defaultSlides[i]?.link || "/hotels",
-        cta: s.ctaText || defaultSlides[i]?.cta || "Learn More",
-      }))
-    : defaultSlides;
+  const activeSlides = (configSlides || []).filter((s) => s.isActive);
+  const resolvedSlides = activeSlides.map((s) => ({
+    image: s.imageUrl || "",
+    title: s.title || "",
+    subtitle: s.subtitle || "",
+    tags: s.tags || "",
+    link: s.ctaLink || "/hotels",
+    cta: s.ctaText || "Learn More",
+  }));
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
+    if (resolvedSlides.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % resolvedSlides.length);
     }, 4000);
@@ -70,10 +30,12 @@ const WeekendDeviationBanner = ({ slides: configSlides }: Props) => {
 
   const current = resolvedSlides[currentIndex];
 
+  if (!resolvedSlides.length || !current || !current.image) return null;
+
   return (
-    <section className="py-4 md:py-5">
+    <section className="py-6">
       <div className="container mx-auto px-4">
-        <div className="relative rounded-2xl overflow-hidden h-[220px] md:h-[340px] lg:h-[380px]">
+        <div className="relative rounded-2xl overflow-hidden h-[220px] md:h-[360px] shadow-xl">
           {resolvedSlides.map((slide, index) => (
             <img
               key={index}
@@ -85,37 +47,44 @@ const WeekendDeviationBanner = ({ slides: configSlides }: Props) => {
             />
           ))}
           
-          <div className="absolute inset-0 bg-gradient-to-r from-heritage-brown/80 via-heritage-brown/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-heritage-brown/90 via-heritage-brown/50 to-transparent" />
           
-          <div className="absolute inset-0 flex flex-col justify-center px-5 md:px-8 lg:px-10">
-            <h2 className="text-xl md:text-3xl lg:text-4xl font-serif font-bold text-cream-light leading-tight mb-2 whitespace-pre-line">
+          <div className="absolute inset-0 flex flex-col justify-center px-8 md:px-12">
+            <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-cream-light/80 text-xs font-medium w-fit mb-4">
+              <span className="w-1.5 h-1.5 rounded-full bg-gold-light" />
+              Featured Destination
+            </span>
+            <h2 className="text-2xl md:text-4xl lg:text-5xl font-serif font-bold text-cream-light leading-tight mb-3 whitespace-pre-line">
               {current.title}
             </h2>
-            <p className="text-cream-light/80 text-sm md:text-base mb-1">
+            <p className="text-cream-light/80 text-sm md:text-lg mb-2 max-w-xl">
               {current.subtitle}
             </p>
-            <p className="text-cream-light/70 text-xs md:text-sm mb-4">
+            <p className="text-cream-light/60 text-xs md:text-sm mb-6 max-w-lg">
               {current.tags}
             </p>
             <Link
               to={current.link}
-              className="inline-flex items-center gap-2 bg-cream-light/20 backdrop-blur-sm border border-cream-light/30 rounded-lg px-4 py-2 md:px-5 md:py-2.5 text-cream-light text-sm md:text-base font-medium w-fit hover:bg-cream-light/30 transition-colors"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-gold text-white rounded-xl px-5 py-2.5 md:px-6 md:py-3 text-sm md:text-base font-semibold w-fit hover:shadow-lg hover:shadow-primary/30 transition-all duration-300 hover:-translate-y-0.5"
             >
               {current.cta}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
-          <div className="absolute bottom-3 right-4 flex gap-1.5">
-            {resolvedSlides.map((_, index) => (
-              <div
-                key={index}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${
-                  index === currentIndex ? "bg-cream-light w-4" : "bg-cream-light/40"
-                }`}
-              />
-            ))}
-          </div>
+          {resolvedSlides.length > 1 && (
+            <div className="absolute bottom-4 right-6 flex gap-2">
+              {resolvedSlides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentIndex(index)}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    index === currentIndex ? "bg-gold-light w-8" : "bg-cream-light/30 w-2 hover:bg-cream-light/50"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -21,6 +21,19 @@ if (normalizedDatabaseUrl) {
   process.env.DATABASE_URL = normalizedDatabaseUrl;
 }
 
+const requiredEnvVars = [
+  'JWT_ACCESS_SECRET',
+  'JWT_REFRESH_SECRET',
+  'RAZORPAY_KEY_ID',
+  'RAZORPAY_KEY_SECRET',
+]
+
+for (const key of requiredEnvVars) {
+  if (!process.env[key]) {
+    throw new Error(`Missing required environment variable: ${key}`)
+  }
+}
+
 export const config = {
   app: {
     nodeEnv: process.env.NODE_ENV || 'development',
@@ -28,6 +41,8 @@ export const config = {
     apiVersion: process.env.API_VERSION || 'v1',
     appUrl: process.env.APP_URL || 'http://localhost:4000',
     frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+    vendorUrl: process.env.VENDOR_URL || 'http://localhost:5174',
+    adminUrl: process.env.ADMIN_URL || 'http://localhost:5175',
   },
 
   database: {
@@ -40,10 +55,10 @@ export const config = {
   },
 
   jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET!,
-    refreshSecret: process.env.JWT_REFRESH_SECRET!,
-    accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
-    refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
+    accessSecret: process.env.JWT_ACCESS_SECRET as string,
+    refreshSecret: process.env.JWT_REFRESH_SECRET as string,
+    accessExpires: process.env.JWT_ACCESS_EXPIRES || '365d',
+    refreshExpires: process.env.JWT_REFRESH_EXPIRES || '365d',
   },
 
   google: {
@@ -61,8 +76,8 @@ export const config = {
   },
 
   razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID || '',
-    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+    keyId: process.env.RAZORPAY_KEY_ID as string,
+    keySecret: process.env.RAZORPAY_KEY_SECRET as string,
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
   },
 
@@ -101,9 +116,13 @@ export const config = {
   },
 
   rateLimit: {
-    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
-    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10),
+    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '60', 10),
+    apiMax: parseInt(process.env.API_RATE_LIMIT_MAX || '200', 10),
+    writeMax: parseInt(process.env.WRITE_RATE_LIMIT_MAX || '60', 10),
+    searchMax: parseInt(process.env.SEARCH_RATE_LIMIT_MAX || '60', 10),
+    uploadMax: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX || '20', 10),
   },
 
   logging: {

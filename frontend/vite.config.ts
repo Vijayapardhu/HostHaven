@@ -34,6 +34,8 @@ export default defineConfig(({ mode }) => ({
         scope: "/",
         start_url: "/",
         categories: ["travel", "lifestyle", "shopping"],
+        platforms: ["webapp", "play_store"],
+        prefer_related_applications: false,
         icons: [
           {
             src: '/pwa-icon-192.png',
@@ -90,6 +92,13 @@ export default defineConfig(({ mode }) => ({
               cacheName: "unsplash-images-cache",
               expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
+          },
+          {
+            // Auth endpoints - always go to network, never cache
+            urlPattern: ({ url }: { url: URL }) => 
+              url.pathname.startsWith("/v1/auth/") ||
+              url.pathname.startsWith("/v1/users/me"),
+            handler: "NetworkOnly",
           },
           {
             // Property listings, search — NetworkFirst so data is fresh

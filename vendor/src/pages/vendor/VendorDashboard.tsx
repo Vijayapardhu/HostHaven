@@ -13,7 +13,6 @@ import {
   ArrowUpRight,
   Users,
   Wallet,
-  Hotel,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -115,13 +114,13 @@ const VendorDashboard = () => {
           </p>
         </div>
         <div className="flex gap-3">
-          <Link to="/vendor/properties">
+          <Link to="/properties">
             <Button variant="outline">
               <Building2 className="w-4 h-4 mr-2" />
               Manage Hotels
             </Button>
           </Link>
-          <Link to="/vendor/bookings">
+          <Link to="/bookings">
             <Button>
               <CalendarDays className="w-4 h-4 mr-2" />
               View Bookings
@@ -262,25 +261,25 @@ const VendorDashboard = () => {
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Link to="/vendor/properties" className="block">
+              <Link to="/properties" className="block">
                 <Button variant="outline" className="w-full justify-start h-12">
                   <Building2 className="w-5 h-5 mr-3 text-primary" />
                   Add New Hotel
                 </Button>
               </Link>
-              <Link to="/vendor/rooms" className="block">
+              <Link to="/rooms" className="block">
                 <Button variant="outline" className="w-full justify-start h-12">
                   <BedDouble className="w-5 h-5 mr-3 text-blue-500" />
                   Manage Rooms
                 </Button>
               </Link>
-              <Link to="/vendor/reviews" className="block">
+              <Link to="/reviews" className="block">
                 <Button variant="outline" className="w-full justify-start h-12">
                   <Star className="w-5 h-5 mr-3 text-amber-500" />
                   View Reviews
                 </Button>
               </Link>
-              <Link to="/vendor/settings" className="block">
+              <Link to="/settings" className="block">
                 <Button variant="outline" className="w-full justify-start h-12">
                   <TrendingUp className="w-5 h-5 mr-3 text-green-500" />
                   View Analytics
@@ -300,7 +299,7 @@ const VendorDashboard = () => {
           <Card className="border-0 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Recent Bookings</CardTitle>
-              <Link to="/vendor/bookings">
+              <Link to="/bookings">
                 <Button variant="ghost" size="sm">
                   View All
                   <ArrowUpRight className="w-4 h-4 ml-1" />
@@ -356,7 +355,7 @@ const VendorDashboard = () => {
         <Card className="border-0 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Your Hotels</CardTitle>
-            <Link to="/vendor/properties">
+            <Link to="/properties">
               <Button variant="ghost" size="sm">
                 Manage All
                 <ArrowUpRight className="w-4 h-4 ml-1" />
@@ -366,7 +365,7 @@ const VendorDashboard = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Link
-                to="/vendor/properties"
+                to="/properties"
                 className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/50 hover:border-primary/50 hover:bg-muted/50 transition-all min-h-[280px]"
               >
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">

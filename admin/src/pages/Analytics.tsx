@@ -32,6 +32,21 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/Table";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
 export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -39,20 +54,6 @@ export default function Analytics() {
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "3m">("30d");
   const [exporting, setExporting] = useState<string | null>(null);
-
-  const handleExport = async (
-    type: "bookings" | "revenue" | "vendors" | "cancellations",
-  ) => {
-    setExporting(type);
-    try {
-      await analyticsService.exportReport(type, timeRange);
-      toast.success(`${type} report downloaded successfully.`);
-    } catch (err) {
-      toast.error("Failed to export report.");
-    } finally {
-      setExporting(null);
-    }
-  };
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
@@ -65,6 +66,20 @@ export default function Analytics() {
       setData(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleExport = async (
+    type: "bookings" | "revenue" | "vendors" | "cancellations",
+  ) => {
+    setExporting(type);
+    try {
+      await analyticsService.exportReport(type, timeRange);
+      toast.success(`${type} report downloaded successfully.`);
+    } catch (err) {
+      toast.error("Failed to export report.");
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -105,6 +120,17 @@ export default function Analytics() {
       },
     ];
   }, [data]);
+
+  const chartColors = ["#0f172a", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+
+  const bookingStatusData = useMemo(
+    () => data?.bookingStatusBreakdown ?? [],
+    [data],
+  );
+  const paymentMethodData = useMemo(
+    () => data?.paymentMethodBreakdown ?? [],
+    [data],
+  );
 
   return (
     <div className="space-y-6">
@@ -215,28 +241,22 @@ export default function Analytics() {
                 <CardTitle>Bookings trend</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex h-64 items-end justify-between gap-2">
-                  {data.bookingsByMonth.map((item) => (
-                    <div key={item.month} className="flex-1">
-                      <div
-                        className="w-full rounded-t-lg bg-slate-900"
-                        style={{
-                          height: `${Math.max(
-                            8,
-                            (item.count /
-                              Math.max(
-                                ...data.bookingsByMonth.map((b) => b.count),
-                                1,
-                              )) *
-                              100,
-                          )}%`,
-                        }}
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data.bookingsByMonth}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="month" stroke="#64748b" />
+                      <YAxis stroke="#64748b" />
+                      <Tooltip />
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#0f172a"
+                        strokeWidth={3}
+                        dot={{ r: 4 }}
                       />
-                      <p className="mt-2 text-center text-xs text-slate-500">
-                        {item.month}
-                      </p>
-                    </div>
-                  ))}
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
@@ -246,28 +266,16 @@ export default function Analytics() {
                 <CardTitle>Revenue trend</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex h-64 items-end justify-between gap-2">
-                  {data.revenueByMonth.map((item) => (
-                    <div key={item.month} className="flex-1">
-                      <div
-                        className="w-full rounded-t-lg bg-emerald-500"
-                        style={{
-                          height: `${Math.max(
-                            8,
-                            (item.amount /
-                              Math.max(
-                                ...data.revenueByMonth.map((r) => r.amount),
-                                1,
-                              )) *
-                              100,
-                          )}%`,
-                        }}
-                      />
-                      <p className="mt-2 text-center text-xs text-slate-500">
-                        {item.month}
-                      </p>
-                    </div>
-                  ))}
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.revenueByMonth}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="month" stroke="#64748b" />
+                      <YAxis stroke="#64748b" />
+                      <Tooltip formatter={(value) => `₹${Number(value).toLocaleString()}`} />
+                      <Bar dataKey="amount" fill="#10b981" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
@@ -308,6 +316,78 @@ export default function Analytics() {
               </Table>
             </CardContent>
           </Card>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Booking Status Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bookingStatusData.length > 0 ? (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={bookingStatusData}
+                          dataKey="count"
+                          nameKey="status"
+                          innerRadius={70}
+                          outerRadius={100}
+                          paddingAngle={2}
+                        >
+                          {bookingStatusData.map((entry, index) => (
+                            <Cell
+                              key={`booking-status-${entry.status}`}
+                              fill={chartColors[index % chartColors.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">No booking status data available.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Method Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {paymentMethodData.length > 0 ? (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={paymentMethodData}
+                          dataKey="count"
+                          nameKey="method"
+                          innerRadius={70}
+                          outerRadius={100}
+                          paddingAngle={2}
+                        >
+                          {paymentMethodData.map((entry, index) => (
+                            <Cell
+                              key={`payment-method-${entry.method}`}
+                              fill={chartColors[index % chartColors.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">No payment method data available.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Bookings by City */}
           <Card>

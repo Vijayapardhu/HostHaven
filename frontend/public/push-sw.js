@@ -15,8 +15,9 @@ self.addEventListener('push', function(event) {
   
   const options = {
     body: data.notification?.body || data.body || '',
-    icon: data.notification?.icon || '/icon-192x192.png',
-    badge: data.notification?.badge || '/badge-72x72.png',
+    icon: data.notification?.icon || '/logo.png',
+    image: data.notification?.image || data.notification?.data?.imageUrl,
+    badge: data.notification?.badge || '/logo.png',
     tag: data.notification?.tag || 'hosthaven-notification',
     data: data.notification?.data || data.data,
     vibrate: [100, 50, 100],
@@ -54,8 +55,12 @@ self.addEventListener('notificationclick', function(event) {
     urlToOpen = `/bookings/${data.bookingId}`;
   } else if (data.propertyId) {
     urlToOpen = `/hotels/${data.propertyId}`;
+  } else if (data.ticketId) {
+    urlToOpen = `/support/${data.ticketId}`;
   } else if (data.type === 'booking') {
     urlToOpen = '/profile';
+  } else if (data.type === 'support') {
+    urlToOpen = '/support';
   }
   
   event.waitUntil(

@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -14,34 +13,40 @@ interface Props {
 }
 
 const BecomePartner = ({ config }: Props) => {
-  const title = config?.title || "Are you a property owner?";
-  const subtitle = config?.subtitle || "List your property on HostHaven and start earning today";
+  if (!config || (!config.title && !config.subtitle)) {
+    return null;
+  }
+
+  const title = config?.title || "";
+  const subtitle = config?.subtitle || "";
   const ctaText = config?.ctaText || "Become a Partner";
-  const ctaLink = config?.ctaLink || "/vendor/signup";
+  const ctaLink = config?.ctaLink || "https://vendor.hosthaven.in";
 
   return (
-    <section className="py-6 bg-background">
+    <section className="py-8">
       <div className="container mx-auto px-4">
-        <div className="bg-gradient-to-r from-heritage-brown to-heritage-brown/90 rounded-2xl p-6 md:p-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-serif font-bold text-cream-light mb-2">
-                {title}
-              </h2>
-              <p className="text-cream-light/80 text-sm md:text-base">
-                {subtitle}
-              </p>
+        <div className="relative bg-gradient-to-r from-heritage-brown via-heritage-brown/95 to-heritage-brown rounded-2xl overflow-hidden">
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1556761175-b413da4baf72?w=1200')] bg-cover bg-center opacity-10" />
+          <div className="relative p-8 md:p-10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="max-w-xl">
+                <h2 className="text-2xl md:text-3xl font-serif font-bold text-cream-light mb-3">
+                  {title}
+                </h2>
+                <p className="text-cream-light/80 text-sm md:text-base leading-relaxed">
+                  {subtitle}
+                </p>
+              </div>
+              <a href={ctaLink} target="_blank" rel="noopener noreferrer" className="w-full md:w-auto flex-shrink-0">
+                <Button
+                  size="lg"
+                  className="h-12 rounded-xl px-8 w-full md:w-auto bg-gradient-to-r from-gold to-gold-dark text-heritage-brown hover:from-gold-dark hover:to-gold font-semibold shadow-lg shadow-gold/30"
+                >
+                  {ctaText}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </a>
             </div>
-            <Link to={ctaLink}>
-              <Button 
-                variant="gold" 
-                size="lg"
-                className="whitespace-nowrap"
-              >
-                {ctaText}
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
           </div>
         </div>
       </div>

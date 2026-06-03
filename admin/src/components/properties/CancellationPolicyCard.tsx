@@ -11,6 +11,17 @@ const POLICIES = [
     { value: "NON_REFUNDABLE", label: "Non-refundable", desc: "No refund at any time", color: "rose" },
 ] as const;
 
+type PolicyValue = typeof POLICIES[number]["value"];
+
+type ApiError = {
+    response?: {
+        data?: {
+            message?: string;
+        };
+    };
+    message?: string;
+};
+
 function detectPolicyFromHours(freeBeforeHours?: number): string {
     if (freeBeforeHours === undefined || freeBeforeHours === null) return "FREE_CANCELLATION";
     if (freeBeforeHours === 0) return "NON_REFUNDABLE";
@@ -32,18 +43,19 @@ interface CancellationPolicyCardProps {
 
 export function CancellationPolicyCard({ propertyId, cancellationPolicy, onUpdate }: CancellationPolicyCardProps) {
     const currentPolicy = detectPolicyFromHours(cancellationPolicy?.freeBeforeHours);
-    const [selected, setSelected] = useState(currentPolicy);
+    const [selected, setSelected] = useState<PolicyValue>(currentPolicy as PolicyValue);
     const [isSaving, setIsSaving] = useState(false);
 
     const handleSave = async () => {
         if (selected === currentPolicy) return;
         setIsSaving(true);
         try {
-            await propertiesService.setCancellationPolicy(propertyId, selected as any);
+            await propertiesService.setCancellationPolicy(propertyId, selected);
             toast.success("Cancellation policy updated successfully.");
             onUpdate();
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Failed to update cancellation policy.");
+        } catch (error) {
+            const apiError = error as ApiError;
+            toast.error(apiError?.response?.data?.message || apiError?.message || "Failed to update cancellation policy.");
         } finally {
             setIsSaving(false);
         }

@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import { UploadsController } from './uploads.controller';
-import { requireRole } from '../../middleware/auth.middleware';
 
 export default async function uploadsRoutes(fastify: FastifyInstance) {
   fastify.post(
@@ -9,7 +8,7 @@ export default async function uploadsRoutes(fastify: FastifyInstance) {
       preHandler: [fastify.authenticate],
       config: {
         rateLimit: {
-          max: 20,
+          max: 30,
           timeWindow: '1 minute',
         },
       },
@@ -23,7 +22,7 @@ export default async function uploadsRoutes(fastify: FastifyInstance) {
       preHandler: [fastify.authenticate],
       config: {
         rateLimit: {
-          max: 10,
+          max: 15,
           timeWindow: '1 minute',
         },
       },

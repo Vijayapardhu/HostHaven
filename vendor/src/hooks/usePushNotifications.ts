@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/lib/api';
+import api, { push } from '@/lib/api';
+import { handleError } from '@/lib/errorHandler';
 
 interface PushSubscription {
   endpoint: string;
@@ -10,6 +11,24 @@ interface PushSubscription {
 }
 
 const VAPID_PUBLIC_KEY = 'BAIN_yNFBud4AQ1M9BUCKwuQnNxVIwnznWXcl7JmUKF84JR0TWRBWY0LJxl-bGW8arLqX1ysiByMZaEk6Ti5m3E';
+
+const resolveVapidPublicKey = async (): Promise<string> => {
+  const candidates = ['/v1/push/vapid-key', '/v1/vendor/push/vapid-key'];
+
+  for (const url of candidates) {
+    try {
+      const response = await api.get(url);
+      const key = response?.data?.data?.publicKey ?? response?.data?.publicKey;
+      if (typeof key === 'string' && key.length > 0) {
+        return key;
+      }
+    } catch {
+      // Try next candidate endpoint.
+    }
+  }
+
+  return VAPID_PUBLIC_KEY;
+};
 
 export const usePushNotifications = () => {
   const [isSupported, setIsSupported] = useState(false);
@@ -31,7 +50,7 @@ export const usePushNotifications = () => {
         setSubscription(existingSub.toJSON() as PushSubscription);
       }
     } catch (error) {
-      console.error('Error checking subscription:', error);
+      handleError(error, 'push');
     }
   };
 
@@ -45,20 +64,21 @@ export const usePushNotifications = () => {
       let sub = await reg.pushManager.getSubscription();
       
       if (!sub) {
+        const vapidPublicKey = await resolveVapidPublicKey();
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
         });
       }
 
       const subscriptionData = sub.toJSON() as PushSubscription;
       setSubscription(subscriptionData);
 
-      await api.push.subscribe(subscriptionData);
+      await push.subscribe(subscriptionData);
       
       return true;
     } catch (error) {
-      console.error('Error subscribing to push:', error);
+      handleError(error, 'push');
       return false;
     } finally {
       setIsLoading(false);
@@ -77,12 +97,12 @@ export const usePushNotifications = () => {
         await sub.unsubscribe();
       }
 
-      await api.push.unsubscribe(subscription.endpoint);
+      await push.unsubscribe(subscription.endpoint);
       setSubscription(null);
       
       return true;
     } catch (error) {
-      console.error('Error unsubscribing from push:', error);
+      handleError(error, 'push');
       return false;
     } finally {
       setIsLoading(false);
@@ -116,7 +136,7 @@ export const usePushNotifications = () => {
   };
 };
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): BufferSource {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   

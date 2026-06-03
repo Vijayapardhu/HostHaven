@@ -1,6 +1,7 @@
-import nodemailer from 'nodemailer';
-import { config } from '../config';
-import { logger } from '../utils/logger.util';
+import nodemailer from "nodemailer";
+import { config } from "../config";
+import { logger } from "../utils/logger.util";
+import { prisma } from "../config/database";
 
 const transporter = nodemailer.createTransport({
   host: config.email.host,
@@ -17,73 +18,78 @@ interface EmailOptions {
   subject: string;
   template: string;
   data: Record<string, any>;
+  attachments?: {
+    filename: string;
+    content: Buffer | string;
+    contentType?: string;
+  }[];
 }
 
-interface EmailTemplate {
-  html: string;
-  text: string;
-}
+// Cache for database templates to avoid querying on every email
+let templateCache: Record<string, { html: string; text: string; updatedAt: Date }> = {};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-const templates: Record<string, (data: any) => EmailTemplate> = {
-  'email-verification': (data) => ({
+// Fallback hardcoded templates for essential system emails (in case database is unavailable)
+const fallbackTemplates: Record<string, { html: string; text: string }> = {
+  "email-verification": {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #d4a574;">Welcome to HostHaven!</h2>
-        <p>Hello ${data.name},</p>
+        <p>Hello {{name}},</p>
         <p>Thank you for registering with HostHaven. Please verify your email address to get started.</p>
-        <a href="${data.verificationUrl}" style="display: inline-block; padding: 12px 24px; background: #d4a574; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
+        <a href="{{verificationUrl}}" style="display: inline-block; padding: 12px 24px; background: #d4a574; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
           Verify Email Address
         </a>
-        <p style="color: #666;">This link will expire in ${data.expiresIn}.</p>
+        <p style="color: #666;">This link will expire in {{expiresIn}}.</p>
         <p style="color: #999; font-size: 12px;">If you didn't create an account, you can ignore this email.</p>
       </div>
     `,
     text: `
       Welcome to HostHaven!
       
-      Hello ${data.name},
+      Hello {{name}},
       
       Thank you for registering with HostHaven. Please verify your email address by visiting:
-      ${data.verificationUrl}
+      {{verificationUrl}}
       
-      This link will expire in ${data.expiresIn}.
+      This link will expire in {{expiresIn}}.
       
       If you didn't create an account, you can ignore this email.
     `,
-  }),
-  'password-reset': (data) => ({
+  },
+  "password-reset": {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #d4a574;">Password Reset</h2>
-        <p>Hello ${data.name},</p>
+        <p>Hello {{name}},</p>
         <p>We received a request to reset your password. Click the button below to create a new password.</p>
-        <a href="${data.resetUrl}" style="display: inline-block; padding: 12px 24px; background: #d4a574; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
+        <a href="{{resetUrl}}" style="display: inline-block; padding: 12px 24px; background: #d4a574; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
           Reset Password
         </a>
-        <p style="color: #666;">This link will expire in ${data.expiresIn}.</p>
+        <p style="color: #666;">This link will expire in {{expiresIn}}.</p>
         <p style="color: #999; font-size: 12px;">If you didn't request a password reset, you can ignore this email.</p>
       </div>
     `,
     text: `
       Password Reset
       
-      Hello ${data.name},
+      Hello {{name}},
       
       We received a request to reset your password. Please visit:
-      ${data.resetUrl}
+      {{resetUrl}}
       
-      This link will expire in ${data.expiresIn}.
+      This link will expire in {{expiresIn}}.
       
       If you didn't request a password reset, you can ignore this email.
     `,
-  }),
-  'welcome': (data) => ({
+  },
+  "welcome": {
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #d4a574;">Welcome to HostHaven!</h2>
-        <p>Hello ${data.name},</p>
+        <p>Hello {{name}},</p>
         <p>Your account has been created successfully. You can now explore Andhra Pradesh's heritage destinations!</p>
-        <a href="${data.loginUrl}" style="display: inline-block; padding: 12px 24px; background: #d4a574; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
+        <a href="{{loginUrl}}" style="display: inline-block; padding: 12px 24px; background: #d4a574; color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
           Start Exploring
         </a>
       </div>
@@ -91,53 +97,74 @@ const templates: Record<string, (data: any) => EmailTemplate> = {
     text: `
       Welcome to HostHaven!
       
-      Hello ${data.name},
+      Hello {{name}},
       
       Your account has been created successfully. Start exploring Andhra Pradesh's heritage destinations!
       
-      Visit: ${data.loginUrl}
+      Visit: {{loginUrl}}
     `,
-  }),
-  'booking-confirmed': (data) => ({
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #d4a574;">Booking Confirmed!</h2>
-        <p>Hello ${data.name},</p>
-        <p>Your booking has been confirmed.</p>
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin: 0 0 10px 0;">${data.propertyName}</h3>
-          <p style="margin: 0;">Check-in: ${data.checkIn}</p>
-          <p style="margin: 0;">Check-out: ${data.checkOut}</p>
-          <p style="margin: 0;">Booking ID: ${data.bookingId}</p>
-        </div>
-        <p>Total Amount: ₹${data.totalAmount}</p>
-      </div>
-    `,
-    text: `
-      Booking Confirmed!
-      
-      Hello ${data.name},
-      
-      Your booking has been confirmed.
-      
-      Property: ${data.propertyName}
-      Check-in: ${data.checkIn}
-      Check-out: ${data.checkOut}
-      Booking ID: ${data.bookingId}
-      Total Amount: ₹${data.totalAmount}
-    `,
-  }),
+  }
 };
+
+// Helper function to replace placeholders in template strings
+function interpolate(template: string, data: Record<string, any>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const value = data[key];
+    return value !== null && value !== undefined ? value : "";
+  });
+}
+
+// Get template from database with caching
+async function getTemplateFromDatabase(name: string): Promise<{ html: string; text: string } | null> {
+  try {
+    // Check cache first
+    const cached = templateCache[name];
+    if (cached && (Date.now() - cached.updatedAt.getTime()) < CACHE_TTL) {
+      return { html: cached.html, text: cached.text };
+    }
+
+    // Fetch from database
+    const template = await prisma.emailTemplate.findUnique({
+      where: { name },
+    });
+
+    if (!template) {
+      return null;
+    }
+
+    // Update cache
+    templateCache[name] = {
+      html: template.html,
+      text: template.text,
+      updatedAt: new Date(),
+    };
+
+    return { html: template.html, text: template.text };
+  } catch (error) {
+    logger.error({ error, name }, "Failed to fetch email template from database");
+    return null;
+  }
+}
 
 export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
   try {
-    const template = templates[options.template];
+    // Try to get template from database, fall back to hardcoded if not found
+    let template = await getTemplateFromDatabase(options.template);
+    let isFallback = false;
+
     if (!template) {
-      logger.error({ template: options.template }, 'Email template not found');
+      template = fallbackTemplates[options.template];
+      isFallback = !!template;
+    }
+
+    if (!template) {
+      logger.error({ template: options.template }, "Email template not found in database or fallback");
       return false;
     }
 
-    const { html, text } = template(options.data);
+    // Interpolate placeholders
+    const html = interpolate(template.html, options.data);
+    const text = interpolate(template.text, options.data);
 
     await transporter.sendMail({
       from: config.email.from,
@@ -145,12 +172,16 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
       subject: options.subject,
       html,
       text,
+      attachments: options.attachments,
     });
 
-    logger.info({ to: options.to, template: options.template }, 'Email sent successfully');
+    logger.info(
+      { to: options.to, template: options.template, fallback: isFallback },
+      "Email sent successfully"
+    );
     return true;
   } catch (error) {
-    logger.error({ error, to: options.to }, 'Failed to send email');
+    logger.error({ error, to: options.to }, "Failed to send email");
     return false;
   }
 };

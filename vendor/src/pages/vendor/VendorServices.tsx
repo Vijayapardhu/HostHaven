@@ -6,17 +6,10 @@ import {
   Search,
   Edit,
   Trash2,
-  MapPin,
-  DollarSign,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Eye,
   Upload,
   X,
-  Camera,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { vendorService } from "@/lib/vendor";
+import { servicesService } from "@/lib/services";
 import { useToast } from "@/hooks/use-toast";
 
 interface Service {
@@ -59,7 +53,7 @@ const serviceCategories = [
   { value: "guide", label: "Tour Guide" },
   { value: "photography", label: "Photography" },
   { value: "catering", label: "Catering" },
-  { value: " Event", label: "Event Planning" },
+  { value: "event", label: "Event Planning" },
   { value: "other", label: "Other" },
 ];
 
@@ -88,9 +82,11 @@ const VendorServices = () => {
   const fetchServices = async () => {
     setIsLoading(true);
     try {
-      setServices([]);
+      const response = await servicesService.getServices();
+      setServices(response || []);
     } catch (error) {
       console.error("Failed to fetch services:", error);
+      setServices([]);
     } finally {
       setIsLoading(false);
     }
@@ -137,6 +133,18 @@ const VendorServices = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      await servicesService.createService({
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        price: Number(formData.price),
+        priceUnit: formData.priceUnit,
+        duration: formData.duration,
+        images: formData.images,
+        advanceType: "percentage",
+        advanceValue: 30,
+        isActive: true,
+      });
       toast({ title: "Service created successfully" });
       setIsCreateOpen(false);
       fetchServices();
@@ -160,6 +168,11 @@ const VendorServices = () => {
 
   const handleToggleActive = async (service: Service) => {
     try {
+      if (service.isActive) {
+        await servicesService.deactivateService(service.id);
+      } else {
+        await servicesService.activateService(service.id);
+      }
       setServices((prev) =>
         prev.map((s) => (s.id === service.id ? { ...s, isActive: !s.isActive } : s))
       );
@@ -172,6 +185,7 @@ const VendorServices = () => {
   const handleDeleteService = async (id: string) => {
     if (!confirm("Are you sure you want to delete this service?")) return;
     try {
+      await servicesService.deleteService(id);
       toast({ title: "Service deleted" });
       fetchServices();
     } catch (error: any) {
@@ -315,15 +329,29 @@ const VendorServices = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="border-0 shadow-lg">
+          <>
+            <Card className="border-0 shadow-lg">
               <div className="h-40 bg-muted animate-pulse"></div>
               <CardContent className="p-4">
                 <div className="h-6 bg-muted rounded w-3/4 mb-2"></div>
                 <div className="h-4 bg-muted rounded w-1/2"></div>
               </CardContent>
             </Card>
-          ))}
+            <Card className="border-0 shadow-lg">
+              <div className="h-40 bg-muted animate-pulse"></div>
+              <CardContent className="p-4">
+                <div className="h-6 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-lg">
+              <div className="h-40 bg-muted animate-pulse"></div>
+              <CardContent className="p-4">
+                <div className="h-6 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          </>
         ) : filteredServices.length > 0 ? (
           filteredServices.map((service, index) => (
             <motion.div key={service.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}>

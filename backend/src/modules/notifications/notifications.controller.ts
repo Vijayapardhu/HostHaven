@@ -7,6 +7,7 @@ import {
   notificationFilterSchema,
   notificationIdSchema,
   markReadSchema,
+  adminPushNotificationSchema,
 } from './notifications.schema';
 
 export const NotificationsController = {
@@ -93,6 +94,20 @@ export const NotificationsController = {
     } catch (error: any) {
       logger.error({ error }, 'Mark all as read failed');
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to mark all as read', 500);
+    }
+  },
+
+  async sendAdminPushNotification(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const payload = adminPushNotificationSchema.parse(request.body);
+      const result = await notificationsService.sendAdminPushNotification(payload);
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Send admin push notification failed');
+      if (error.name === 'ZodError' || error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, error.message || 'Invalid input', 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to send push notification', 500);
     }
   },
 

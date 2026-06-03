@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { logger } from '../../utils/logger.util';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { Prisma } from '@prisma/client';
+import { webPushService } from '../../services/webpush.service';
 
 export class NotificationsService {
   async getAll(userId: string, filters: {
@@ -75,6 +76,14 @@ export class NotificationsService {
 
     logger.info({ notificationId: notification.id, userId: data.userId }, 'Notification created');
 
+    // Send web push notification
+    await webPushService.sendNotification(data.userId, {
+      title: data.title,
+      body: data.message,
+      tag: `notification-${data.type}`,
+      data: data.data,
+    });
+
     return this.sanitizeNotification(notification);
   }
 
@@ -142,6 +151,79 @@ export class NotificationsService {
     logger.info({ userId }, 'All notifications deleted');
 
     return { message: 'All notifications deleted' };
+  }
+
+  async sendAdminPushNotification(data: {
+    title: string;
+    message: string;
+    type: string;
+    target: 'all' | 'users' | 'vendors' | 'admins';
+    userIds?: string[];
+    data?: Record<string, any>;
+  }) {
+    const where: Prisma.UserWhereInput = {
+      isActive: true,
+      isDeleted: false,
+    };
+
+    if (data.userIds?.length) {
+      where.id = { in: data.userIds };
+    } else if (data.target === 'users') {
+      where.role = 'USER';
+    } else if (data.target === 'vendors') {
+      where.role = 'VENDOR';
+    } else if (data.target === 'admins') {
+      where.role = 'ADMIN';
+    }
+
+    const recipients = await prisma.user.findMany({
+      where,
+      select: { id: true },
+    });
+
+    if (recipients.length === 0) {
+      const error = new Error('No recipients found for the selected target');
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const recipientIds = recipients.map((recipient) => recipient.id);
+
+    await prisma.notification.createMany({
+      data: recipientIds.map((userId) => ({
+        userId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        data: data.data ?? {},
+      })),
+    });
+
+    const pushData = {
+      ...data.data,
+      type: data.type,
+    };
+
+    const imageUrl = typeof data.data?.imageUrl === 'string' ? data.data.imageUrl : undefined;
+
+    await webPushService.sendNotificationToMultiple(recipientIds, {
+      title: data.title,
+      body: data.message,
+      icon: imageUrl,
+      image: imageUrl,
+      tag: `admin-${Date.now()}`,
+      data: pushData,
+    });
+
+    logger.info(
+      { target: data.target, recipients: recipientIds.length },
+      'Admin push notification sent',
+    );
+
+    return {
+      sentCount: recipientIds.length,
+      target: data.target,
+    };
   }
 
   private sanitizeNotification(notification: any) {

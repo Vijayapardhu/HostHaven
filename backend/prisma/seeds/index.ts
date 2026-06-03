@@ -1108,6 +1108,7 @@ async function main() {
   const services = [
     {
       name: "Tirupati VIP Darshan & Guide",
+      slug: "tirupati-vip-darshan-guide",
       description:
         "Skip the lines and get expert insights into the history and architecture of Tirumala. A dedicated guide will take you through the temple rituals, ensure you get a comfortable VIP darshan, and assist with Prasadam collection.",
       category: "Guide",
@@ -1136,6 +1137,7 @@ async function main() {
     },
     {
       name: "Luxury AC Cab - Vijayawada Airport Transfer",
+      slug: "luxury-ac-cab-vijayawada-airport-transfer",
       description:
         "Comfortable and hassle-free airport transfer connecting Vijayawada International Airport to any hotel in the city limits. Professional drivers, pristine air-conditioned sedans or SUVs, and complimentary bottled water.",
       category: "Transport",
@@ -1164,6 +1166,7 @@ async function main() {
     },
     {
       name: "Srikalahasti Rahu-Ketu Pooja Package",
+      slug: "srikalahasti-rahu-ketu-pooja-package",
       description:
         "A full spiritual package for the famous Rahu-Ketu Sarpa Dosha Nivarana Pooja. Includes all pooja completely arranged by a local pandit, premium entry tickets, and assistance throughout the complex rituals.",
       category: "Religious",
@@ -1192,6 +1195,7 @@ async function main() {
     },
     {
       name: "Full-Day Vijayawada Heritage Photography Tour",
+      slug: "full-day-vijayawada-heritage-photography-tour",
       description:
         "Explore the incredible heritage of Vijayawada with a professional photographer. Visit the ancient Undavalli Caves, Prakasam Barrage, and Kanaka Durga Temple. You'll receive 50+ professionally edited portrait and landscape photographs of your journey.",
       category: "Photography",

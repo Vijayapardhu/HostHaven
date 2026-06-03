@@ -8,7 +8,7 @@ const VendorProtectedRoute = () => {
 
   if (!token) {
     removeVendorToken();
-    return <Navigate to="/vendor/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   return <Outlet />;

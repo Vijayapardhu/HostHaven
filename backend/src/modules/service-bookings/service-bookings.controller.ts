@@ -115,4 +115,39 @@ export const ServiceBookingsController = {
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to process refund', 500);
     }
   },
+
+  async getMyBookingById(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = serviceBookingIdSchema.parse(request.params);
+      const userId = (request as any).user.id;
+      
+      const booking = await serviceBookingsService.getMyBookingById(id, userId);
+      return sendSuccess(reply, booking);
+    } catch (error: any) {
+      logger.error({ error }, 'Get service booking failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch service booking', 500);
+    }
+  },
+
+  async getInvoice(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = serviceBookingIdSchema.parse(request.params);
+      const userId = (request as any).user.id;
+      
+      const invoice = await serviceBookingsService.generateInvoice(id, userId);
+      
+      reply.header('Content-Type', 'application/pdf');
+      reply.header('Content-Disposition', `attachment; filename="invoice-${id}.pdf"`);
+      return reply.send(invoice);
+    } catch (error: any) {
+      logger.error({ error }, 'Generate service booking invoice failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to generate invoice', 500);
+    }
+  },
 };

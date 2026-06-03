@@ -15,15 +15,27 @@ export interface WishlistItem {
 interface WishlistContextType {
   items: WishlistItem[];
   addToWishlist: (item: WishlistItem) => void;
-  removeFromWishlist: (id: string) => void;
-  isInWishlist: (id: string) => boolean;
+  removeFromWishlist: (id: string, type?: WishlistItem["type"]) => void;
+  isInWishlist: (id: string, type?: WishlistItem["type"]) => boolean;
   toggleWishlist: (item: WishlistItem) => void;
   syncWithBackend: () => void;
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-const isLoggedIn = () => !!localStorage.getItem("accessToken");
+const isLoggedIn = () => {
+  try {
+    const stored = localStorage.getItem("hosthaven_auth");
+    if (stored) {
+      const authData = JSON.parse(stored);
+      if (authData.accessToken || authData.token) return true;
+    }
+  } catch (error) {
+    console.warn("Failed to read auth from localStorage", error);
+  }
+  // Fallback to old keys
+  return !!localStorage.getItem("accessToken") || !!localStorage.getItem("vendorToken");
+};
 
 export const WishlistProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<WishlistItem[]>([]);
@@ -32,7 +44,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
     if (!isLoggedIn()) return;
     try {
       const data = await api.wishlist.getAll();
-      const backendItems: WishlistItem[] = (Array.isArray(data?.data) ? data.data : []).map((w: any) => ({
+      const backendItems: WishlistItem[] = (Array.isArray(data?.data) ? data.data : []).map((w) => ({
         id: w.itemId,
         type: w.itemType,
         name: w.itemName,
@@ -44,10 +56,17 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
       }));
       setItems(backendItems);
       localStorage.setItem("hosthaven_wishlist", JSON.stringify(backendItems));
-    } catch {
-      // Fallback to localStorage
+    } catch (error) {
+      console.warn("Failed to load wishlist from backend, falling back to localStorage:", error);
       const stored = localStorage.getItem("hosthaven_wishlist");
-      if (stored) try { setItems(JSON.parse(stored)); } catch {}
+      if (stored) {
+        try { 
+          setItems(JSON.parse(stored)); 
+        } catch (parseError) {
+          console.error("Failed to parse localStorage wishlist:", parseError);
+          localStorage.removeItem("hosthaven_wishlist");
+        }
+      }
     }
   }, []);
 
@@ -56,7 +75,14 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
       loadFromBackend();
     } else {
       const stored = localStorage.getItem("hosthaven_wishlist");
-      if (stored) try { setItems(JSON.parse(stored)); } catch { localStorage.removeItem("hosthaven_wishlist"); }
+      if (stored) {
+        try { 
+          setItems(JSON.parse(stored)); 
+        } catch (error) {
+          console.error("Failed to parse localStorage wishlist:", error);
+          localStorage.removeItem("hosthaven_wishlist");
+        }
+      }
     }
   }, [loadFromBackend]);
 
@@ -65,7 +91,7 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
   }, [items]);
 
   const addToWishlist = async (item: WishlistItem) => {
-    if (items.some((i) => i.id === item.id)) return;
+    if (items.some((i) => i.id === item.id && i.type === item.type)) return;
     const newItem = { ...item };
     setItems((prev) => [...prev, newItem]);
     if (isLoggedIn()) {
@@ -79,26 +105,35 @@ export const WishlistProvider = ({ children }: { children: ReactNode }) => {
           itemPrice: item.price,
           itemRating: item.rating,
         });
-        if (result?.id) {
-          setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, wishlistId: result.id } : i));
+        const wishlistId = result?.item?.id || result?.id;
+        if (wishlistId) {
+          setItems((prev) => prev.map((i) => (i.id === item.id && i.type === item.type) ? { ...i, wishlistId } : i));
         }
-      } catch {}
+      } catch (error) {
+        console.error("Failed to add to wishlist:", error);
+        setItems((prev) => prev.filter((i) => !(i.id === item.id && i.type === item.type)));
+      }
     }
   };
 
-  const removeFromWishlist = async (id: string) => {
-    const item = items.find((i) => i.id === id);
-    setItems((prev) => prev.filter((i) => i.id !== id));
+  const removeFromWishlist = async (id: string, type?: WishlistItem["type"]) => {
+    const item = items.find((i) => i.id === id && (!type || i.type === type));
+    setItems((prev) => prev.filter((i) => !(i.id === id && (!type || i.type === type))));
     if (isLoggedIn() && item?.wishlistId) {
-      try { await api.wishlist.remove(item.wishlistId); } catch {}
+      try { 
+        await api.wishlist.remove(item.wishlistId); 
+      } catch (error) {
+        console.error("Failed to remove from wishlist:", error);
+      }
     }
   };
 
-  const isInWishlist = (id: string) => items.some((item) => item.id === id);
+  const isInWishlist = (id: string, type?: WishlistItem["type"]) =>
+    items.some((item) => item.id === id && (!type || item.type === type));
 
   const toggleWishlist = (item: WishlistItem) => {
-    if (isInWishlist(item.id)) {
-      removeFromWishlist(item.id);
+    if (isInWishlist(item.id, item.type)) {
+      removeFromWishlist(item.id, item.type);
     } else {
       addToWishlist(item);
     }

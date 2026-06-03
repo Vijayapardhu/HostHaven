@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { vendorService } from "@/lib/vendor";
@@ -44,7 +44,7 @@ const VendorForgotPassword = () => {
             >
                 {/* Logo */}
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="flex justify-center">
-                    <Link to="/vendor/login">
+                    <Link to="/login">
                         <img src={logo} alt="HostHaven" className="h-16 w-auto drop-shadow-2xl" />
                     </Link>
                 </motion.div>
@@ -137,7 +137,7 @@ const VendorForgotPassword = () => {
                 {/* Back link */}
                 <div className="text-center">
                     <Link
-                        to="/vendor/login"
+                        to="/login"
                         className="inline-flex items-center gap-2 text-sm text-white/30 hover:text-white/60 transition-colors"
                     >
                         <ArrowLeft className="w-3.5 h-3.5" />

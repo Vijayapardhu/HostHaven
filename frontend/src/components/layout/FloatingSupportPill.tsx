@@ -8,15 +8,17 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import logo from "@/assets/logo.png";
+import { usePublicPlatformSettings } from "@/hooks/usePublicPlatformSettings";
 
 const FloatingSupportPill = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const settings = usePublicPlatformSettings();
 
   return (
     <>
       {/* Floating Pill - Bottom Right */}
-      <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-[50]">
-        <button 
+      <div className="support-widget fixed bottom-[calc(80px+env(safe-area-inset-bottom,0px))] right-4 z-[500] md:hidden">
+        <button
           onClick={() => setIsOpen(true)}
           className="flex items-center gap-3 rounded-full pl-1.5 pr-5 py-1.5 bg-gradient-to-r from-heritage-brown via-heritage-brown/95 to-heritage-brown/90 shadow-lg shadow-heritage-brown/30 cursor-pointer group transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-heritage-brown/40 border border-gold/30"
         >
@@ -68,27 +70,27 @@ const FloatingSupportPill = () => {
             <div className="space-y-2">
               <h3 className="font-semibold text-foreground text-sm px-1">Contact Us</h3>
               
-              <a href="tel:+919876543210" className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors group">
+              <a href={`tel:${settings.contact.supportPhone.replace(/\s+/g, '')}`} className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors group">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
                     <Phone className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground text-sm">Call Us</p>
-                    <p className="text-xs text-muted-foreground">+91 98765 43210</p>
+                    <p className="text-xs text-muted-foreground">{settings.contact.supportPhone}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
               </a>
 
-              <a href="mailto:info@hosthaven.in" className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors group">
+              <a href={`mailto:${settings.contact.supportEmail}`} className="flex items-center justify-between p-4 bg-muted/50 rounded-xl hover:bg-muted transition-colors group">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
                     <Mail className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground text-sm">Email Us</p>
-                    <p className="text-xs text-muted-foreground">info@hosthaven.in</p>
+                    <p className="text-xs text-muted-foreground">{settings.contact.supportEmail}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -101,7 +103,7 @@ const FloatingSupportPill = () => {
                   </div>
                   <div>
                     <p className="font-medium text-foreground text-sm">Location</p>
-                    <p className="text-xs text-muted-foreground">Vijayawada, Andhra Pradesh</p>
+                    <p className="text-xs text-muted-foreground">{settings.contact.supportAddress}</p>
                   </div>
                 </div>
               </div>
@@ -113,7 +115,7 @@ const FloatingSupportPill = () => {
                   </div>
                   <div>
                     <p className="font-medium text-foreground text-sm">Working Hours</p>
-                    <p className="text-xs text-muted-foreground">24/7 Available</p>
+                    <p className="text-xs text-muted-foreground">{settings.contact.supportHours}</p>
                   </div>
                 </div>
               </div>

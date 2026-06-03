@@ -9,7 +9,7 @@ export const createSupportTicketSchema = z.object({
 
 export const supportFilterSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(50).default(10),
+  limit: z.coerce.number().int().positive().min(1).max(100).default(10),
   status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']).optional(),
 });
 

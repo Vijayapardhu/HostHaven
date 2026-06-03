@@ -1,7 +1,141 @@
 import prisma from '../../config/database';
 import { ERROR_CODES } from '../../constants/error-codes';
+import { AuthUser } from '../../types';
+
+export interface LiveRoomBooking {
+  bookingId: string;
+  bookingNumber: string;
+  guestName: string;
+  phone: string;
+  status: string;
+  checkIn: string;
+  checkOut: string;
+}
+
+export interface LiveRoom {
+  roomId: string;
+  roomName: string;
+  roomType: string;
+  totalRooms: number;
+  filledRooms: number;
+  lockedRooms: number;
+  availableRooms: number;
+  bookings: LiveRoomBooking[];
+}
+
+export interface PropertyInventory {
+  propertyId: string;
+  propertyName: string;
+  vendorName: string;
+  city: string;
+  rooms: LiveRoom[];
+}
 
 export class InventoryService {
+  async getLiveInventorySnapshot(user: AuthUser): Promise<PropertyInventory[]> {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const endOfDay = new Date(today);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const vendorFilter = user.role === 'VENDOR' && user.vendorId 
+        ? { vendorId: user.vendorId }
+        : {};
+
+      const properties = await prisma.property.findMany({
+        where: {
+          ...vendorFilter,
+          status: 'ACTIVE',
+          isDeleted: false,
+        },
+        include: {
+          vendor: {
+            select: {
+              businessName: true,
+            },
+          },
+          rooms: {
+            where: { isActive: true, isDeleted: false },
+            include: {
+              bookings: {
+                where: {
+                  status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+                  checkInDate: { lte: endOfDay },
+                  checkOutDate: { gte: today },
+                },
+                select: {
+                  id: true,
+                  bookingNumber: true,
+                  guestDetails: true,
+                  guestPhone: true,
+                  status: true,
+                  checkInDate: true,
+                  checkOutDate: true,
+                },
+              },
+              inventoryLocks: {
+                where: {
+                  lockUntil: { gte: new Date() },
+                },
+                select: {
+                  quantity: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return properties.map((property) => {
+        const rooms: LiveRoom[] = property.rooms.map((room) => {
+          const filledRooms = room.bookings.length;
+          const lockedRooms = room.inventoryLocks.reduce((sum, lock) => sum + lock.quantity, 0);
+          const availableRooms = Math.max(room.totalRooms - filledRooms - lockedRooms, 0);
+
+          const bookings: LiveRoomBooking[] = room.bookings.map((booking) => {
+            const guestDetails = booking.guestDetails as any;
+            const guestName = guestDetails?.[0]?.name || 'Guest';
+            
+            return {
+              bookingId: booking.id,
+              bookingNumber: booking.bookingNumber,
+              guestName,
+              phone: booking.guestPhone || '',
+              status: booking.status,
+              checkIn: booking.checkInDate.toISOString(),
+              checkOut: booking.checkOutDate.toISOString(),
+            };
+          });
+
+          return {
+            roomId: room.id,
+            roomName: room.name,
+            roomType: room.type,
+            totalRooms: room.totalRooms,
+            filledRooms,
+            lockedRooms,
+            availableRooms,
+            bookings,
+          };
+        });
+
+        return {
+          propertyId: property.id,
+          propertyName: property.name,
+          vendorName: property.vendor?.businessName || 'Unknown',
+          city: property.city,
+          rooms,
+        };
+      });
+    } catch (error) {
+      console.error('Error getting live inventory snapshot:', error);
+      throw error;
+    }
+  }
+
   async getAvailability(roomId: string, date: Date) {
     const room = await prisma.room.findUnique({ where: { id: roomId } });
     if (!room) {

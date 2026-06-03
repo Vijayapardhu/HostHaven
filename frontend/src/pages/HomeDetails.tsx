@@ -1,43 +1,42 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { format } from "date-fns";
-import {
+import { useState, useEffect, useMemo } from "react";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
+import { format, addDays, parseISO } from "date-fns";
+import { 
   Star, MapPin, Bed, Users, ArrowLeft, Calendar as CalendarIcon,
-  Wifi, CalendarDays, Minus, Plus, Maximize, PlayCircle, Eye,
-  ShoppingBag, ShieldCheck, CheckCircle2, ChevronRight, Wind,
-  Coffee, Tv, Snowflake, Info
+  Minus, Plus, X, ImageIcon, Share2, Heart, Check,
+  Clock, Shield, Car, Waves, Snowflake, Tv, Coffee, Wind,
+  ChevronLeft, ChevronRight, Info, Wifi, UtensilsCrossed, Dumbbell
 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { createBookingPayment } from "@/lib/razorpay";
+import { useWishlist } from "@/contexts/WishlistContext";
 import { api } from "@/lib/api";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerFooter,
-} from "@/components/ui/drawer";
-import { cn } from "@/lib/utils";
+import { cn, formatCity } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { RoomCard } from "@/components/room/RoomCard";
+import { PropertyReviews } from "@/components/review/PropertyReviews";
+import SEOHead from "@/components/SEOHead";
+import { 
+  useBookingFlow, 
+  VideoModal, 
+  LoginPromptModal 
+} from "@/components/booking/BookingFlowHandler";
 
 interface PropertyRoom {
   id: string;
   name: string;
   description?: string;
-  type: string;
+  type?: string;
   capacity: number;
-  extraBedCapacity: number;
+  extraBedCapacity?: number;
   sizeSqm?: number;
   pricePerNight: number;
-  weekendPrice?: number;
   amenities: string[];
-  images?: Array<{ url: string; alt?: string; isPrimary?: boolean }>;
+  images?: Array<{ url: string; alt?: string }>;
+  video?: string;
 }
 
 interface CancellationPolicy {
@@ -66,62 +65,94 @@ interface PropertyData {
   virtualTourUrl?: string;
   amenities: string[];
   highlights?: string[];
-  featureFlags?: any;
   rooms?: PropertyRoom[];
   cancellationPolicy?: CancellationPolicy;
-  reviews?: Array<{
-    id: string;
-    rating: number;
-    comment?: string;
-    createdAt: string;
-    user?: { name?: string; avatarUrl?: string };
-  }>;
   latitude?: number;
   longitude?: number;
+  slug?: string;
+  // SEO fields from database
+  metaTitle?: string;
+  metaDesc?: string;
 }
 
+const amenityIcons: Record<string, React.ReactNode> = {
+  wifi: <Wifi className="w-5 h-5" />,
+  restaurant: <UtensilsCrossed className="w-5 h-5" />,
+  parking: <Car className="w-5 h-5" />,
+  gym: <Dumbbell className="w-5 h-5" />,
+  pool: <Waves className="w-5 h-5" />,
+  ac: <Snowflake className="w-5 h-5" />,
+  "air-conditioner": <Snowflake className="w-5 h-5" />,
+  tv: <Tv className="w-5 h-5" />,
+  breakfast: <Coffee className="w-5 h-5" />,
+  "room-service": <Clock className="w-5 h-5" />,
+  "wind-fan": <Wind className="w-5 h-5" />,
+};
+
 const getAmenityIcon = (name: string) => {
-  const n = name.toLowerCase();
-  if (n.includes("wifi") || n.includes("internet")) return <Wifi className="w-5 h-5" />;
-  if (n.includes("ac") || n.includes("air")) return <Snowflake className="w-5 h-5" />;
-  if (n.includes("tv") || n.includes("television")) return <Tv className="w-5 h-5" />;
-  if (n.includes("coffee") || n.includes("tea")) return <Coffee className="w-5 h-5" />;
-  if (n.includes("wind")) return <Wind className="w-5 h-5" />;
-  return <CheckCircle2 className="w-5 h-5" />;
+  const key = name.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  return amenityIcons[key] || <Check className="w-5 h-5" />;
 };
 
 const HomeDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  
   const [home, setHome] = useState<PropertyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Gallery state
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
-  const autoScrollInterval = useRef<NodeJS.Timeout | null>(null);
+  const [showGallery, setShowGallery] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  
+  // Touch swipe support
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  
+  // Calendar modal state
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState<"checkIn" | "checkOut">("checkIn");
+  
+  // Tabs
+  const [activeTab, setActiveTab] = useState("overview");
+  
+  // Booking state - Initialize from URL params
+  const [checkIn, setCheckIn] = useState<Date | undefined>(() => {
+    const param = searchParams.get("checkIn");
+    return param ? parseISO(param) : addDays(new Date(), 1);
+  });
+  const [checkOut, setCheckOut] = useState<Date | undefined>(() => {
+    const param = searchParams.get("checkOut");
+    return param ? parseISO(param) : addDays(new Date(), 2);
+  });
+  const [guests, setGuests] = useState(() => {
+    const param = searchParams.get("guests");
+    return param ? parseInt(param) : 1;
+  });
 
-  // Booking state
-  const [checkIn, setCheckIn] = useState<Date>();
-  const [checkOut, setCheckOut] = useState<Date>();
-  const [guests, setGuests] = useState(1);
-  const [isCheckInOpen, setIsCheckInOpen] = useState(false);
-  const [isCheckOutOpen, setIsCheckOutOpen] = useState(false);
-  const [isGuestsOpen, setIsGuestsOpen] = useState(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const { toast } = useToast();
-
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  // Calculate nights
-  const calculateNights = () => {
-    if (!checkIn || !checkOut) return 0;
-    const diffTime = Math.abs(checkOut.getTime() - checkIn.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const nights = calculateNights();
+  // Booking flow hook
+  const {
+    showVideo,
+    hasWatchedVideo,
+    showLoginPrompt,
+    currentVideoUrl,
+    currentRoomId,
+    videoRef,
+    handleRoomBook,
+    handleQuickBook,
+    handleLoginRedirect,
+    handleCloseVideo,
+    handleVideoTimeUpdate,
+    handleVideoEnded,
+    proceedToBooking,
+    setShowLoginPrompt,
+  } = useBookingFlow(id || "", "homes");
 
   const homeImages = useMemo(() => {
     if (!home?.images?.length) return [];
@@ -130,125 +161,16 @@ const HomeDetails = () => {
 
   const rooms = useMemo(() => home?.rooms || [], [home]);
 
-  const updateGuests = (delta: number) => {
-    const maxGuests = rooms.length
-      ? Math.max(...rooms.map((room) => room.capacity + (room.extraBedCapacity || 0)))
-      : 4;
-    setGuests((prev) => Math.max(1, Math.min(maxGuests, prev + delta)));
-  };
-
-  const handleBooking = async () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Login Required",
-        description: "Please login to book this property",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        navigate("/login", { state: { from: window.location.pathname } });
-      }, 1500);
-      return;
-    }
-
-    if (!checkIn || !checkOut) {
-      toast({
-        title: "Missing Information",
-        description: "Please select check-in and check-out dates",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!home) return;
-
-    setIsProcessingPayment(true);
-    let bookingId: string | undefined;
-
-    try {
-      const totalAmount = home.basePrice * nights;
-      const checkInIso = checkIn.toISOString();
-      const checkOutIso = checkOut.toISOString();
-      const roomId = rooms[0]?.id;
-      let lockAcquired = false;
-
-      if (roomId) {
-        await api.inventory.lock({
-          roomId,
-          checkIn: checkInIso,
-          checkOut: checkOutIso,
-          quantity: 1,
-        });
-        lockAcquired = true;
-      }
-      if (!roomId) {
-        throw new Error("No rooms available for this home");
-      }
-
-      const bookingResponse = await api.bookings.create({
-        propertyId: home.id,
-        roomId,
-        checkInDate: checkInIso,
-        checkOutDate: checkOutIso,
-        adults: guests,
-        children: 0,
-        extraBeds: 0,
-      });
-
-      bookingId = bookingResponse?.booking?.id || bookingResponse?.id;
-      if (!bookingId) {
-        throw new Error("Booking creation failed");
-      }
-
-      const order = await api.payments.createOrder(bookingId);
-
-      const result = await createBookingPayment({
-        propertyName: home.name,
-        amount: totalAmount,
-        nights: nights,
-        checkIn: format(checkIn, "MMM dd, yyyy"),
-        checkOut: format(checkOut, "MMM dd, yyyy"),
-        guests: guests,
-        orderId: order.orderId,
-        notes: { propertyId: home.id, roomId: roomId || "" },
-      });
-
-      if (result.success) {
-        const resp = result.response as any;
-        if (resp?.razorpay_order_id && resp?.razorpay_payment_id && resp?.razorpay_signature) {
-          await api.payments.verify({
-            razorpay_order_id: resp.razorpay_order_id,
-            razorpay_payment_id: resp.razorpay_payment_id,
-            razorpay_signature: resp.razorpay_signature,
-          });
-        }
-        toast({
-          title: "Booking Successful! 🎉",
-          description: `Your booking for ${home.name} has been confirmed.`,
-        });
-      } else {
-        if (bookingId) {
-          await api.bookings.cancel(bookingId, "Payment failed");
-        }
-        if (lockAcquired && roomId) {
-          await api.inventory.release({ roomId });
-        }
-        throw new Error(result.error || "Payment failed");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Payment Error",
-        description: error.message || "Unable to process payment. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
+  const nights = useMemo(() => {
+    if (!checkIn || !checkOut) return 0;
+    return Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+  }, [checkIn, checkOut]);
 
   useEffect(() => {
     const fetchHome = async () => {
       if (!id) return;
       setIsLoading(true);
+      setError(null);
       try {
         const data = await api.properties.getById(id);
         setHome(data);
@@ -261,36 +183,54 @@ const HomeDetails = () => {
     fetchHome();
   }, [id]);
 
+  // Keyboard navigation for gallery
   useEffect(() => {
-    if (!homeImages.length) return;
-    const startAutoScroll = () => {
-      if (autoScrollInterval.current) clearInterval(autoScrollInterval.current);
-      autoScrollInterval.current = setInterval(() => {
+    if (!showGallery) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        setCurrentImageIndex((prev) => (prev - 1 + homeImages.length) % homeImages.length);
+      } else if (e.key === "ArrowRight") {
         setCurrentImageIndex((prev) => (prev + 1) % homeImages.length);
-      }, 4000);
+      } else if (e.key === "Escape") {
+        setShowGallery(false);
+      }
     };
-    startAutoScroll();
-    return () => {
-      if (autoScrollInterval.current) clearInterval(autoScrollInterval.current);
-    };
-  }, [homeImages.length]);
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showGallery, homeImages.length]);
 
-  const handleTouchStart = (e: React.TouchEvent) => setTouchStart(e.targetTouches[0].clientX);
-  const handleTouchMove = (e: React.TouchEvent) => setTouchEnd(e.targetTouches[0].clientX);
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd || !homeImages.length) return;
-    const dist = touchStart - touchEnd;
-    if (dist > 50) setCurrentImageIndex((prev) => (prev + 1) % homeImages.length);
-    if (dist < -50) setCurrentImageIndex((prev) => (prev - 1 + homeImages.length) % homeImages.length);
-    setTouchStart(0); setTouchEnd(0);
+  // Touch swipe support
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    setTouchEnd(e.changedTouches[0].clientX);
+    if (touchStart && e.changedTouches[0].clientX) {
+      const swipeDistance = touchStart - e.changedTouches[0].clientX;
+      if (Math.abs(swipeDistance) > 50) {
+        if (swipeDistance > 0) {
+          // Swipe left - next image
+          setCurrentImageIndex((prev) => (prev + 1) % homeImages.length);
+        } else {
+          // Swipe right - previous image
+          setCurrentImageIndex((prev) => (prev - 1 + homeImages.length) % homeImages.length);
+        }
+      }
+    }
+  };
+
+  const scrollToRooms = () => {
+    document.getElementById("rooms-section")?.scrollIntoView({ behavior: "smooth" });
   };
 
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-xl font-medium text-muted-foreground animate-pulse">Loading amazing spaces...</p>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </Layout>
     );
@@ -299,367 +239,728 @@ const HomeDetails = () => {
   if (error || !home) {
     return (
       <Layout>
-        <div className="py-20 text-center max-w-md mx-auto">
-          <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
+        <div className="min-h-[60vh] flex flex-col items-center justify-center">
+          <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
             <Info className="w-10 h-10 text-destructive" />
           </div>
-          <h2 className="text-2xl font-bold mb-2">Property Not Found</h2>
-          <p className="text-muted-foreground mb-8">{error || "We couldn't find the home you're looking for."}</p>
-          <Button onClick={() => navigate("/homes")} size="lg">Browse Other Homes</Button>
+          <p className="text-lg font-semibold">{error || "Property not found"}</p>
+          <Button onClick={() => navigate("/homes")} className="mt-4">Back to Homestays</Button>
         </div>
       </Layout>
     );
   }
 
-  const currencyStr = home.currency || "INR";
+  const currencyStr = home.currency || "₹";
+  const lowestPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.pricePerNight)) : home.basePrice;
+
+  const wishlistItem = {
+    id: home.id,
+    type: "home" as const,
+    name: home.name,
+    location: `${formatCity(home.city)}, ${home.state}`,
+    image: home.images?.[0]?.url || "",
+    price: lowestPrice,
+    rating: home.rating,
+  };
+
+  const liked = isInWishlist(home.id, "home");
+
+  const handleToggleLike = () => {
+    toggleWishlist(wishlistItem);
+    toast({
+      title: liked ? "Removed from wishlist" : "Added to wishlist",
+      description: liked ? "This home is no longer in your wishlist." : "This home was added to your wishlist.",
+    });
+  };
+
+  const handleShare = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+
+    const shareData = {
+      title: home.name,
+      text: `${home.name} in ${formatCity(home.city)}`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareData.url);
+        toast({
+          title: "Link copied",
+          description: "Home link copied to clipboard.",
+        });
+      } else {
+        toast({
+          title: "Share not supported",
+          description: "Your browser does not support sharing on this page.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      // User cancellation from native share sheet is a normal flow.
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   return (
     <Layout>
-      <div className="bg-background min-h-screen pb-20 md:pb-10">
-        <div className="container mx-auto px-4 md:px-6 py-6 md:py-8">
+      <SEOHead
+        title={home.metaTitle || `${home.name} - Homestay in ${formatCity(home.city)}`}
+        description={home.metaDesc || `${home.name} in ${formatCity(home.city)}, ${home.state}. Explore amenities, room options, and secure booking on HostHaven.`}
+        keywords={`${home.name}, homes in ${formatCity(home.city).toLowerCase()}, ${formatCity(home.city).toLowerCase()} homestay booking, HostHaven`}
+        canonical={`https://hosthaven.in/homes/${home.slug || id}`}
+        ogImage={home.images?.[0]?.url || "/logo.png"}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "LodgingBusiness",
+          name: home.name,
+          image: home.images?.map((img) => img.url).filter(Boolean),
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: formatCity(home.city),
+            addressRegion: home.state,
+            streetAddress: home.address,
+            addressCountry: "IN",
+          },
+          aggregateRating: home.reviewCount > 0
+            ? {
+                "@type": "AggregateRating",
+                ratingValue: home.rating,
+                reviewCount: home.reviewCount,
+              }
+            : undefined,
+          url: `https://hosthaven.in/homes/${home.slug || id}`,
+        }}
+      />
+      {/* Hero Gallery Section */}
+      <div className="relative">
+        {/* Mobile: Horizontal scroll */}
+        <div className="md:hidden">
+          <div className="relative aspect-[4/3] overflow-hidden bg-muted" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            {homeImages.map((img, index) => (
+              <img
+                key={index}
+                src={img}
+                alt={`${home.name} ${index + 1}`}
+                className={cn(
+                  "absolute inset-0 w-full h-full object-cover transition-all duration-500",
+                  index === currentImageIndex ? "opacity-100" : "opacity-0"
+                )}
+              />
+            ))}
+            
+            {/* Top actions */}
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between z-10">
+              <button
+                onClick={() => navigate("/homes")}
+                title="Back to homes"
+                aria-label="Back to homes"
+                className="w-10 h-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-lg"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleShare}
+                  disabled={isSharing}
+                  title="Share home"
+                  aria-label="Share home"
+                  className="w-10 h-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-lg disabled:opacity-60"
+                >
+                  <Share2 className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleToggleLike}
+                  title={liked ? "Remove from wishlist" : "Add to wishlist"}
+                  aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
+                  className="w-10 h-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-lg"
+                >
+                  <Heart className={cn("w-5 h-5", liked ? "fill-primary text-primary" : "text-foreground")} />
+                </button>
+              </div>
+            </div>
 
-          <Link to="/homes" className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 hover:bg-muted text-foreground rounded-full transition-all duration-300 mb-6 font-medium text-sm group">
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Homes
-          </Link>
+            {/* Image counter */}
+            <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" />
+              {currentImageIndex + 1}/{homeImages.length}
+            </div>
 
-          {/* Hero Section */}
-          <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl mb-12 bg-black group h-[40vh] md:h-[60vh]">
-            <div className="absolute inset-0 transition-opacity duration-1000 ease-in-out">
-              {homeImages.map((img, index) => (
-                <img
+            {/* Swipe dots */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {homeImages.map((_, index) => (
+                <button
                   key={index}
-                  src={img}
-                  alt={`${home.name} ${index + 1}`}
+                  onClick={() => setCurrentImageIndex(index)}
+                  title={`Show image ${index + 1}`}
+                  aria-label={`Show image ${index + 1}`}
                   className={cn(
-                    "absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-in-out",
-                    index === currentImageIndex ? "opacity-100 scale-100" : "opacity-0 scale-105"
+                    "h-2 rounded-full transition-all",
+                    index === currentImageIndex ? "w-6 bg-white" : "w-2 bg-white/50"
                   )}
                 />
               ))}
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+          </div>
+          
+          {/* Title below carousel */}
+          <div className="p-4 bg-background border-b">
+            <div className="flex items-center gap-2 mb-2">
+              {home.rating > 0 && (
+                <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                  <Star className="w-4 h-4 fill-current" />
+                  {home.rating} ({home.reviewCount})
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-1">{home.name}</h1>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MapPin className="w-4 h-4" />
+              {formatCity(home.city)}, {home.state}
+            </div>
+          </div>
+        </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-12 text-white">
-              <div className="flex flex-wrap gap-3 mb-4">
-                {home.rating > 0 && (
-                  <Badge variant="secondary" className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-0 py-1.5 px-3">
-                    <Star className="w-4 h-4 fill-current mr-1 text-yellow-500" />
-                    <span className="font-bold">{home.rating}</span>
-                    <span className="ml-1 opacity-80 font-normal">({home.reviewCount} reviews)</span>
-                  </Badge>
+        {/* Desktop: Grid gallery */}
+        <div className="hidden md:block">
+          <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[50vh] max-h-[500px]">
+            <div className="col-span-2 row-span-2 relative rounded-l-2xl overflow-hidden group cursor-pointer" onClick={() => setShowGallery(true)}>
+              <img src={homeImages[0]} alt={home.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+              <div className="absolute bottom-4 left-4 bg-white/90 px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2">
+                <ImageIcon className="w-4 h-4" /> View all photos
+              </div>
+            </div>
+            {homeImages.slice(1, 5).map((img, index) => (
+              <div key={index} className={cn("relative overflow-hidden group cursor-pointer", index === 1 ? "rounded-tr-2xl" : index === 3 ? "rounded-br-2xl" : "")} onClick={() => setShowGallery(true)}>
+                <img src={img} alt={`${home.name} ${index + 2}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                {index === 3 && homeImages.length > 5 && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <span className="text-white font-semibold text-lg">+{homeImages.length - 5}</span>
+                  </div>
                 )}
-                {home.viewCount && home.viewCount > 100 && (
-                  <Badge variant="secondary" className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-0 py-1.5 px-3">
-                    <Eye className="w-4 h-4 mr-1 text-primary-foreground" />
-                    Highly Viewed
-                  </Badge>
-                )}
-                {home.highlights?.slice(0, 2).map((h, i) => (
-                  <Badge key={i} variant="secondary" className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-md border-0 py-1.5 px-3">
-                    {h}
-                  </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Gallery Modal */}
+        {showGallery && (
+          <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+            <button
+              onClick={() => setShowGallery(false)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+              title="Close gallery"
+              aria-label="Close gallery"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <button
+              onClick={() => setCurrentImageIndex((prev) => (prev - 1 + homeImages.length) % homeImages.length)}
+              className="absolute left-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+              title="Previous image"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+            <button
+              onClick={() => setCurrentImageIndex((prev) => (prev + 1) % homeImages.length)}
+              className="absolute right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+              title="Next image"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+            <img src={homeImages[currentImageIndex]} alt={`${home.name} ${currentImageIndex + 1}`} className="max-w-full max-h-full object-contain" />
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {homeImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-all",
+                    index === currentImageIndex ? "w-8 bg-white" : "bg-white/50"
+                  )}
+                  title={`Go to image ${index + 1}`}
+                  aria-label={`Go to image ${index + 1}`}
+                />
+              ))}
+            </div>
+            <div className="absolute top-4 left-4 text-white text-sm bg-black/30 px-3 py-1 rounded-full">
+              {currentImageIndex + 1} / {homeImages.length}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Left Content */}
+          <div className="flex-1 lg:max-w-[65%]">
+            {/* Header Info */}
+            <div className="mb-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-1 bg-amber-100 text-amber-700 rounded-full px-2.5 py-0.5">
+                      <Star className="w-4 h-4 fill-current" />
+                      <span className="font-semibold">{home.rating}</span>
+                    </div>
+                    <span className="text-muted-foreground">({home.reviewCount} reviews)</span>
+                    {home.bookingCount && home.bookingCount > 0 && (
+                      <span className="text-muted-foreground">• {home.bookingCount} bookings</span>
+                    )}
+                  </div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                    {home.name}
+                  </h1>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="w-5 h-5 text-primary" />
+                    <span>{home.address}, {formatCity(home.city)}, {home.state} {home.pincode}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="flex flex-wrap gap-4 mb-6 py-4 border-y">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Up to {rooms.length ? Math.max(...rooms.map(r => r.capacity + (r.extraBedCapacity || 0))) : 4} Guests</p>
+                  <p className="text-xs text-muted-foreground">Per night</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bed className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{rooms.length} Bedrooms</p>
+                  <p className="text-xs text-muted-foreground">Available</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Secure Booking</p>
+                  <p className="text-xs text-muted-foreground">Free cancellation</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="border-b mb-6 sticky top-0 bg-background z-10 -mx-4 px-4 md:mx-0 md:px-0">
+              <div className="flex gap-6 overflow-x-auto scrollbar-hide">
+                {["overview", "rooms", "reviews", "location"].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => {
+                      setActiveTab(tab);
+                      if (tab === "rooms") scrollToRooms();
+                      if (tab === "reviews") document.getElementById("reviews-section")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className={cn(
+                      "pb-3 text-sm font-medium capitalize border-b-2 transition-colors whitespace-nowrap",
+                      activeTab === tab
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {tab}
+                  </button>
                 ))}
               </div>
-              <h1 className="text-3xl md:text-5xl lg:text-7xl font-serif font-bold text-white mb-3 text-shadow-sm tracking-tight">
-                {home.name}
-              </h1>
-              <div className="flex items-center gap-2 text-white/90 text-sm md:text-lg">
-                <MapPin className="w-5 h-5 text-primary-foreground" />
-                <span className="font-medium">{home.address}, {home.city}, {home.state} {home.pincode}</span>
-              </div>
             </div>
 
-            {home.virtualTourUrl && (
-              <a href={home.virtualTourUrl} target="_blank" rel="noreferrer" className="absolute top-6 right-6 bg-white/20 hover:bg-white/40 backdrop-blur-lg rounded-full px-5 py-2.5 flex items-center gap-2 text-white font-semibold transition-all shadow-xl">
-                <PlayCircle className="w-5 h-5" /> Virtual Tour
-              </a>
-            )}
-
-            {/* Gallery Navigation Controls (Desktop) */}
-            <div className="absolute bottom-12 right-12 hidden md:flex gap-2">
-              {homeImages.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentImageIndex(i)}
-                  className={cn(
-                    "h-2 rounded-full transition-all duration-300",
-                    i === currentImageIndex ? "w-8 bg-primary" : "w-3 bg-white/50 hover:bg-white"
+            {/* Tab Content */}
+            {activeTab === "overview" && (
+              <div className="space-y-8">
+                {/* About */}
+                <section>
+                  <h2 className="text-xl font-bold mb-4">About this place</h2>
+                  {home.shortDesc && (
+                    <p className="text-lg text-foreground/80 italic border-l-4 border-primary pl-4 py-2 mb-4">
+                      "{home.shortDesc}"
+                    </p>
                   )}
-                />
-              ))}
-            </div>
+                  <p className="text-muted-foreground leading-relaxed">{home.description}</p>
+                </section>
 
-            {/* Mobile Touch Area */}
-            <div
-              className="absolute inset-0 md:hidden z-10"
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-
-            {/* Main Content Area */}
-            <div className="lg:col-span-8 space-y-10">
-
-              {/* Quick Info Bar */}
-              <div className="flex flex-wrap items-center gap-4 p-5 bg-card rounded-2xl shadow-sm border border-border/50">
-                <div className="flex items-center gap-3 pr-4 border-r border-border/50">
-                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Users className="w-5 h-5" /></div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Guests</p>
-                    <p className="font-semibold text-foreground">Up to {rooms.length ? Math.max(...rooms.map(r => r.capacity + (r.extraBedCapacity || 0))) : 4}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 pr-4 border-r border-border/50">
-                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><Bed className="w-5 h-5" /></div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Rooms</p>
-                    <p className="font-semibold text-foreground">{rooms.length} Bedrooms</p>
-                  </div>
-                </div>
-                {home.bookingCount && home.bookingCount > 0 && (
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><ShoppingBag className="w-5 h-5" /></div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Popular</p>
-                      <p className="font-semibold text-foreground">{home.bookingCount} Bookings</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Description */}
-              <div className="space-y-4">
-                <h2 className="text-2xl font-serif font-bold text-foreground flex items-center gap-2">
-                  About this Property
-                </h2>
-                {home.shortDesc && (
-                  <p className="text-lg font-medium text-foreground/80 leading-relaxed italic border-l-4 border-primary pl-4 py-1">
-                    "{home.shortDesc}"
-                  </p>
-                )}
-                <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none text-muted-foreground leading-loose">
-                  {home.description.split('\n').map((paragraph, idx) => (
-                    <p key={idx} className="mb-4">{paragraph}</p>
-                  ))}
-                </div>
-              </div>
-
-              {/* Amenities */}
-              <div className="space-y-6">
-                <h2 className="text-2xl font-serif font-bold text-foreground">What this place offers</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {home.amenities.map((amenity, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-4 bg-muted/30 rounded-2xl hover:bg-muted/70 transition-colors border border-border/30">
-                      <div className="text-primary">{getAmenityIcon(amenity)}</div>
-                      <span className="font-medium text-sm sm:text-base text-foreground/90">{amenity}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Rooms Details */}
-              {rooms.length > 0 && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-serif font-bold text-foreground mb-6">Accommodations</h2>
-                  <div className="grid gap-6">
-                    {rooms.map((room) => (
-                      <Card key={room.id} className="overflow-hidden border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex flex-col md:flex-row">
-                          <div className="md:w-1/3 bg-muted isolate">
-                            {room.images?.[0]?.url ? (
-                              <img src={room.images[0].url} alt={room.name} className="w-full h-full object-cover min-h-[200px]" />
-                            ) : (
-                              <div className="w-full h-full min-h-[200px] flex items-center justify-center bg-primary/5">
-                                <Bed className="w-12 h-12 text-primary/20" />
-                              </div>
-                            )}
-                          </div>
-                          <CardContent className="p-6 md:w-2/3 flex flex-col justify-between">
-                            <div>
-                              <div className="flex justify-between items-start mb-2">
-                                <h3 className="text-xl font-bold">{room.name}</h3>
-                                <Badge variant="outline" className="capitalize font-semibold">{room.type}</Badge>
-                              </div>
-                              {room.description && <p className="text-sm text-muted-foreground mb-4">{room.description}</p>}
-
-                              <div className="flex flex-wrap gap-x-6 gap-y-2 mb-4 text-sm font-medium">
-                                <div className="flex items-center gap-1.5"><Users className="w-4 h-4 text-primary" /> Max: {room.capacity + (room.extraBedCapacity || 0)} Guests</div>
-                                {room.sizeSqm && <div className="flex items-center gap-1.5"><Maximize className="w-4 h-4 text-primary" /> {room.sizeSqm} m²</div>}
-                              </div>
-
-                              {room.amenities?.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                  {room.amenities.slice(0, 4).map((am, i) => (
-                                    <span key={i} className="text-xs bg-muted px-2 py-1 rounded-md text-muted-foreground">{am}</span>
-                                  ))}
-                                  {room.amenities.length > 4 && <span className="text-xs text-muted-foreground self-center">+{room.amenities.length - 4} more</span>}
-                                </div>
-                              )}
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-border/50 flex items-end justify-between">
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Room Rate</p>
-                                <p className="text-xl font-bold text-primary">{currencyStr} {room.pricePerNight.toLocaleString()} <span className="text-sm text-muted-foreground font-normal">/ night</span></p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </div>
-                      </Card>
+                {/* Amenities */}
+                <section>
+                  <h2 className="text-xl font-bold mb-4">What this place offers</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {home.amenities.map((amenity) => (
+                      <div key={amenity} className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
+                        <div className="text-primary">{getAmenityIcon(amenity)}</div>
+                        <span className="text-sm font-medium capitalize">{amenity.replace(/-/g, " ")}</span>
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
+                </section>
 
-              {/* Policies */}
-              <div className="space-y-6">
-                <h2 className="text-2xl font-serif font-bold text-foreground">Things to know</h2>
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Cancellation Policy */}
-                  <div className="bg-card p-6 rounded-2xl shadow-sm border border-border/50">
-                    <div className="flex items-center gap-3 mb-4">
-                      <ShieldCheck className="w-6 h-6 text-primary" />
-                      <h3 className="text-lg font-bold">Cancellation Policy</h3>
-                    </div>
-                    {home.cancellationPolicy ? (
-                      <ul className="space-y-3 text-sm text-muted-foreground">
-                        <li className="flex gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
-                          <span>Cancel before {home.cancellationPolicy.freeBeforeHours} hours for a {home.cancellationPolicy.refundPercentBefore}% refund.</span>
-                        </li>
-                        <li className="flex gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-yellow-500 mt-0.5 shrink-0" />
-                          <span>Cancel within {home.cancellationPolicy.freeBeforeHours} hours for a {home.cancellationPolicy.refundPercentAfter}% refund.</span>
-                        </li>
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Free cancellation up to 24 hours before check-in. Non-refundable afterwards.</p>
-                    )}
-                  </div>
-
-                  {/* House Rules */}
-                  <div className="bg-card p-6 rounded-2xl shadow-sm border border-border/50">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Info className="w-6 h-6 text-primary" />
-                      <h3 className="text-lg font-bold">House Rules</h3>
-                    </div>
-                    <ul className="space-y-3 text-sm text-muted-foreground">
-                      <li className="flex gap-2"><ChevronRight className="w-4 h-4 text-primary mt-0.5 shrink-0" /> Check-in: After 2:00 PM</li>
-                      <li className="flex gap-2"><ChevronRight className="w-4 h-4 text-primary mt-0.5 shrink-0" /> Checkout: Before 11:00 AM</li>
-                      <li className="flex gap-2"><ChevronRight className="w-4 h-4 text-primary mt-0.5 shrink-0" /> No smoking or unregistered guests allowed</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Sticky Sidebar Widget */}
-            <div className="lg:col-span-4 relative mt-10 lg:mt-0">
-              <div className="sticky top-24">
-                <Card className="border-border/60 shadow-xl overflow-hidden rounded-3xl">
-                  {/* Price Header */}
-                  <div className="bg-muted/30 p-6 border-b border-border/50">
-                    <div className="flex items-end gap-2 mb-2">
-                      <span className="text-4xl font-serif font-black text-primary">{currencyStr} {home.basePrice.toLocaleString()}</span>
-                      <span className="text-muted-foreground font-medium mb-1">/ night</span>
-                    </div>
-                    {home.viewCount && home.viewCount > 50 && (
-                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-500 bg-rose-500/10 px-2.5 py-1 rounded-full mt-2">
-                        <Eye className="w-3.5 h-3.5" /> High Demand Property
+                {/* Policies */}
+                <section>
+                  <h2 className="text-xl font-bold mb-4">Things to know</h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold">Cancellation</h3>
                       </div>
-                    )}
-                  </div>
-
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-
-                      {/* Dates Selector */}
-                      <div className="grid grid-cols-2 bg-muted/40 p-1 rounded-xl border border-border/50">
-                        <div className="relative p-3">
-                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Check-in</p>
-                          <input
-                            type="date"
-                            className="w-full bg-transparent border-none p-0 text-sm font-semibold focus:outline-none focus:ring-0 text-foreground cursor-pointer"
-                            min={new Date().toISOString().split("T")[0]}
-                            value={checkIn ? format(checkIn, "yyyy-MM-dd") : ""}
-                            onChange={(e) => setCheckIn(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
-                          />
-                        </div>
-                        <div className="relative p-3 border-l border-border/50">
-                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Checkout</p>
-                          <input
-                            type="date"
-                            className="w-full bg-transparent border-none p-0 text-sm font-semibold focus:outline-none focus:ring-0 text-foreground cursor-pointer"
-                            min={checkIn ? format(new Date(checkIn.getTime() + 86400000), "yyyy-MM-dd") : new Date().toISOString().split("T")[0]}
-                            value={checkOut ? format(checkOut, "yyyy-MM-dd") : ""}
-                            onChange={(e) => setCheckOut(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Guests Selector */}
-                      <div className="bg-muted/40 p-1 rounded-xl border border-border/50">
-                        <div className="p-3">
-                          <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Guests</p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-foreground">{guests} Guest{guests > 1 ? 's' : ''}</span>
-                            <div className="flex items-center gap-3">
-                              <button onClick={() => updateGuests(-1)} disabled={guests <= 1} className="w-8 h-8 rounded-full bg-background border flex justify-center items-center hover:bg-muted disabled:opacity-50 transition-colors">
-                                <Minus className="w-4 h-4 text-foreground" />
-                              </button>
-                              <button onClick={() => updateGuests(1)} disabled={rooms.length ? guests >= Math.max(...rooms.map(r => r.capacity + (r.extraBedCapacity || 0))) : guests >= 4} className="w-8 h-8 rounded-full bg-background border flex justify-center items-center hover:bg-muted disabled:opacity-50 transition-colors">
-                                <Plus className="w-4 h-4 text-foreground" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Summary Pricing (Visible if dates selected) */}
-                      {nights > 0 && (
-                        <div className="pt-4 mt-2 border-t border-border/50 space-y-3">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{currencyStr} {home.basePrice.toLocaleString()} x {nights} night{nights > 1 ? 's' : ''}</span>
-                            <span className="font-medium text-foreground">{currencyStr} {(home.basePrice * nights).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground underline decoration-dotted">Taxes & fees</span>
-                            <span className="font-medium text-foreground">Calculated at checkout</span>
-                          </div>
-                          <div className="flex justify-between font-bold text-lg pt-3 border-t border-border/50">
-                            <span>Total</span>
-                            <span className="text-primary">{currencyStr} {(home.basePrice * nights).toLocaleString()}</span>
-                          </div>
-                        </div>
+                      {home.cancellationPolicy ? (
+                        <p className="text-sm text-muted-foreground">
+                          Free cancellation up to {home.cancellationPolicy.freeBeforeHours} hours before check-in.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Free cancellation up to 24 hours before check-in.</p>
                       )}
-
-                      <Button
-                        size="xl"
-                        onClick={handleBooking}
-                        disabled={!checkIn || !checkOut || isProcessingPayment}
-                        className="w-full h-14 text-lg font-bold rounded-2xl bg-primary hover:bg-primary/90 mt-4 shadow-lg shadow-primary/30 transition-all hover:-translate-y-1"
-                      >
-                        {isProcessingPayment ? (
-                          <span className="flex items-center gap-2">
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Processing...
-                          </span>
-                        ) : "Reserve Now"}
-                      </Button>
-                      <p className="text-center text-xs text-muted-foreground font-medium">You won't be charged yet</p>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="bg-muted/50 p-4 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold">House Rules</h3>
+                      </div>
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        <li>Check-in: After 2:00 PM</li>
+                        <li>Checkout: Before 11:00 AM</li>
+                        <li>No smoking</li>
+                      </ul>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeTab === "rooms" && (
+              <section id="rooms-section">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold">Available Rooms</h2>
+                  <p className="text-muted-foreground">{rooms.length} room types</p>
+                </div>
+                <div className="space-y-4">
+                  {rooms.map((room) => (
+                    <RoomCard
+                      key={room.id}
+                      room={{
+                        ...room,
+                        video: room.video,
+                        images: room.images
+                      }}
+                      hotelId={home.id}
+                      checkIn={checkIn}
+                      checkOut={checkOut}
+                      guests={guests}
+                      onBookNow={(roomId) => {
+                        handleRoomBook(roomId, room.video);
+                      }}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {activeTab === "reviews" && (
+              <section id="reviews-section">
+                <h2 className="text-xl font-bold mb-6">Guest Reviews</h2>
+                <PropertyReviews propertyId={home.id} />
+              </section>
+            )}
+
+            {activeTab === "location" && (
+              <section>
+                <h2 className="text-xl font-bold mb-4">Location</h2>
+                <div className="rounded-2xl overflow-hidden h-[300px] bg-muted">
+                  {home.latitude && home.longitude ? (
+                    <iframe
+                      title="Property location"
+                      src={`https://www.google.com/maps?q=${home.latitude},${home.longitude}&z=14&output=embed`}
+                      className="w-full h-full"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      Location not available
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 flex items-center gap-2 text-muted-foreground">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  <span>{home.address}, {home.city}, {home.state} {home.pincode}</span>
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* Right Sidebar - Booking Card */}
+          <div className="lg:w-[35%] lg:max-w-[400px]">
+            <div className="bg-white rounded-2xl shadow-xl border sticky top-24 overflow-hidden">
+              {/* Price Header */}
+              <div className="bg-gradient-to-r from-primary to-primary/80 p-4 text-white">
+                <div className="flex items-baseline justify-between">
+                  <div>
+                    <span className="text-3xl font-bold">{currencyStr}{lowestPrice.toLocaleString()}</span>
+                    <span className="text-white/80"> /night</span>
+                  </div>
+                  {nights > 0 && (
+                    <div className="text-right">
+                      <span className="text-sm">Total: </span>
+                      <span className="font-bold">{currencyStr}{(lowestPrice * nights).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Booking Form */}
+              <div className="p-4 space-y-4">
+                {/* Date Selection */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setCalendarTarget("checkIn");
+                      setShowCalendarModal(true);
+                    }}
+                    className="text-left md:pointer-events-none"
+                  >
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-in</label>
+                    <div className="border rounded-xl p-3 cursor-pointer hover:border-primary/50 transition md:cursor-default md:hover:border-border flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-primary flex-shrink-0" />
+                      <div>
+                        <span className="text-sm font-medium block">
+                          {checkIn ? format(checkIn, "MMM dd") : "Select"}
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {checkIn ? format(checkIn, "EEE") : ""}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCalendarTarget("checkOut");
+                      setShowCalendarModal(true);
+                    }}
+                    className="text-left md:pointer-events-none"
+                  >
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Check-out</label>
+                    <div className="border rounded-xl p-3 cursor-pointer hover:border-primary/50 transition md:cursor-default md:hover:border-border flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-primary flex-shrink-0" />
+                      <div>
+                        <span className="text-sm font-medium block">
+                          {checkOut ? format(checkOut, "MMM dd") : "Select"}
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {checkOut ? format(checkOut, "EEE") : ""}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Calendar - Desktop only */}
+                <div className="hidden md:block border rounded-xl overflow-hidden">
+                  <Calendar
+                    mode="range"
+                    selected={{ from: checkIn, to: checkOut }}
+                    onSelect={(range) => {
+                      setCheckIn(range?.from);
+                      setCheckOut(range?.to);
+                    }}
+                    disabled={(date) => date < new Date()}
+                    numberOfMonths={1}
+                  />
+                </div>
+
+                {/* Guests */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Guests</label>
+                  <div className="flex items-center justify-between border rounded-xl p-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">{guests} Guest{guests > 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setGuests(Math.max(1, guests - 1))}
+                        title="Decrease guests"
+                        aria-label="Decrease guests"
+                        className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-muted"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setGuests(Math.min(10, guests + 1))}
+                        title="Increase guests"
+                        aria-label="Increase guests"
+                        className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-muted"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price Breakdown */}
+                {nights > 0 && (
+                  <div className="space-y-2 py-3 border-t">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{currencyStr}{lowestPrice} x {nights} night{nights > 1 ? "s" : ""}</span>
+                      <span>{currencyStr}{(lowestPrice * nights).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Taxes & fees</span>
+                      <span>{currencyStr}{Math.round(lowestPrice * nights * 0.12).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-bold pt-2 border-t">
+                      <span>Total</span>
+                      <span>{currencyStr}{Math.round(lowestPrice * nights * 1.12).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Book Button */}
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => {
+                    if (rooms.length > 0) {
+                      document.getElementById("rooms-section")?.scrollIntoView({ behavior: "smooth" });
+                      setActiveTab("rooms");
+                    } else {
+                      handleQuickBook();
+                    }
+                  }}
+                >
+                  {rooms.length > 0 ? "Select Room to Book" : "Book Now"}
+                </Button>
+
+                <p className="text-xs text-center text-muted-foreground">
+                  You won't be charged yet
+                </p>
               </div>
             </div>
-
           </div>
         </div>
       </div>
+
+      {/* Video Modal */}
+      <VideoModal
+        isOpen={showVideo}
+        videoUrl={currentVideoUrl || ""}
+        onClose={handleCloseVideo}
+        onTimeUpdate={handleVideoTimeUpdate}
+        onEnded={handleVideoEnded}
+        hasWatched={hasWatchedVideo}
+        videoRef={videoRef as any}
+        onProceed={() => {
+          handleCloseVideo();
+          const params = new URLSearchParams(window.location.search);
+          if (currentRoomId) params.set("roomId", currentRoomId);
+          navigate(`/booking/${home.id}?${params.toString()}`);
+        }}
+      />
+
+      {/* Login Prompt Modal */}
+      <LoginPromptModal
+        isOpen={showLoginPrompt}
+        onClose={() => setShowLoginPrompt(false)}
+        onLogin={handleLoginRedirect}
+      />
+
+      {/* Calendar Bottom Drawer Modal - Mobile Only */}
+      {showCalendarModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:hidden">
+          <div className="w-full bg-background rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-background border-b p-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                {calendarTarget === "checkIn" ? "Select Check-in" : "Select Check-out"}
+              </h2>
+              <button
+                onClick={() => setShowCalendarModal(false)}
+                className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center"
+                aria-label="Close calendar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Calendar */}
+            <div className="p-4">
+              <Calendar
+                mode="single"
+                selected={calendarTarget === "checkIn" ? checkIn : checkOut}
+                onSelect={(date) => {
+                  if (!date) return;
+
+                  if (calendarTarget === "checkIn") {
+                    setCheckIn(date);
+                    if (!checkOut || checkOut <= date) {
+                      setCheckOut(addDays(date, 1));
+                    }
+                    setCalendarTarget("checkOut");
+                    return;
+                  }
+
+                  if (checkIn && date <= checkIn) {
+                    setCheckOut(addDays(checkIn, 1));
+                  } else {
+                    setCheckOut(date);
+                  }
+                  setShowCalendarModal(false);
+                }}
+                disabled={(date) => {
+                  const today = new Date();
+                  if (calendarTarget === "checkIn") return date < today;
+                  return date <= (checkIn || today);
+                }}
+                numberOfMonths={1}
+              />
+            </div>
+
+            {/* Footer Actions */}
+            <div className="sticky bottom-0 bg-background border-t p-4 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Selecting: {calendarTarget === "checkIn" ? "Check-in date" : "Check-out date"}
+              </p>
+              <div className="flex gap-2 text-sm">
+                <div className="flex-1">
+                  <p className="text-muted-foreground text-xs mb-1">Check-in</p>
+                  <p className="font-semibold">{checkIn ? format(checkIn, "MMM dd, yyyy") : "Select date"}</p>
+                </div>
+                <div className="flex-1">
+                  <p className="text-muted-foreground text-xs mb-1">Check-out</p>
+                  <p className="font-semibold">{checkOut ? format(checkOut, "MMM dd, yyyy") : "Select date"}</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  if (calendarTarget === "checkIn") {
+                    setCalendarTarget("checkOut");
+                    return;
+                  }
+                  setShowCalendarModal(false);
+                }}
+                size="lg"
+                className="w-full"
+              >
+                {calendarTarget === "checkIn" ? "Continue to Check-out" : "Confirm Dates"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

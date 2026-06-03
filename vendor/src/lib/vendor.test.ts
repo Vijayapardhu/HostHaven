@@ -29,11 +29,11 @@ describe("vendorService", () => {
     it("should update vendor profile", async () => {
       const updateData = { name: "Updated Hotel Name" };
       const mockResponse = { data: { id: "vendor-1", ...updateData } };
-      vi.mocked(api.patch).mockResolvedValue(mockResponse);
+      vi.mocked(api.put).mockResolvedValue(mockResponse);
 
       const result = await vendorService.updateProfile(updateData);
 
-      expect(api.patch).toHaveBeenCalledWith("/v1/vendor/profile", updateData);
+      expect(api.put).toHaveBeenCalledWith("/v1/vendor/profile", updateData);
       expect(result).toEqual(mockResponse.data);
     });
   });

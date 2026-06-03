@@ -30,9 +30,9 @@ const VendorResetPassword = () => {
         }
         setIsLoading(true);
         try {
-            await vendorService.resetPassword(token, password, confirmPassword);
+            await vendorService.resetPassword(token, password);
             setIsSuccess(true);
-            setTimeout(() => navigate("/vendor/login"), 3000);
+            setTimeout(() => navigate("/login"), 3000);
         } catch (error: any) {
             toast({
                 title: "Error",
@@ -58,7 +58,7 @@ const VendorResetPassword = () => {
             >
                 {/* Logo */}
                 <div className="flex justify-center">
-                    <Link to="/vendor/login">
+                    <Link to="/login">
                         <img src={logo} alt="HostHaven" className="h-16 w-auto drop-shadow-2xl" />
                     </Link>
                 </div>
@@ -74,7 +74,7 @@ const VendorResetPassword = () => {
                             <p className="text-white/40 text-sm">This password reset link is invalid or has expired.</p>
                         </div>
                         <Link
-                            to="/vendor/forgot-password"
+                            to="/forgot-password"
                             className="inline-flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 font-medium border border-orange-500/20 hover:border-orange-500/40 px-5 py-2.5 rounded-xl bg-orange-500/5 hover:bg-orange-500/10 transition-all"
                         >
                             Request a new link
@@ -217,7 +217,7 @@ const VendorResetPassword = () => {
 
                 <div className="text-center">
                     <Link
-                        to="/vendor/login"
+                        to="/login"
                         className="inline-flex items-center gap-1.5 text-sm text-white/30 hover:text-white/60 transition-colors"
                     >
                         <Lock className="w-3.5 h-3.5" />

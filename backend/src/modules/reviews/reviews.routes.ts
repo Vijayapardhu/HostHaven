@@ -1,40 +1,47 @@
-import { FastifyInstance } from 'fastify';
-import { ReviewsController } from './reviews.controller';
-import { requireRole } from '../../middleware/auth.middleware';
+import { FastifyInstance } from "fastify";
+import { ReviewsController } from "./reviews.controller";
+import { requireRole } from "../../middleware/auth.middleware";
 
 export default async function reviewsRoutes(fastify: FastifyInstance) {
   // Specific routes must come before parameterized routes
-  fastify.get('/property/:propertyId', ReviewsController.getPropertyReviews);
-  fastify.get('/:id', ReviewsController.getById);
-  fastify.get('/', ReviewsController.getAll);
+  fastify.get("/property/:propertyId", ReviewsController.getPropertyReviews);
 
   fastify.get(
-    '/vendor',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    ReviewsController.getVendorReviews
+    "/vendor",
+    { preHandler: [fastify.authenticate, requireRole("VENDOR")] },
+    ReviewsController.getVendorReviews,
   );
 
   fastify.post(
-    '/vendor/:id/respond',
-    { preHandler: [fastify.authenticate, requireRole('VENDOR')] },
-    ReviewsController.respondToReview
+    "/vendor/:id/respond",
+    { preHandler: [fastify.authenticate, requireRole("VENDOR")] },
+    ReviewsController.respondToReview,
   );
 
   fastify.post(
-    '/',
+    "/",
     { preHandler: fastify.authenticate },
-    ReviewsController.create
+    ReviewsController.create,
   );
+
+  fastify.get(
+    "/eligibility/:propertyId",
+    { preHandler: fastify.authenticate },
+    ReviewsController.checkEligibility,
+  );
+
+  fastify.get("/:id", ReviewsController.getById);
+  fastify.get("/", ReviewsController.getAll);
 
   fastify.put(
-    '/:id',
+    "/:id",
     { preHandler: fastify.authenticate },
-    ReviewsController.update
+    ReviewsController.update,
   );
 
   fastify.delete(
-    '/:id',
+    "/:id",
     { preHandler: fastify.authenticate },
-    ReviewsController.delete
+    ReviewsController.delete,
   );
 }

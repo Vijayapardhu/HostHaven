@@ -1,47 +1,51 @@
 import { Link } from "react-router-dom";
 import { MapPin, Phone, Mail, Facebook, Instagram, Twitter } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { usePublicPlatformSettings } from "@/hooks/usePublicPlatformSettings";
 
 interface FooterProps {
   className?: string;
 }
 
 const Footer = ({ className = "" }: FooterProps) => {
+  const settings = usePublicPlatformSettings();
+
   return (
     <footer className={`bg-heritage-brown text-cream-light ${className}`}>
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+      <div className="container mx-auto px-4 py-14">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* Brand */}
-          <div className="space-y-4">
-            <img src={logo} alt="HostHaven" className="h-16 w-auto brightness-110" />
-            <p className="text-cream-light/80 text-sm leading-relaxed">
+          <div className="space-y-5">
+            <img src={logo} alt="HostHaven" className="h-14 w-auto brightness-110" />
+            <p className="text-cream-light/70 text-sm leading-relaxed">
               Explore the rich heritage of Andhra Pradesh with premium stays, 
               authentic temple experiences, and seamless travel services.
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="p-2 rounded-full bg-cream-light/10 hover:bg-primary transition-colors">
-                <Facebook className="w-5 h-5" />
-              </a>
-              <a href="#" className="p-2 rounded-full bg-cream-light/10 hover:bg-primary transition-colors">
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a href="#" className="p-2 rounded-full bg-cream-light/10 hover:bg-primary transition-colors">
-                <Twitter className="w-5 h-5" />
-              </a>
+            <div className="flex gap-3">
+              {[Facebook, Instagram, Twitter].map((Icon, i) => (
+                <a
+                  key={i}
+                  href="#"
+                  className="w-9 h-9 rounded-xl bg-cream-light/10 hover:bg-primary hover:scale-110 transition-all duration-200 flex items-center justify-center"
+                >
+                  <Icon className="w-4 h-4" />
+                </a>
+              ))}
             </div>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-serif text-lg font-semibold mb-4 text-gold-light">Quick Links</h4>
-            <ul className="space-y-2">
-              {["Hotels", "Homes", "Temples", "Services", "Contact"].map((link) => (
-                <li key={link}>
+            <h4 className="font-serif text-lg font-semibold mb-5 text-gold-light">Quick Links</h4>
+            <ul className="space-y-3">
+              {[{ name: "Hotels", path: "/hotels" }, { name: "Homestays", path: "/homes" }, { name: "Temples", path: "/temples" }, { name: "Services", path: "/services" }, { name: "Contact", path: "/contact" }].map((link) => (
+                <li key={link.name}>
                   <Link
-                    to={`/${link.toLowerCase().replace(" ", "-")}`}
-                    className="text-cream-light/80 hover:text-gold-light transition-colors text-sm"
+                    to={link.path}
+                    className="text-cream-light/70 hover:text-gold-light transition-colors text-sm flex items-center gap-2 group"
                   >
-                    {link}
+                    <span className="w-1 h-1 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                    {link.name}
                   </Link>
                 </li>
               ))}
@@ -50,65 +54,59 @@ const Footer = ({ className = "" }: FooterProps) => {
 
           {/* Explore */}
           <div>
-            <h4 className="font-serif text-lg font-semibold mb-4 text-gold-light">Explore</h4>
-            <ul className="space-y-2">
-              {["Vijayawada", "Nandyala", "Vetapalem"].map((place) => (
+            <h4 className="font-serif text-lg font-semibold mb-5 text-gold-light">Explore</h4>
+            <ul className="space-y-3">
+              {["Vijayawada", "Nandyal", "Vetapalem", "Tirupati"].map((place) => (
                 <li key={place}>
-                  <span className="text-cream-light/80 text-sm">{place}</span>
+                  <Link
+                    to={`/search?q=${place}`}
+                    className="text-cream-light/70 hover:text-gold-light transition-colors text-sm flex items-center gap-2 group"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                    {place}
+                  </Link>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Legal */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-4 text-gold-light">Legal</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  to="/terms"
-                  className="text-cream-light/80 hover:text-gold-light transition-colors text-sm"
-                >
-                  Terms & Conditions
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/privacy"
-                  className="text-cream-light/80 hover:text-gold-light transition-colors text-sm"
-                >
-                  Privacy Policy
-                </Link>
-              </li>
-            </ul>
-          </div>
-
           {/* Contact */}
           <div>
-            <h4 className="font-serif text-lg font-semibold mb-4 text-gold-light">Contact Us</h4>
-            <ul className="space-y-3">
+            <h4 className="font-serif text-lg font-semibold mb-5 text-gold-light">Contact Us</h4>
+            <ul className="space-y-4">
               <li className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-primary mt-0.5" />
-                <span className="text-cream-light/80 text-sm">
-                  Vijayawada, Andhra Pradesh, India
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <MapPin className="w-4 h-4 text-primary" />
+                </div>
+                <span className="text-cream-light/70 text-sm leading-relaxed">
+                  {settings.contact.supportAddress}
                 </span>
               </li>
               <li className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-primary" />
-                <span className="text-cream-light/80 text-sm">+91 98765 43210</span>
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-4 h-4 text-primary" />
+                </div>
+                <span className="text-cream-light/70 text-sm">{settings.contact.supportPhone}</span>
               </li>
               <li className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-primary" />
-                <span className="text-cream-light/80 text-sm">info@hosthaven.in</span>
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-4 h-4 text-primary" />
+                </div>
+                <span className="text-cream-light/70 text-sm">{settings.contact.supportEmail}</span>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-cream-light/20 text-center">
-          <p className="text-cream-light/60 text-sm">
-            © 2024 HostHaven. All rights reserved. Explore Andhra's Heritage.
+        <div className="mt-12 pt-8 border-t border-cream-light/10 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-cream-light/50 text-xs">
+            © 2025 HostHaven. All rights reserved. Explore Andhra's Heritage.
           </p>
+          <div className="flex items-center gap-6 text-xs text-cream-light/50">
+            <Link to="/terms" className="hover:text-gold-light transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-gold-light transition-colors">Privacy</Link>
+            <Link to="/support" className="hover:text-gold-light transition-colors">Support</Link>
+          </div>
         </div>
       </div>
     </footer>

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
+import { useLiveBookingMonitor, LiveBookingToasts } from "@/hooks/useLiveBookingMonitor";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -56,10 +57,14 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { canInstall, install } = usePWAInstall();
+  const { alerts, clearAlert } = useLiveBookingMonitor({
+    pollInterval: 15000,
+    enabled: true,
+  });
 
   const handleLogout = () => {
     logout();
-    navigate("/auth/login");
+    navigate("/login");
   };
 
   return (
@@ -181,6 +186,9 @@ export default function Layout() {
         <main className="p-4 lg:p-8 overflow-y-auto h-[calc(100vh-64px)]">
           <Outlet />
         </main>
+        
+        {/* Live Booking Notifications */}
+        <LiveBookingToasts alerts={alerts} onDismiss={clearAlert} />
       </div>
     </div>
   );

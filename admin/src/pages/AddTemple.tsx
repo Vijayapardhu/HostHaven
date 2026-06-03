@@ -4,10 +4,12 @@ import { toast } from 'sonner'
 import { templesService } from '../lib/temples'
 import { mediaUploadService } from '../lib/mediaUpload'
 import { templeAutofillService } from '../lib/templeAutofill'
+import { propertiesService } from '../lib/properties'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { PageLoader } from '../components/ui/PageLoader'
 import { EmptyState } from '../components/ui/EmptyState'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../components/ui/Dialog'
 
 type DarshanTiming = {
   day: string
@@ -33,7 +35,7 @@ type PlaceSearchResult = {
 type TempleFormValues = {
   name: string
   slug: string
-  city: 'Vijayawada' | 'Nandiyala' | 'Vetlapalem' | ''
+  city: string
   fullAddress: string
   landmark: string
   description: string
@@ -124,7 +126,6 @@ type TempleFormValues = {
   active: boolean
 }
 
-const CITY_OPTIONS: Array<TempleFormValues['city']> = ['Vijayawada', 'Nandiyala', 'Vetlapalem']
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 const emptyTiming = (): DarshanTiming => ({
@@ -243,14 +244,55 @@ const slugify = (value: string) =>
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
 
+const TEMPLE_FORM_STORAGE_KEY = 'temple_form_autosave'
+
+const loadSavedForm = (): TempleFormValues | null => {
+  try {
+    const saved = localStorage.getItem(TEMPLE_FORM_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (parsed && parsed.savedAt && Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
+        return parsed.values
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load saved form:', e)
+  }
+  return null
+}
+
+const saveFormToStorage = (values: TempleFormValues) => {
+  try {
+    localStorage.setItem(TEMPLE_FORM_STORAGE_KEY, JSON.stringify({
+      values,
+      savedAt: Date.now()
+    }))
+  } catch (e) {
+    console.error('Failed to save form:', e)
+  }
+}
+
+const clearSavedForm = () => {
+  try {
+    localStorage.removeItem(TEMPLE_FORM_STORAGE_KEY)
+  } catch (e) {
+    console.error('Failed to clear saved form:', e)
+  }
+}
+
 export default function AddTemple() {
-  const { id } = useParams<{ id: string }>()
+  const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [formValues, setFormValues] = useState<TempleFormValues>(getInitialValues)
+  const aiAbortRef = useRef<AbortController | null>(null)
+  const [formValues, setFormValues] = useState<TempleFormValues>(() => {
+    const saved = loadSavedForm()
+    return saved || getInitialValues()
+  })
+
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [error, setError] = useState<string | null>(null)
   const [isMapPickerOpen, setIsMapPickerOpen] = useState(false)
   const [mapSearchQuery, setMapSearchQuery] = useState('')
   const [mapSearchResults, setMapSearchResults] = useState<PlaceSearchResult[]>([])
@@ -265,6 +307,13 @@ export default function AddTemple() {
   const [isBulkUploadingImages, setIsBulkUploadingImages] = useState(false)
   const [activeStep, setActiveStep] = useState(1)
   const [maxUnlockedStep, setMaxUnlockedStep] = useState(1)
+  const [isJsonModalOpen, setIsJsonModalOpen] = useState(false)
+  const [jsonInput, setJsonInput] = useState('')
+  const [cityOptions, setCityOptions] = useState<string[]>([])
+
+  useEffect(() => {
+    propertiesService.getCityNames().then(setCityOptions).catch(() => {})
+  }, [])
 
   const stepTitles = [
     'Basic information',
@@ -350,22 +399,40 @@ export default function AddTemple() {
     }))
   }, [preferredMediaImageUrl, formValues.openGraphImage])
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveFormToStorage(formValues)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [formValues])
+
+  useEffect(() => {
+    return () => {
+      if (aiAbortRef.current) {
+        aiAbortRef.current.abort()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (slug) {
+      clearSavedForm()
+    }
+  }, [slug])
+
   const loadTemple = async () => {
-    if (!id) return
+    if (!slug) return
     setIsLoading(true)
     setError(null)
     try {
-      const data = await templesService.getTempleById(id)
-      const cityCandidate = data.city?.charAt(0).toUpperCase() + data.city?.slice(1).toLowerCase()
+      const data = await templesService.getTempleBySlug(slug)
       setFormValues((prev) => ({
         ...prev,
         name: data.name || '',
         slug: slugify(data.name || ''),
         description: data.description || '',
         shortDescription: data.shortDesc || data.description?.slice(0, 150) || '',
-        city: CITY_OPTIONS.includes(cityCandidate as TempleFormValues['city'])
-          ? (cityCandidate as TempleFormValues['city'])
-          : '',
+        city: data.city || '',
         fullAddress: data.fullAddress || '',
         landmark: data.landmark || '',
         latitude: data.latitude != null ? String(data.latitude) : '',
@@ -475,7 +542,189 @@ export default function AddTemple() {
 
   useEffect(() => {
     loadTemple()
-  }, [id])
+  }, [slug])
+
+  const getSampleJsonTemplate = () => {
+    return JSON.stringify({
+      name: "Kanaka Durga Temple",
+      city: "Vijayawada",
+      fullAddress: "Indrakeeladri, Vijayawada, Andhra Pradesh 520001",
+      landmark: "Indrakeeladri Hills",
+      latitude: "16.5228",
+      longitude: "80.6180",
+      deityName: "Goddess Kanaka Durga",
+      templeType: "Hindu Temple",
+      description: "Kanaka Durga Temple is a prominent Hindu temple located on the Indrakeeladri hill in Vijayawada...",
+      shortDescription: "A sacred Hindu temple dedicated to Goddess Kanaka Durga on Indrakeeladri hill",
+      builtYear: "16th Century",
+      founder: "Krishna Deva Raya",
+      mythologicalSignificance: "According to mythology, Goddess Durga killed the demon Mahishasura here",
+      historicalSignificance: "Built during the reign of Krishna Deva Raya of Vijayanagara Empire",
+      architectureStyle: "Vijayanagara Architecture",
+      uniqueFeatures: "The temple has a unique voice shrine where devotees' wishes are believed to be answered",
+      sacredNearby: "Pradakshina Patha, Kanaka Durga Nilayam",
+      associatedLegends: "Legend of Mahishasura Mardini",
+      darshanTimings: [
+        { day: "Monday", morningOpen: "05:00", morningClose: "12:00", eveningOpen: "16:00", eveningClose: "21:00" },
+        { day: "Tuesday", morningOpen: "05:00", morningClose: "12:00", eveningOpen: "16:00", eveningClose: "21:00" },
+        { day: "Wednesday", morningOpen: "05:00", morningClose: "12:00", eveningOpen: "16:00", eveningClose: "21:00" },
+        { day: "Thursday", morningOpen: "05:00", morningClose: "12:00", eveningOpen: "16:00", eveningClose: "21:00" },
+        { day: "Friday", morningOpen: "05:00", morningClose: "12:00", eveningOpen: "16:00", eveningClose: "21:00" },
+        { day: "Saturday", morningOpen: "05:00", morningClose: "12:00", eveningOpen: "16:00", eveningClose: "21:00" },
+        { day: "Sunday", morningOpen: "05:00", morningClose: "12:00", eveningOpen: "16:00", eveningClose: "21:00" }
+      ],
+      morningAarti: "06:00 AM",
+      afternoonAarti: "12:00 PM",
+      eveningAarti: "06:30 PM",
+      specialSevas: "Supatha Devi Seva, Archana, Abhishekam",
+      festivalSpecificTimings: "Navaratri: Special timings 04:00 AM to 11:00 PM",
+      generalEntryFee: "Free",
+      specialDarshanFee: "Rs. 100",
+      vipDarshanFee: "Rs. 500",
+      parkingAvailable: true,
+      wheelchairAccessible: true,
+      cloakroomAvailable: true,
+      restroomsAvailable: true,
+      drinkingWaterAvailable: true,
+      prasadamCounterAvailable: true,
+      photographyAllowed: false,
+      mobileRestrictions: "Mobile phones not allowed inside the sanctum",
+      dressCodeMen: "Traditional wear, dhoti preferred",
+      dressCodeWomen: "Traditional wear, saree preferred",
+      securityNotes: "Security check at entrance",
+      majorFestivals: "Navaratri, Dasara, Diwali, Mahashivratri",
+      festivalDates: "Navaratri: October (dates vary), Dasara: October",
+      annualBrahmotsavam: "September-October",
+      rathotsavamDetails: "Rathotsavam during Dasara",
+      crowdExpectationLevel: "High during weekends and festivals",
+      specialPoojas: "Navaratri Mahotsavam, Kumkumarchana, Rudrabhishekam",
+      specialDecorationDays: "Fridays and festival days",
+      bestMonths: "October to March",
+      bestTimeOfDay: "Early morning and evening",
+      peakCrowdDays: "Fridays, Sundays, and festivals",
+      avoidDays: "Mondays (comparatively less crowd)",
+      weatherConditions: "Summer can be hot, winters are pleasant",
+      nearbyTemples: "Prakritmal, Sri Venkateswara Temple",
+      nearbyBeachesOrHills: "Indrakeeladri Hill",
+      nearbyRestaurants: "Minerva Coffee House, Southern Spice",
+      nearbyHotels: "Hotel Minerva Grand, Hotel DV Manor",
+      distanceRailwayStation: "3 km from Vijayawada Railway Station",
+      distanceBusStand: "2 km from Vijayawada Bus Stand",
+      distanceAirport: "20 km from Vijayawada Airport",
+      images: [
+        { url: "https://example.com/image1.jpg", alt: "Temple entrance", isPrimary: true },
+        { url: "https://example.com/image2.jpg", alt: "Goddess idol", isPrimary: false },
+        { url: "https://example.com/image3.jpg", alt: "Rathotsavam", isPrimary: false },
+        { url: "https://example.com/image4.jpg", alt: "Gopuram", isPrimary: false },
+        { url: "https://example.com/image5.jpg", alt: "Festival celebration", isPrimary: false }
+      ],
+      virtualTourUrl: "",
+      metaTitle: "Kanaka Durga Temple Vijayawada - Darshan Timings, History, Festivals",
+      metaDescription: "Visit Kanaka Durga Temple in Vijayawada. Find darshan timings, festivals, history, and travel guide.",
+      searchKeywords: "Kanaka Durga Temple, Vijayawada temple, Hindu temple Andhra Pradesh",
+      devoteeTips: "Wear comfortable shoes, carry water bottle, arrive early to avoid crowds",
+      thingsToCarry: "Traditional dress, water bottle, umbrella",
+      thingsNotAllowed: "Mobile phones, leather items, non-vegetarian food",
+      idealVisitDuration: "2-3 hours",
+      suggestedItinerary: "Start early morning darshan, visit nearby hills",
+      localFoodRecommendations: "Pulihora, Punugulu, Mysore Pak",
+      faqs: "Q: What are the darshan timings? A: 5 AM to 12 PM and 4 PM to 9 PM",
+      emergencyContact: "0866-1234567",
+      templeOfficePhone: "0866-1234568",
+      lostAndFoundDesk: "Available near entrance",
+      medicalFacilityNearby: "Government Hospital within 2 km",
+      policeStationNearby: "Police Station within 1 km",
+      active: true
+    }, null, 2)
+  }
+
+  const handleJsonParse = () => {
+    try {
+      const parsed = JSON.parse(jsonInput)
+      
+      setFormValues((prev) => {
+        const next = { ...prev }
+        
+        const stringKeys: Array<keyof TempleFormValues> = [
+          'name', 'city', 'fullAddress', 'landmark', 'description', 'shortDescription',
+          'latitude', 'longitude', 'deityName', 'templeType', 'builtYear', 'founder',
+          'mythologicalSignificance', 'historicalSignificance', 'architectureStyle', 'uniqueFeatures',
+          'sacredNearby', 'associatedLegends', 'morningAarti', 'afternoonAarti', 'eveningAarti',
+          'specialSevas', 'festivalSpecificTimings', 'generalEntryFee', 'specialDarshanFee', 'vipDarshanFee',
+          'mobileRestrictions', 'dressCodeMen', 'dressCodeWomen', 'securityNotes',
+          'majorFestivals', 'festivalDates', 'annualBrahmotsavam', 'rathotsavamDetails',
+          'crowdExpectationLevel', 'specialPoojas', 'specialDecorationDays',
+          'bestMonths', 'bestTimeOfDay', 'peakCrowdDays', 'avoidDays', 'weatherConditions',
+          'nearbyTemples', 'nearbyBeachesOrHills', 'nearbyRestaurants', 'nearbyHotels',
+          'distanceRailwayStation', 'distanceBusStand', 'distanceAirport',
+          'virtualTourUrl', 'metaTitle', 'metaDescription', 'searchKeywords', 'canonicalUrl',
+          'openGraphImage', 'structuredDataJsonLd', 'devoteeTips', 'thingsToCarry', 'thingsNotAllowed',
+          'idealVisitDuration', 'suggestedItinerary', 'localFoodRecommendations', 'faqs',
+          'emergencyContact', 'templeOfficePhone', 'lostAndFoundDesk', 'medicalFacilityNearby', 'policeStationNearby'
+        ]
+        
+        const booleanKeys: Array<keyof TempleFormValues> = [
+          'parkingAvailable', 'wheelchairAccessible', 'cloakroomAvailable', 'restroomsAvailable',
+          'drinkingWaterAvailable', 'prasadamCounterAvailable', 'photographyAllowed', 'active'
+        ]
+        
+        for (const key of stringKeys) {
+          if (parsed[key] !== undefined && typeof parsed[key] === 'string') {
+            (next[key] as string) = parsed[key]
+          } else if (parsed[key] !== undefined && typeof parsed[key] !== 'string') {
+            (next[key] as string) = String(parsed[key])
+          }
+        }
+        
+        for (const key of booleanKeys) {
+          if (parsed[key] !== undefined && typeof parsed[key] === 'boolean') {
+            (next[key] as boolean) = parsed[key]
+          }
+        }
+        
+        if (parsed.slug) {
+          next.slug = parsed.slug
+        } else if (parsed.name) {
+          next.slug = slugify(parsed.name)
+        }
+        
+        if (Array.isArray(parsed.darshanTimings) && parsed.darshanTimings.length > 0) {
+          next.darshanTimings = parsed.darshanTimings.map((item: any) => ({
+            day: item.day || 'Monday',
+            morningOpen: item.morningOpen || '05:00',
+            morningClose: item.morningClose || '12:00',
+            eveningOpen: item.eveningOpen || '16:00',
+            eveningClose: item.eveningClose || '21:00'
+          }))
+        }
+        
+        if (Array.isArray(parsed.images) && parsed.images.length > 0) {
+          next.images = parsed.images.map((img: any, index: number) => ({
+            url: typeof img === 'string' ? img : img?.url || '',
+            alt: typeof img === 'string' ? `Image ${index + 1}` : img?.alt || `Image ${index + 1}`,
+            isPrimary: typeof img === 'string' ? index === 0 : !!img?.isPrimary
+          }))
+        }
+        
+        if (Array.isArray(parsed.videos) && parsed.videos.length > 0) {
+          next.videos = parsed.videos.filter(Boolean)
+        }
+        
+        return next
+      })
+      
+      toast.success('JSON parsed successfully! Form has been updated.')
+      setIsJsonModalOpen(false)
+      setJsonInput('')
+    } catch (err: any) {
+      toast.error('Invalid JSON: ' + (err.message || 'Please check the JSON format.'))
+    }
+  }
+
+  const handleJsonCopy = () => {
+    navigator.clipboard.writeText(getSampleJsonTemplate())
+    toast.success('Sample JSON copied to clipboard!')
+  }
 
   const handleChange = (key: keyof TempleFormValues, value: string | boolean | DarshanTiming[] | TempleImage[] | string[]) => {
     setFormValues((prev) => {
@@ -696,6 +945,11 @@ export default function AddTemple() {
       return
     }
 
+    if (aiAbortRef.current) {
+      aiAbortRef.current.abort()
+    }
+    aiAbortRef.current = new AbortController()
+
     setIsAIAutofilling(true)
     try {
       const result = await templeAutofillService.generate({
@@ -712,7 +966,7 @@ export default function AddTemple() {
             .filter((item) => Boolean(item && String(item).trim()))
             .join(' | ') || undefined,
         forceComplete: false,
-      })
+      }, aiAbortRef.current.signal)
 
       const draft = (result?.draft || {}) as Record<string, unknown>
 
@@ -869,10 +1123,14 @@ export default function AddTemple() {
         toast.success('AI autofill completed.')
       }
     } catch (err: any) {
+      if (err.name === 'AbortError' || err?.response?.status === 0) {
+        return
+      }
       const message = err?.response?.data?.error?.message || err?.message || 'Failed to run AI autofill.'
       toast.error(message)
     } finally {
       setIsAIAutofilling(false)
+      aiAbortRef.current = null
     }
   }
 
@@ -913,13 +1171,6 @@ export default function AddTemple() {
     if (!validateForm()) return
     setIsSaving(true)
 
-    const cityEnum =
-      formValues.city === 'Vijayawada'
-        ? 'VIJAYAWADA'
-        : formValues.city === 'Nandiyala'
-          ? 'NANDIYALA'
-          : 'VETLAPALEM'
-
     const payload = {
       name: formValues.name,
       slug: formValues.slug || slugify(formValues.name),
@@ -927,7 +1178,7 @@ export default function AddTemple() {
       landmark: formValues.landmark,
       description: formValues.description,
       shortDesc: formValues.shortDescription,
-      city: cityEnum,
+      city: formValues.city,
       latitude: Number(formValues.latitude),
       longitude: Number(formValues.longitude),
       deityName: formValues.deityName,
@@ -1004,13 +1255,14 @@ export default function AddTemple() {
     }
 
     try {
-      if (id) {
-        await templesService.updateTemple(id, payload)
+      if (slug) {
+        await templesService.updateTemple(slug, payload)
         toast.success('Temple updated successfully.')
       } else {
         await templesService.createTemple(payload)
         toast.success('Temple created successfully.')
       }
+      clearSavedForm()
       navigate('/temples')
     } catch (err: any) {
       const message =
@@ -1053,7 +1305,7 @@ export default function AddTemple() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={id ? 'Edit temple' : 'Add temple'}
+        title={slug ? 'Edit temple' : 'Add temple'}
         description="Premium temple content model for spiritual, travel and SEO-rich experience."
       />
 
@@ -1073,10 +1325,10 @@ export default function AddTemple() {
                 onClick={() => goToStep(stepNumber)}
                 disabled={!isUnlocked}
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition ${isActive
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : isUnlocked
-                      ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
-                      : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : isUnlocked
+                    ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                    : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
                   }`}
               >
                 {stepNumber}. {step}
@@ -1127,16 +1379,23 @@ export default function AddTemple() {
                 >
                   {isAIAutofilling ? 'Generating accurate details...' : 'Generate Accurate Details'}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsJsonModalOpen(true)}
+                  className="mt-2 ml-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Parse JSON
+                </button>
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-600">City</label>
                 <select
                   value={formValues.city}
-                  onChange={(event) => handleChange('city', event.target.value as TempleFormValues['city'])}
+                  onChange={(event) => handleChange('city', event.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 >
                   <option value="">Select city</option>
-                  {CITY_OPTIONS.map((city) => (
+                  {cityOptions.map((city) => (
                     <option key={city} value={city}>
                       {city}
                     </option>
@@ -1772,12 +2031,68 @@ export default function AddTemple() {
                 disabled={isSaving}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
-                {isSaving ? 'Saving...' : id ? 'Update temple' : 'Create temple'}
+                {isSaving ? 'Saving...' : slug ? 'Update temple' : 'Create temple'}
               </button>
             ) : null}
           </div>
         </div>
       </form>
+
+      <Dialog open={isJsonModalOpen} onOpenChange={setIsJsonModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle>JSON Parse - Fill Temple Details</DialogTitle>
+              <DialogClose onClick={() => setIsJsonModalOpen(false)} />
+            </div>
+            <p className="text-sm text-slate-500 mt-1">
+              Copy the sample JSON, fill in your temple details, paste it here, and click Parse to fill the form.
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden flex flex-col gap-4 p-4 pt-0">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleJsonCopy}
+                className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Copy Sample JSON
+              </button>
+              <button
+                type="button"
+                onClick={() => setJsonInput(getSampleJsonTemplate())}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Load Sample Template
+              </button>
+            </div>
+            <div className="flex-1 min-h-[300px]">
+              <textarea
+                value={jsonInput}
+                onChange={(event) => setJsonInput(event.target.value)}
+                placeholder='{"name": "Temple Name", "city": "Vijayawada", ...}'
+                className="w-full h-full min-h-[300px] rounded-lg border border-slate-200 bg-slate-50 p-4 font-mono text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 p-4 border-t">
+            <button
+              type="button"
+              onClick={() => setIsJsonModalOpen(false)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleJsonParse}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              Parse JSON & Fill Form
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

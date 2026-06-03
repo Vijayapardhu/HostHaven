@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bell, Check, CheckCheck, Trash2, Calendar, CreditCard, Star, AlertCircle, Filter } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bell, Check, CheckCheck, Calendar, CreditCard, Star, AlertCircle, Filter } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { notificationsService } from "@/lib/notifications";
 import { useToast } from "@/hooks/use-toast";

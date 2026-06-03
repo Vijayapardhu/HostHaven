@@ -1,28 +1,31 @@
 import api from "@/lib/api";
 
+const getData = (response: any) => response?.data?.data ?? response?.data ?? response;
+
 export const inventoryService = {
   getInventory: async (roomTypeId: string) => {
     const response = await api.get("/v1/bookings/vendor/inventory", {
       params: { roomTypeId },
     });
-    return response.data;
+    return getData(response.data);
   },
 
   getRoomInventory: async (date?: string) => {
     const response = await api.get("/v1/bookings/vendor/inventory", {
       params: date ? { date } : undefined,
     });
-    return response.data?.inventory ?? response.data;
+    const data = getData(response.data);
+    return data?.inventory ?? data;
   },
 
   blockDate: async (data: { roomTypeId: string; date: string; reason?: string }) => {
     const response = await api.post("/v1/vendor/inventory/block-date", data);
-    return response.data;
+    return getData(response.data);
   },
 
   unblockDate: async (data: { roomTypeId: string; date: string }) => {
     const response = await api.post("/v1/vendor/inventory/unblock-date", data);
-    return response.data;
+    return getData(response.data);
   },
 
   blockDates: async (data: {
@@ -33,6 +36,6 @@ export const inventoryService = {
     reason?: string;
   }) => {
     const response = await api.post("/v1/vendor/inventory/block-dates", data);
-    return response.data;
+    return getData(response.data);
   },
 };

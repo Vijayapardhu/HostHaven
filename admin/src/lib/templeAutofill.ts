@@ -5,6 +5,7 @@ export interface TempleAIAutofillRequest {
   city?: string
   additionalContext?: string
   forceComplete?: boolean
+  signal?: AbortSignal
 }
 
 export interface TempleAIAutofillResponse {
@@ -32,7 +33,8 @@ const unwrap = <T>(response: any): T => {
 
 export const templeAutofillService = {
   async generate(payload: TempleAIAutofillRequest): Promise<TempleAIAutofillResponse> {
-    const response = await api.post('/v1/temples/ai/autofill', payload)
+    const { signal, ...requestBody } = payload
+    const response = await api.post('/v1/temples/ai/autofill', requestBody, signal ? { signal } : {})
     return unwrap<TempleAIAutofillResponse>(response)
   },
 }

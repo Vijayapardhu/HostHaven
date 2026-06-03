@@ -12,13 +12,12 @@ describe("roomsService", () => {
   describe("getRooms", () => {
     it("should fetch rooms with query params", async () => {
       const mockRooms = [{ id: "1", name: "Deluxe Room" }];
-      vi.mocked(api.get).mockResolvedValue({ data: { rooms: mockRooms } });
+      // Simulate canonical envelope: response.data = { data: [...] }
+      vi.mocked(api.get).mockResolvedValue({ data: { data: mockRooms } });
 
       const result = await roomsService.getRooms("prop-1");
 
-      expect(api.get).toHaveBeenCalledWith("/v1/vendor/rooms", {
-        params: { propertyId: "prop-1" },
-      });
+      expect(api.get).toHaveBeenCalledWith("/v1/rooms/property/prop-1");
       expect(result).toEqual(mockRooms);
     });
   });
@@ -31,7 +30,7 @@ describe("roomsService", () => {
 
       const result = await roomsService.createRoom(roomData);
 
-      expect(api.post).toHaveBeenCalledWith("/v1/vendor/rooms", roomData);
+      expect(api.post).toHaveBeenCalledWith("/v1/rooms", roomData);
       expect(result).toEqual(mockResponse.data);
     });
   });
@@ -40,11 +39,11 @@ describe("roomsService", () => {
     it("should update existing room", async () => {
       const updateData = { name: "Updated Suite" };
       const mockResponse = { data: { id: "room-1", ...updateData } };
-      vi.mocked(api.patch).mockResolvedValue(mockResponse);
+      vi.mocked(api.put).mockResolvedValue(mockResponse);
 
       const result = await roomsService.updateRoom("room-1", updateData);
 
-      expect(api.patch).toHaveBeenCalledWith("/v1/vendor/rooms/room-1", updateData);
+      expect(api.put).toHaveBeenCalledWith("/v1/rooms/room-1", updateData);
       expect(result).toEqual(mockResponse.data);
     });
   });
@@ -56,7 +55,7 @@ describe("roomsService", () => {
 
       const result = await roomsService.deleteRoom("room-1");
 
-      expect(api.delete).toHaveBeenCalledWith("/v1/vendor/rooms/room-1");
+      expect(api.delete).toHaveBeenCalledWith("/v1/rooms/room-1");
       expect(result).toEqual(mockResponse.data);
     });
   });

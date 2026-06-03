@@ -16,7 +16,7 @@ describe("inventoryService", () => {
 
       const result = await inventoryService.getRoomInventory("2026-02-25");
 
-      expect(api.get).toHaveBeenCalledWith("/v1/vendor/inventory", {
+      expect(api.get).toHaveBeenCalledWith("/v1/bookings/vendor/inventory", {
         params: { date: "2026-02-25" },
       });
       expect(result).toEqual(mockInventory);

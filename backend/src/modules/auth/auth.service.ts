@@ -8,6 +8,42 @@ import { sendEmail } from '../../services/email.service';
 import { cacheService } from '../../services/cache.service';
 import { logger } from '../../utils/logger.util';
 import { ERROR_CODES } from '../../constants/error-codes';
+import { TOTP, Secret } from 'otpauth';
+
+function generateSecret(): string {
+  const totp = new TOTP({
+    issuer: 'HostHaven',
+    label: 'HostHaven Account',
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+  });
+  return totp.secret.base32;
+}
+
+function generateQRCode(email: string, secret: string): string {
+  const totp = new TOTP({
+    issuer: 'HostHaven',
+    label: email,
+    secret: Secret.fromBase32(secret),
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+  });
+  return totp.toString();
+}
+
+function verifyToken(secret: string, token: string): boolean {
+  const totp = new TOTP({
+    issuer: 'HostHaven',
+    label: 'HostHaven Account',
+    secret: Secret.fromBase32(secret),
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+  });
+  return totp.validate({ token, window: 1 }) !== null;
+}
 
 const googleClient = new OAuth2Client({
   clientId: config.google.clientId,
@@ -112,7 +148,7 @@ export class AuthService {
       throw error;
     }
 
-    const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent);
+    const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent, undefined);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -180,7 +216,7 @@ export class AuthService {
       throw error;
     }
 
-    const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent);
+    const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent, undefined);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -389,7 +425,7 @@ export class AuthService {
       throw error;
     }
 
-    const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent);
+    const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent, undefined);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -600,13 +636,21 @@ export class AuthService {
   private async createUserSession(
     user: { id: string; email: string; role: string },
     ipAddress: string,
-    userAgent: string
+    userAgent: string,
+    oldRefreshToken?: string
   ) {
     const { accessToken, refreshToken, expiresIn } = generateTokens({
       userId: user.id,
       email: user.email,
       role: user.role,
     });
+
+    if (oldRefreshToken) {
+      await prisma.session.updateMany({
+        where: { refreshToken: oldRefreshToken, isActive: true },
+        data: { isActive: false },
+      });
+    }
 
     await prisma.session.create({
       data: {
@@ -615,7 +659,7 @@ export class AuthService {
         ipAddress,
         userAgent,
         deviceType: userAgent?.includes('Mobile') ? 'mobile' : 'desktop',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000), // 100 years - effectively permanent
       },
     });
 
@@ -623,41 +667,58 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string) {
-    const payload = verifyRefreshToken(refreshToken);
+    try {
+      const payload = verifyRefreshToken(refreshToken);
 
-    if (!payload) {
-      const error = new Error('Invalid refresh token');
-      (error as any).code = ERROR_CODES.INVALID_TOKEN;
-      throw error;
+      if (!payload) {
+        const error = new Error('Invalid refresh token');
+        (error as any).code = ERROR_CODES.INVALID_TOKEN;
+        throw error;
+      }
+
+      const session = await prisma.session.findFirst({
+        where: {
+          refreshToken,
+          isActive: true,
+        },
+        include: { user: true },
+      });
+
+      if (!session) {
+        const error = new Error('Session not found or expired');
+        (error as any).code = ERROR_CODES.INVALID_TOKEN;
+        throw error;
+      }
+
+      if (!session.user.isActive) {
+        const error = new Error('Account is disabled');
+        (error as any).code = ERROR_CODES.ACCOUNT_DISABLED;
+        throw error;
+      }
+
+      if (session.user.lockedUntil && session.user.lockedUntil > new Date()) {
+        const error = new Error('Account is locked');
+        (error as any).code = ERROR_CODES.ACCOUNT_LOCKED;
+        throw error;
+      }
+
+      const tokens = await this.createUserSession(
+        session.user,
+        session.ipAddress || '',
+        session.userAgent || '',
+        refreshToken
+      );
+
+      return tokens;
+    } catch (error: any) {
+      if (error.code && Object.values(ERROR_CODES).includes(error.code)) {
+        throw error;
+      }
+      logger.error({ error, refreshToken: refreshToken?.substring(0, 10) }, 'Token refresh failed');
+      const dbError = new Error('Failed to refresh token');
+      (dbError as any).code = ERROR_CODES.INTERNAL_ERROR;
+      throw dbError;
     }
-
-    const session = await prisma.session.findFirst({
-      where: {
-        refreshToken,
-        isActive: true,
-        expiresAt: { gt: new Date() },
-      },
-      include: { user: true },
-    });
-
-    if (!session) {
-      const error = new Error('Session not found or expired');
-      (error as any).code = ERROR_CODES.INVALID_TOKEN;
-      throw error;
-    }
-
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { isActive: false },
-    });
-
-    const tokens = await this.createUserSession(
-      session.user,
-      session.ipAddress || '',
-      session.userAgent || ''
-    );
-
-    return tokens;
   }
 
   async logout(refreshToken: string) {
@@ -708,6 +769,91 @@ export class AuthService {
     logger.info({ userId }, 'Password changed successfully');
 
     return { message: 'Password changed successfully' };
+  }
+
+  async setupTwoFactor(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user) {
+      const error = new Error("User not found");
+      (error as any).code = ERROR_CODES.USER_NOT_FOUND;
+      throw error;
+    }
+
+    const secret = generateSecret();
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: secret } as any,
+    });
+
+    const qrCodeUrl = generateQRCode(user.email, secret);
+
+    return {
+      secret,
+      qrCodeUrl,
+      message: "2FA secret generated. Scan QR code with authenticator app.",
+    };
+  }
+
+  async verifyTwoFactor(userId: string, code: string) {
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      
+      if (!user || !user.twoFactorSecret) {
+        const error = new Error("2FA not set up");
+        (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+        throw error;
+      }
+
+      const isValid = verifyToken(user.twoFactorSecret, code);
+      
+      if (!isValid) {
+        const error = new Error("Invalid verification code");
+        (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+        throw error;
+      }
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { twoFactorEnabled: true, twoFactorSecret: null } as any,
+      });
+
+      logger.info({ userId }, "2FA enabled successfully");
+
+      return { message: "2FA enabled successfully" };
+    } catch (error: any) {
+      logger.error({ error }, "Enable 2FA failed");
+      throw error;
+    }
+  }
+
+  async disableTwoFactor(userId: string, code: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user || !user.twoFactorEnabled) {
+      const error = new Error("2FA not enabled");
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const secret = user.twoFactorSecret || generateSecret();
+    const isValid = verifyToken(secret, code);
+    
+    if (!isValid) {
+      const error = new Error("Invalid verification code");
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: false, twoFactorSecret: null } as any,
+    });
+
+    logger.info({ userId }, "2FA disabled successfully");
+
+    return { message: "2FA disabled successfully" };
   }
 
   // ==========================================
@@ -810,12 +956,31 @@ export class AuthService {
   // PROFILE MANAGEMENT
   // ==========================================
 
-  async updateProfile(userId: string, data: { name?: string; avatar?: string; phone?: string }) {
+  async updateProfile(userId: string, data: { 
+    name?: string; 
+    avatar?: string; 
+    phone?: string;
+    emailNotifications?: boolean;
+    smsNotifications?: boolean;
+    pushNotifications?: boolean;
+    bookingNotifications?: boolean;
+    paymentNotifications?: boolean;
+    reviewNotifications?: boolean;
+    promotionalNotifications?: boolean;
+  }) {
     const updateData: any = {};
     
     if (data.name !== undefined) updateData.name = data.name;
     if (data.avatar !== undefined) updateData.avatarUrl = data.avatar;
     if (data.phone !== undefined) updateData.phone = data.phone;
+    
+    if (data.emailNotifications !== undefined) updateData.emailNotifications = data.emailNotifications;
+    if (data.smsNotifications !== undefined) updateData.smsNotifications = data.smsNotifications;
+    if (data.pushNotifications !== undefined) updateData.pushNotifications = data.pushNotifications;
+    if (data.bookingNotifications !== undefined) updateData.bookingNotifications = data.bookingNotifications;
+    if (data.paymentNotifications !== undefined) updateData.paymentNotifications = data.paymentNotifications;
+    if (data.reviewNotifications !== undefined) updateData.reviewNotifications = data.reviewNotifications;
+    if (data.promotionalNotifications !== undefined) updateData.promotionalNotifications = data.promotionalNotifications;
 
     const user = await prisma.user.update({
       where: { id: userId },

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Download } from 'lucide-react'
-import { paymentsService, type Payment, type Payout } from '../lib/payments'
+import { paymentsService, type Payment, type Payout, type RefundItem } from '../lib/payments'
 import { FiltersBar } from '../components/ui/FiltersBar'
 import { PageHeader } from '../components/ui/PageHeader'
 import { SearchInput } from '../components/ui/SearchInput'
@@ -11,24 +12,64 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table'
 import { PageLoader } from '../components/ui/PageLoader'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { FormInput } from '../components/ui/FormInput'
 import { downloadCsvExport } from '../lib/export'
 import api from '../lib/api'
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string
+      error?: { message?: string }
+    }
+  }
+  message?: string
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  const apiError = error as ApiError
+  return apiError?.response?.data?.error?.message || apiError?.response?.data?.message || apiError?.message || fallback
+}
 
 type Tab = 'payments' | 'payouts' | 'refunds'
 
 export default function Payments() {
-  const [activeTab, setActiveTab] = useState<Tab>('payments')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const resolveTab = (): Tab => {
+    const tab = searchParams.get('tab')
+    if (tab === 'payouts' || tab === 'refunds') return tab
+    return 'payments'
+  }
+
+  const [activeTab, setActiveTab] = useState<Tab>(resolveTab())
   const [payments, setPayments] = useState<Payment[]>([])
   const [payouts, setPayouts] = useState<Payout[]>([])
-  const [refunds, setRefunds] = useState<any[]>([])
+  const [refunds, setRefunds] = useState<RefundItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
-  const [confirmRefund, setConfirmRefund] = useState<{ paymentId: string } | null>(null)
+  const [confirmRefund, setConfirmRefund] = useState<{ paymentId: string; paymentAmount: number } | null>(null)
   const [confirmPayout, setConfirmPayout] = useState<{ payoutId: string } | null>(null)
+  const [approvingPayoutId, setApprovingPayoutId] = useState<string | null>(null)
+  const [txnIdInput, setTxnIdInput] = useState('')
+  const [payoutScreenshotFile, setPayoutScreenshotFile] = useState<File | null>(null)
+  const [payoutScreenshotPreview, setPayoutScreenshotPreview] = useState('')
+  const [refundAmountInput, setRefundAmountInput] = useState('')
+  const [refundReasonInput, setRefundReasonInput] = useState('')
+
+  const switchTab = (tab: Tab) => {
+    setActiveTab(tab)
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', tab)
+    setSearchParams(next, { replace: true })
+    setPage(1)
+  }
 
   const fetchPayments = async () => {
     setIsLoading(true)
@@ -38,11 +79,14 @@ export default function Payments() {
         page,
         limit: pageSize,
         search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`).toISOString() : undefined,
+        endDate: endDate ? new Date(`${endDate}T23:59:59.999Z`).toISOString() : undefined,
       })
       setPayments(data.data ?? [])
       setTotal(data.pagination?.total ?? 0)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to load payments.')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load payments.'))
     } finally {
       setIsLoading(false)
     }
@@ -56,11 +100,14 @@ export default function Payments() {
         page,
         limit: pageSize,
         search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`).toISOString() : undefined,
+        endDate: endDate ? new Date(`${endDate}T23:59:59.999Z`).toISOString() : undefined,
       })
       setPayouts(data.data ?? [])
       setTotal(data.pagination?.total ?? 0)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to load payouts.')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load payouts.'))
     } finally {
       setIsLoading(false)
     }
@@ -70,19 +117,30 @@ export default function Payments() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await api.get('/v1/admin/refunds', {
-        params: { page, limit: pageSize }
+      const data = await paymentsService.getRefunds({
+        page,
+        limit: pageSize,
+        search: searchTerm || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        startDate: startDate ? new Date(`${startDate}T00:00:00.000Z`).toISOString() : undefined,
+        endDate: endDate ? new Date(`${endDate}T23:59:59.999Z`).toISOString() : undefined,
       })
-      setRefunds(response.data?.data ?? [])
-      setTotal(response.data?.meta?.total ?? 0)
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to load refunds.')
+      setRefunds(data.data ?? [])
+      setTotal(data.pagination?.total ?? 0)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load refunds.'))
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
+    const tabFromUrl = resolveTab()
+    if (tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl)
+      return
+    }
+
     if (activeTab === 'payments') {
       fetchPayments()
     } else if (activeTab === 'payouts') {
@@ -90,42 +148,149 @@ export default function Payments() {
     } else {
       fetchRefunds()
     }
-  }, [activeTab, page, pageSize, searchTerm])
+  }, [activeTab, page, pageSize, searchTerm, statusFilter, startDate, endDate, searchParams])
 
   const confirmPayoutAction = async () => {
-    if (!confirmPayout) return
-    const txnId = prompt('Enter Transaction ID / Reference ID:')
-    if (!txnId) return
+    if (!confirmPayout || !txnIdInput.trim()) {
+      toast.error('Please enter a transaction ID')
+      return
+    }
+
+    if (!payoutScreenshotFile) {
+      toast.error('Please attach payment screenshot')
+      return
+    }
+
+    const txnId = txnIdInput.trim()
+    
+    // Validate transaction ID format
+    if (txnId.length < 3) {
+      toast.error('Transaction ID must be at least 3 characters long')
+      return
+    }
+    
+    if (txnId.length > 120) {
+      toast.error('Transaction ID must not exceed 120 characters')
+      return
+    }
+    
+    // Only alphanumeric, hyphens, and underscores allowed
+    if (!/^[A-Za-z0-9\-_]+$/.test(txnId)) {
+      toast.error('Transaction ID can only contain letters, numbers, hyphens (-), and underscores (_)')
+      return
+    }
 
     try {
-      await paymentsService.markPayoutPaid(confirmPayout.payoutId, txnId)
+      const formData = new FormData()
+      formData.append('file', payoutScreenshotFile)
+
+      const uploadRes = await api.post('/v1/uploads/single?folder=payouts', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+
+      const screenshotUrl = uploadRes.data?.data?.url ?? uploadRes.data?.url
+      if (!screenshotUrl) {
+        throw new Error('Failed to upload payment screenshot')
+      }
+
+      await api.put(`/v1/admin/payouts/${confirmPayout.payoutId}/mark-paid`, {
+        transactionId: txnId,
+        paymentScreenshot: screenshotUrl,
+      })
+
       setPayouts((prev) =>
         prev.map((p) =>
-          p.id === confirmPayout.payoutId ? { ...p, status: 'completed', referenceId: txnId } : p
+          p.id === confirmPayout.payoutId ? { ...p, status: 'paid', referenceId: txnId } : p
         )
       )
       toast.success('Payout marked as paid.')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update payout.')
+      setTxnIdInput('')
+      setPayoutScreenshotFile(null)
+      setPayoutScreenshotPreview('')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to update payout.'))
     } finally {
       setConfirmPayout(null)
     }
   }
 
+  const handlePayoutScreenshotChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file for payment screenshot')
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Payment screenshot must be less than 10MB')
+      return
+    }
+
+    setPayoutScreenshotFile(file)
+    setPayoutScreenshotPreview(URL.createObjectURL(file))
+  }
+
+  const approvePayout = async (payoutId: string) => {
+    setApprovingPayoutId(payoutId)
+    try {
+      await api.post('/v1/admin/payouts/process', {
+        payoutId,
+        action: 'approve',
+      })
+
+      setPayouts((prev) =>
+        prev.map((payout) =>
+          payout.id === payoutId ? { ...payout, status: 'approved' } : payout
+        )
+      )
+
+      toast.success('Payout approved. You can now mark it as paid.')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to approve payout.'))
+    } finally {
+      setApprovingPayoutId(null)
+    }
+  }
+
   const confirmRefundAction = async () => {
     if (!confirmRefund) return
+    const amount = Number(refundAmountInput)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Enter a valid refund amount')
+      return
+    }
+    const payment = payments.find((entry) => entry.id === confirmRefund.paymentId)
+    const refundableBalance = payment?.refundableBalance ?? confirmRefund.paymentAmount
+    if (amount > refundableBalance) {
+      toast.error('Refund amount cannot exceed the remaining refundable balance')
+      return
+    }
+    if (refundReasonInput.trim().length < 5) {
+      toast.error('Refund reason must be at least 5 characters')
+      return
+    }
     try {
-      await paymentsService.refundPayment(confirmRefund.paymentId, 'Admin initiated')
+      await paymentsService.refundPayment(confirmRefund.paymentId, amount, refundReasonInput.trim())
       setPayments((prev) =>
         prev.map((payment) =>
-          payment.id === confirmRefund.paymentId ? { ...payment, status: 'refunded' } : payment
+          payment.id === confirmRefund.paymentId
+            ? {
+                ...payment,
+                status: amount < refundableBalance ? 'partially_refunded' : 'refunded',
+                refundableBalance: Math.max(0, refundableBalance - amount),
+              }
+            : payment
         )
       )
       toast.success('Refund processed successfully.')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Unable to process refund.')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Unable to process refund.'))
     } finally {
       setConfirmRefund(null)
+      setRefundAmountInput('')
+      setRefundReasonInput('')
     }
   }
 
@@ -138,7 +303,7 @@ export default function Payments() {
     }
   }
 
-  const hasFilters = useMemo(() => searchTerm.length > 0, [searchTerm])
+  const hasFilters = useMemo(() => searchTerm.length > 0 || statusFilter !== 'all' || Boolean(startDate) || Boolean(endDate), [searchTerm, statusFilter, startDate, endDate])
 
   return (
     <div className="space-y-6">
@@ -158,10 +323,7 @@ export default function Payments() {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('payments')
-            setPage(1)
-          }}
+          onClick={() => switchTab('payments')}
           className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeTab === 'payments'
             ? 'bg-slate-900 text-white'
             : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -171,10 +333,7 @@ export default function Payments() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('payouts')
-            setPage(1)
-          }}
+          onClick={() => switchTab('payouts')}
           className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeTab === 'payouts'
             ? 'bg-slate-900 text-white'
             : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -184,10 +343,7 @@ export default function Payments() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('refunds')
-            setPage(1)
-          }}
+          onClick={() => switchTab('refunds')}
           className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeTab === 'refunds'
             ? 'bg-slate-900 text-white'
             : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -198,14 +354,57 @@ export default function Payments() {
       </div>
 
       <FiltersBar>
-        <SearchInput
-          placeholder={`Search ${activeTab}`}
-          value={searchTerm}
-          onChange={(event) => {
-            setPage(1)
-            setSearchTerm(event.target.value)
-          }}
-        />
+        <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-4">
+          <SearchInput
+            placeholder={`Search ${activeTab}`}
+            value={searchTerm}
+            onChange={(event) => {
+              setPage(1)
+              setSearchTerm(event.target.value)
+            }}
+          />
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setPage(1)
+              setStatusFilter(event.target.value)
+            }}
+            title="Filter by status"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"
+          >
+            <option value="all">All statuses</option>
+              {(activeTab === 'payouts'
+              ? ['pending', 'approved', 'paid', 'rejected']
+                : activeTab === 'refunds'
+                  ? ['processed', 'pending']
+                  : ['pending', 'processing', 'completed', 'failed', 'refunded', 'partially_refunded']
+            ).map((status) => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(event) => {
+              setPage(1)
+              setStartDate(event.target.value)
+            }}
+            title="Start date"
+            placeholder="Start date"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(event) => {
+              setPage(1)
+              setEndDate(event.target.value)
+            }}
+            title="End date"
+            placeholder="End date"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"
+          />
+        </div>
       </FiltersBar>
 
       {isLoading ? (
@@ -217,7 +416,7 @@ export default function Payments() {
           action={
             <button
               type="button"
-              onClick={activeTab === 'payments' ? fetchPayments : fetchPayouts}
+               onClick={activeTab === 'payments' ? fetchPayments : activeTab === 'payouts' ? fetchPayouts : fetchRefunds}
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             >
               Retry
@@ -248,19 +447,29 @@ export default function Payments() {
                   <TableCell>
                     <div>
                       <p className="font-semibold text-slate-900">{payment.transactionId}</p>
-                      <p className="text-xs text-slate-500">Booking {payment.bookingId || payment.serviceBookingId || '—'}</p>
+                      <p className="text-xs text-slate-500">
+                        Booking {payment.bookingNumber || payment.bookingId || payment.serviceBookingId || '—'}
+                      </p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm font-semibold text-slate-900">₹{payment.amount.toLocaleString()}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-slate-600">{payment.method}</span>
+                    <span className="text-sm text-slate-600 uppercase">{payment.method}</span>
                   </TableCell>
                   <TableCell>
                     <StatusBadge
                       label={payment.status}
-                      variant={payment.status === 'completed' ? 'success' : payment.status === 'pending' ? 'warning' : payment.status === 'refunded' ? 'neutral' : 'danger'}
+                      variant={
+                        payment.status === 'completed'
+                          ? 'success'
+                          : payment.status === 'pending' || payment.status === 'processing'
+                            ? 'warning'
+                            : payment.status === 'refunded' || payment.status === 'partially_refunded'
+                              ? 'neutral'
+                              : 'danger'
+                      }
                       className="capitalize"
                     />
                   </TableCell>
@@ -268,15 +477,27 @@ export default function Payments() {
                     <span className="text-sm text-slate-600">{new Date(payment.createdAt).toLocaleDateString()}</span>
                   </TableCell>
                   <TableCell className="text-right">
-                    {payment.status === 'completed' ? (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmRefund({ paymentId: payment.id })}
-                        className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        to={`/payments/${payment.id}`}
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                       >
-                        Refund
-                      </button>
-                    ) : null}
+                        Details
+                      </Link>
+                       {(payment.status === 'completed' || payment.status === 'partially_refunded') && (payment.refundableBalance ?? 0) > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmRefund({ paymentId: payment.id, paymentAmount: payment.amount })
+                              setRefundAmountInput(String(payment.refundableBalance ?? payment.amount))
+                              setRefundReasonInput('')
+                            }}
+                           className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                         >
+                          Refund
+                        </button>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -316,7 +537,7 @@ export default function Payments() {
                   <TableCell>
                     <StatusBadge
                       label={payout.status}
-                      variant={payout.status === 'completed' ? 'success' : payout.status === 'processing' ? 'info' : payout.status === 'failed' ? 'danger' : 'warning'}
+                       variant={payout.status === 'paid' ? 'success' : payout.status === 'approved' ? 'info' : payout.status === 'rejected' ? 'danger' : 'warning'}
                       className="capitalize"
                     />
                   </TableCell>
@@ -324,15 +545,33 @@ export default function Payments() {
                     <span className="text-sm text-slate-600">{new Date(payout.createdAt).toLocaleDateString()}</span>
                   </TableCell>
                   <TableCell className="text-right">
-                    {payout.status === 'pending' ? (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmPayout({ payoutId: payout.id })}
-                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        to={`/payouts/${payout.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                       >
-                        Mark Paid
-                      </button>
-                    ) : null}
+                        View
+                      </Link>
+                      {payout.status === 'pending' || payout.status === 'processing' ? (
+                        <button
+                          type="button"
+                          onClick={() => approvePayout(payout.id)}
+                          disabled={approvingPayoutId === payout.id}
+                          className="rounded-lg border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                        >
+                          {approvingPayoutId === payout.id ? 'Approving...' : 'Approve'}
+                        </button>
+                      ) : null}
+                       {payout.status === 'approved' ? (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmPayout({ payoutId: payout.id })}
+                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Mark Paid
+                        </button>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -413,24 +652,89 @@ export default function Payments() {
       <ConfirmDialog
         open={Boolean(confirmPayout)}
         onOpenChange={(open) => {
-          if (!open) setConfirmPayout(null)
+          if (!open) {
+            setConfirmPayout(null)
+            setTxnIdInput('')
+            setPayoutScreenshotFile(null)
+            setPayoutScreenshotPreview('')
+          }
         }}
         title="Mark payout as paid?"
-        description="You will be prompted to enter a transaction ID. This action will mark the payout as completed."
         confirmText="Confirm Payout"
         onConfirm={confirmPayoutAction}
-      />
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">Enter the transaction ID from Razorpay to mark this payout as completed.</p>
+          <FormInput
+            label="Transaction ID"
+            name="transactionId"
+            type="text"
+            value={txnIdInput}
+            onChange={setTxnIdInput}
+            placeholder="e.g. pay_1234567890"
+            validateOnBlur
+            showValidationHint
+            required
+          />
+          <div>
+            <label className="text-sm font-medium text-gray-700">Payment Screenshot</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePayoutScreenshotChange}
+              title="Upload payment screenshot"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">Upload screenshot proof of payment (max 10MB).</p>
+            {payoutScreenshotPreview ? (
+              <div className="mt-2">
+                <img
+                  src={payoutScreenshotPreview}
+                  alt="Payment screenshot preview"
+                  className="h-28 rounded border object-contain"
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </ConfirmDialog>
       <ConfirmDialog
         open={Boolean(confirmRefund)}
         onOpenChange={(open) => {
           if (!open) setConfirmRefund(null)
         }}
         title="Process refund?"
-        description="This will trigger a Razorpay refund for the payment."
+        description="Enter the exact refund amount and a clear business reason. This action is audited."
         confirmText="Process refund"
         variant="danger"
         onConfirm={confirmRefundAction}
-      />
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-gray-700">Refund Amount</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={refundAmountInput}
+              onChange={(e) => setRefundAmountInput(e.target.value)}
+              title="Refund amount"
+              placeholder="Enter refund amount"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Reason</label>
+            <textarea
+              value={refundReasonInput}
+              onChange={(e) => setRefundReasonInput(e.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="Describe why this refund is being issued"
+            />
+          </div>
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

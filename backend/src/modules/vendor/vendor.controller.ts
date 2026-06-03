@@ -10,6 +10,7 @@ import {
   vendorIdSchema,
   vendorFilterSchema,
   adminCreateVendorOnboardingSchema,
+  changePasswordSchema,
 } from './vendor.schema';
 
 export const VendorController = {
@@ -23,12 +24,34 @@ export const VendorController = {
     } catch (error: any) {
       logger.error({ error }, 'Vendor registration failed');
       if (error.code === ERROR_CODES.RESOURCE_CONFLICT) {
-        return sendError(reply, error.code, error.message, 409);
+        return sendError(reply, error.code, "An account with this email already exists. Please try a different email or login to your existing account.", 409);
       }
       if (error.name === 'ZodError') {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, "Please fill in all required fields correctly.", 400);
       }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to register vendor', 500);
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Unable to create your account. Please try again later.", 500);
+    }
+  },
+
+  async apply(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const data = registerVendorSchema.parse(request.body);
+
+      const result = await vendorService.apply(data);
+
+      return sendSuccess(reply, result, 201);
+    } catch (error: any) {
+      logger.error({ error }, 'Vendor apply failed');
+      if (error.code === ERROR_CODES.RESOURCE_CONFLICT) {
+        const message = error.message.includes('email') || error.message.includes('Email')
+          ? "An account with this email already exists. Please try a different email or login to your existing account."
+          : "This phone number is already registered. Please use a different phone number.";
+        return sendError(reply, error.code, message, 409);
+      }
+      if (error.name === 'ZodError') {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, "Please fill in all required fields correctly.", 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Unable to submit your application. Please try again later.", 500);
     }
   },
 
@@ -42,21 +65,25 @@ export const VendorController = {
     } catch (error: any) {
       logger.error({ error }, 'Vendor login failed');
       if (error.code === ERROR_CODES.UNAUTHORIZED) {
-        return sendError(reply, error.code, error.message, 401);
+        return sendError(reply, error.code, "Invalid email or password. Please check your credentials and try again.", 401);
       }
       if (error.code === ERROR_CODES.FORBIDDEN) {
-        return sendError(reply, error.code, error.message, 403);
+        return sendError(reply, error.code, "Your account has been suspended. Please contact support for assistance.", 403);
       }
       if (error.name === 'ZodError') {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, "Please enter a valid email and password.", 400);
       }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to login', 500);
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Unable to login at the moment. Please try again later.", 500);
     }
   },
 
   async getDashboard(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
 
       const dashboard = await vendorService.getDashboard(vendorId);
 
@@ -64,15 +91,19 @@ export const VendorController = {
     } catch (error: any) {
       logger.error({ error }, 'Get vendor dashboard failed');
       if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
-        return sendError(reply, error.code, error.message, 404);
+        return sendError(reply, error.code, "Your account details could not be found.", 404);
       }
-      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to fetch dashboard', 500);
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Unable to load your dashboard. Please try again.", 500);
     }
   },
 
   async getProfile(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
 
       const profile = await vendorService.getVendorProfile(vendorId);
 
@@ -88,7 +119,11 @@ export const VendorController = {
 
   async updateProfile(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
       const data = updateVendorSchema.parse(request.body);
 
       const profile = await vendorService.updateVendor(vendorId, data);
@@ -100,15 +135,52 @@ export const VendorController = {
         return sendError(reply, error.code, error.message, 404);
       }
       if (error.name === 'ZodError') {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+        const firstIssue = error.issues?.[0];
+        const field = firstIssue?.path?.join('.') ?? 'field';
+        const message = firstIssue?.message ?? 'Invalid input data';
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, `${field}: ${message}`, 400);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to update profile', 500);
     }
   },
 
+  async changePassword(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
+      const data = changePasswordSchema.parse(request.body);
+
+      const result = await vendorService.changePassword(vendorId, data.currentPassword, data.newPassword);
+
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, 'Vendor change password failed');
+      if (error.code === ERROR_CODES.UNAUTHORIZED) {
+        return sendError(reply, error.code, 'Current password is incorrect', 401);
+      }
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      if (error.name === 'ZodError') {
+        const firstIssue = error.issues?.[0];
+        const field = firstIssue?.path?.join('.') ?? 'field';
+        const message = firstIssue?.message ?? 'Invalid input data';
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, `${field}: ${message}`, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to change password', 500);
+    }
+  },
+
   async getEarningsSummary(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
 
       const summary = await vendorService.getEarningsSummary(vendorId);
 
@@ -121,7 +193,11 @@ export const VendorController = {
 
   async getPayoutHistory(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
       const query = request.query as { page?: string; limit?: string; status?: string };
 
       const result = await vendorService.getPayoutHistory(vendorId, {
@@ -137,9 +213,34 @@ export const VendorController = {
     }
   },
 
+  async requestPayout(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
+      const body = request.body as { amount?: number };
+
+      const payout = await vendorService.requestPayout(vendorId, body.amount);
+
+      return sendSuccess(reply, payout, 201);
+    } catch (error: any) {
+      logger.error({ error }, 'Request payout failed');
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to request payout', 500);
+    }
+  },
+
   async blockInventoryDate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
       const body = request.body as { roomTypeId: string; date: string; reason?: string };
 
       const result = await vendorService.blockInventoryDate(vendorId, body);
@@ -159,7 +260,11 @@ export const VendorController = {
 
   async unblockInventoryDate(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
       const body = request.body as { roomTypeId: string; date: string };
 
       const result = await vendorService.unblockInventoryDate(vendorId, body);
@@ -176,7 +281,11 @@ export const VendorController = {
 
   async blockInventoryDates(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const vendorId = (request as any).user.vendorId;
+      const user = (request as any).user;
+      if (user?.role !== 'VENDOR' || !user.vendorId) {
+        return sendError(reply, ERROR_CODES.FORBIDDEN, 'Vendor access required', 403);
+      }
+      const vendorId = user.vendorId;
       const body = request.body as {
         roomId?: string;
         propertyId?: string;
@@ -225,7 +334,11 @@ export const AdminVendorController = {
   async approveVendor(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = vendorIdSchema.parse(request.params);
-      const adminId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const adminId = user.id;
 
       const result = await vendorService.approveVendor(id, adminId);
 
@@ -242,7 +355,11 @@ export const AdminVendorController = {
   async createOnboardingVendor(request: FastifyRequest, reply: FastifyReply) {
     try {
       const data = adminCreateVendorOnboardingSchema.parse(request.body);
-      const adminId = (request as any).user.id;
+      const user = (request as any).user;
+      if (!user?.id) {
+        return sendError(reply, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      }
+      const adminId = user.id;
 
       const result = await vendorService.adminCreateOnboarding(data, adminId);
 

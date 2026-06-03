@@ -18,19 +18,19 @@ describe("supportService", () => {
 
       const result = await supportService.getMyTickets();
 
-      expect(api.get).toHaveBeenCalledWith("/v1/vendor/support/tickets", {
+      expect(api.get).toHaveBeenCalledWith("/v1/support/tickets/my", {
         params: undefined,
       });
       expect(result).toEqual(mockTickets);
     });
 
     it("should fetch tickets with status filter", async () => {
-      const mockTickets = [];
+      const mockTickets: unknown[] = [];
       vi.mocked(api.get).mockResolvedValue({ data: mockTickets });
 
       await supportService.getMyTickets({ status: "RESOLVED" });
 
-      expect(api.get).toHaveBeenCalledWith("/v1/vendor/support/tickets", {
+      expect(api.get).toHaveBeenCalledWith("/v1/support/tickets/my", {
         params: { status: "RESOLVED" },
       });
     });
@@ -47,7 +47,7 @@ describe("supportService", () => {
 
       const result = await supportService.createTicket(ticketData);
 
-      expect(api.post).toHaveBeenCalledWith("/v1/vendor/support/tickets", ticketData);
+      expect(api.post).toHaveBeenCalledWith("/v1/support/tickets", ticketData);
       expect(result).toEqual(mockResponse.data);
     });
   });
