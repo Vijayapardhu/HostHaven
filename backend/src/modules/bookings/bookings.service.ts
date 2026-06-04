@@ -5,6 +5,8 @@ import { hashPassword } from "../../utils/hash.util";
 import inventoryService from "../inventory/inventory.service";
 import { ERROR_CODES } from "../../constants/error-codes";
 import { Prisma } from "@prisma/client";
+import Razorpay from "razorpay";
+import { config } from "../../config";
 import notificationsService from "../notifications/notifications.service";
 import adminService from "../admin/admin.service";
 import { cacheService } from "../../services/cache.service";
@@ -592,23 +594,53 @@ export class BookingsService {
       }
     }
 
-    if (booking.payment?.status === "COMPLETED") {
-      await prisma.payment.update({
-        where: { id: booking.payment.id },
-        data: {
-          status: "REFUNDED",
-          refundedAt: new Date(),
-        },
-      });
+    const payRec = fullBooking.payment;
+    if (payRec?.status === "COMPLETED" && payRec.razorpayPaymentId) {
+      try {
+        const razorpayClient = new Razorpay({
+          key_id: config.razorpay.keyId,
+          key_secret: config.razorpay.keySecret,
+        });
 
-      await prisma.refund.create({
-        data: {
-          paymentId: booking.payment.id,
-          amount: booking.totalAmount,
-          reason,
-          status: "initiated",
-        },
-      });
+        const refundResponse = await razorpayClient.payments.refund(
+          payRec.razorpayPaymentId,
+          {
+            amount: Math.round(Number(fullBooking.totalAmount) * 100),
+            speed: "normal",
+            notes: { reason: reason || "Booking cancelled" },
+          },
+        );
+
+        await prisma.$transaction([
+          prisma.payment.update({
+            where: { id: payRec.id },
+            data: {
+              status: "REFUNDED",
+              refundedAt: new Date(),
+              refundId: refundResponse.id,
+            },
+          }),
+          prisma.refund.create({
+            data: {
+              paymentId: payRec.id,
+              amount: fullBooking.totalAmount,
+              razorpayRefundId: refundResponse.id,
+              reason,
+              status: "processed",
+            },
+          }),
+        ]);
+      } catch (refundError) {
+        logger.error({ error: refundError, bookingId: id }, "Razorpay refund failed during cancellation");
+        await prisma.refund.create({
+          data: {
+            paymentId: payRec.id,
+            amount: fullBooking.totalAmount,
+            reason,
+            status: "initiated",
+          },
+        });
+      }
     }
 
     await this.sendBookingNotifications(
@@ -709,20 +741,51 @@ export class BookingsService {
       newTotal += Number(bookingAny.extraBedPrice) * bookingAny.extraBeds * nightsNew;
     }
 
-    const taxAmount = newTotal * 0.12;
-    const grandTotal = newTotal + taxAmount;
+    const taxRate = Number(booking.taxPercent || 12) / 100;
+    const taxAmount = Math.round(newTotal * taxRate * 100) / 100;
+    const grandTotal = Math.round((newTotal + taxAmount) * 100) / 100;
+
+    if (booking.roomId && booking.room) {
+      const oldDates: Date[] = [];
+      const oldCur = new Date(booking.checkInDate);
+      while (oldCur < booking.checkOutDate) {
+        oldDates.push(new Date(oldCur));
+        oldCur.setDate(oldCur.getDate() + 1);
+      }
+      const newDates: Date[] = [];
+      const newCur = new Date(checkIn);
+      while (newCur < checkOut) {
+        newDates.push(new Date(newCur));
+        newCur.setDate(newCur.getDate() + 1);
+      }
+      const roomId = booking.roomId as string;
+      const totalRooms = Number((booking.room as any)?.totalRooms ?? 1);
+      await prisma.$transaction([
+        ...oldDates.map((date) =>
+          prisma.inventoryDay.upsert({
+            where: { roomId_date: { roomId, date } },
+            update: { availableRooms: { increment: 1 } },
+            create: { roomId, date, totalRooms, availableRooms: totalRooms },
+          }),
+        ),
+        ...newDates.map((date) =>
+          prisma.inventoryDay.upsert({
+            where: { roomId_date: { roomId, date } },
+            update: { availableRooms: { decrement: 1 } },
+            create: { roomId, date, totalRooms, availableRooms: totalRooms - 1 },
+          }),
+        ),
+      ]);
+    }
 
     const updated = await prisma.booking.update({
       where: { id },
       data: {
         checkInDate: checkIn,
         checkOutDate: checkOut,
-        totalNights: nightsNew,
-        totalAmount: grandTotal,
-        subtotal: newTotal,
-        taxAmount,
-        rescheduledAt: new Date(),
-      } as any,
+        totalAmount: new Prisma.Decimal(grandTotal),
+        taxAmount: new Prisma.Decimal(taxAmount),
+      },
       include: {
         property: true,
         room: true,
@@ -783,23 +846,24 @@ export class BookingsService {
       throw error;
     }
 
+    const nights = Math.ceil(
+      (booking.checkOutDate.getTime() - booking.checkInDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const updateData: any = {};
-    const bookingAny = booking as any;
     
     if (data.guests !== undefined) {
-      updateData.guests = data.guests;
+      updateData.adults = data.guests;
     }
     
     if (data.extraBeds !== undefined) {
       const roomData = booking.room as any;
-      const extraBedPrice = roomData?.extraBedPrice ? Number(roomData.extraBedPrice) : 0;
-      const currentExtraBeds = bookingAny.extraBeds || 0;
-      const extraBedDiff = (data.extraBeds - currentExtraBeds) * extraBedPrice * (bookingAny.totalNights || 1);
+      const extraBedPrice = roomData?.extraBedPrice ? Number(roomData.extraBedPrice) : 500;
+      const currentExtraBeds = booking.extraBeds || 0;
+      const extraBedDiff = (data.extraBeds - currentExtraBeds) * extraBedPrice * nights;
       
       if (extraBedDiff !== 0) {
         updateData.extraBeds = data.extraBeds;
-        updateData.extraBedPrice = extraBedPrice;
-        updateData.totalAmount = Number(booking.totalAmount) + extraBedDiff;
+        updateData.totalAmount = new Prisma.Decimal(Number(booking.totalAmount) + extraBedDiff);
       }
     }
     
@@ -896,6 +960,16 @@ export class BookingsService {
   }
 
   async updateStatus(id: string, status: string, vendorId?: string) {
+    const validTransitions: Record<string, string[]> = {
+      PENDING: ['CONFIRMED', 'CANCELLED'],
+      CONFIRMED: ['CHECKED_IN', 'CANCELLED', 'NO_SHOW'],
+      CHECKED_IN: ['CHECKED_OUT'],
+      CHECKED_OUT: [],
+      CANCELLED: [],
+      NO_SHOW: [],
+      REFUNDED: [],
+    };
+
     const where: Prisma.BookingWhereInput = { id };
 
     if (vendorId) {
@@ -907,6 +981,13 @@ export class BookingsService {
     if (!booking) {
       const error = new Error("Booking not found");
       (error as any).code = ERROR_CODES.BOOKING_NOT_FOUND;
+      throw error;
+    }
+
+    const allowed = validTransitions[booking.status];
+    if (!allowed || !allowed.includes(status)) {
+      const error = new Error(`Cannot transition from ${booking.status} to ${status}`);
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
       throw error;
     }
 
@@ -1211,7 +1292,8 @@ export class BookingsService {
       },
     });
 
-    if (paymentStatus === "COMPLETED") {
+    const bookingStatus = paymentStatus === "COMPLETED" || data.paymentMethod === "CASH" ? "CONFIRMED" : "PENDING";
+    if (bookingStatus === "CONFIRMED") {
       await prisma.booking.update({
         where: { id: booking.id },
         data: { status: "CONFIRMED" },
@@ -1223,7 +1305,7 @@ export class BookingsService {
     await this.sendBookingNotifications(
       { ...booking, user, payment },
       property,
-      paymentStatus === "COMPLETED" ? "CONFIRMED" : "CREATED",
+      bookingStatus,
     );
 
     const invoiceNights = Math.ceil(

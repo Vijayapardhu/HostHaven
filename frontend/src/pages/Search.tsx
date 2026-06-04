@@ -71,7 +71,7 @@ export default function SearchPage() {
           );
         } else if (cat === "homes") {
           searches.push(
-            api.properties.search({ search: searchQuery, type: "HOMESTAY", limit: "10" }).then(res =>
+            api.properties.search({ search: searchQuery, type: "HOME", limit: "10" }).then(res =>
               (res.data || []).map((p: any) => ({
                 type: "homes" as SearchCategory,
                 id: p.id,
@@ -172,9 +172,9 @@ export default function SearchPage() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <div className="min-h-screen bg-gradient-to-b from-muted/50 to-background">
         {/* Search Header */}
-        <div className="bg-white border-b shadow-sm sticky top-16 z-40">
+        <div className="bg-card border-b border-border shadow-sm sticky top-16 z-40">
           <div className="container mx-auto px-4 py-4">
             <form onSubmit={handleSearch} className="flex gap-2">
               <div className="relative flex-1">
@@ -182,10 +182,12 @@ export default function SearchPage() {
                 <Input
                   ref={inputRef}
                   type="text"
-                   placeholder="Search hotels, homestays, temples, services..."
+                  placeholder="Search hotels, homestays, temples, services..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="pl-10 h-12 text-lg border-2 focus:border-primary"
+                  autoComplete="off"
+                  aria-label="Search"
                 />
                 {query && (
                   <button
@@ -210,10 +212,10 @@ export default function SearchPage() {
                   <button
                     key={key}
                     onClick={() => handleCategoryChange(key as SearchCategory)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors text-ellipsis ${
                       category === key
                         ? "bg-primary text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -233,15 +235,15 @@ export default function SearchPage() {
             </div>
           ) : hasSearched ? (
             <>
-              <p className="text-gray-600 mb-6">
+              <p className="text-muted-foreground mb-6">
                 {results.length} results for "{query}"
               </p>
               
               {results.length === 0 ? (
                 <div className="text-center py-16">
-                  <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">No results found</h3>
-                  <p className="text-gray-500">Try different keywords or browse categories</p>
+                  <Search className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-foreground/80 mb-2">No results found</h3>
+                  <p className="text-muted-foreground">Try different keywords or browse categories</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -249,9 +251,9 @@ export default function SearchPage() {
                     <Link
                       key={`${result.type}-${result.id}`}
                       to={getLink(result)}
-                      className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
+                      className="bg-card rounded-xl shadow-sm border border-border overflow-hidden hover:shadow-md transition-shadow"
                     >
-                      <div className="aspect-video relative bg-gray-100">
+                      <div className="aspect-video relative bg-muted">
                         {result.image ? (
                           <img
                             src={result.image}
@@ -260,10 +262,10 @@ export default function SearchPage() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            {result.type === "hotels" && <Hotel className="w-12 h-12 text-gray-300" />}
-                            {result.type === "homes" && <Home className="w-12 h-12 text-gray-300" />}
-                            {result.type === "temples" && <Landmark className="w-12 h-12 text-gray-300" />}
-                            {result.type === "services" && <Wrench className="w-12 h-12 text-gray-300" />}
+                            {result.type === "hotels" && <Hotel className="w-12 h-12 text-muted-foreground/30" />}
+                            {result.type === "homes" && <Home className="w-12 h-12 text-muted-foreground/30" />}
+                            {result.type === "temples" && <Landmark className="w-12 h-12 text-muted-foreground/30" />}
+                            {result.type === "services" && <Wrench className="w-12 h-12 text-muted-foreground/30" />}
                           </div>
                         )}
                         <span className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded-full text-xs font-medium">
@@ -271,10 +273,10 @@ export default function SearchPage() {
                         </span>
                       </div>
                       <div className="p-4">
-                        <h3 className="font-semibold text-lg text-gray-900 mb-1 line-clamp-1">
+                        <h3 className="font-semibold text-lg text-foreground mb-1 line-clamp-1">
                           {result.name}
                         </h3>
-                        <div className="flex items-center gap-1 text-gray-500 text-sm mb-2">
+                        <div className="flex items-center gap-1 text-muted-foreground text-sm mb-2">
                           <MapPin className="w-4 h-4" />
                           {result.location || "Location not available"}
                         </div>
@@ -282,13 +284,13 @@ export default function SearchPage() {
                           {result.rating && (
                             <div className="flex items-center gap-1 text-amber-500">
                               <Star className="w-4 h-4 fill-current" />
-                              <span className="font-medium">{result.rating.toFixed(1)}</span>
+                              <span className="font-medium">{result.rating ? Number(result.rating).toFixed(1) : '-'}</span>
                             </div>
                           )}
-                          {result.price && (
+                          {result.price != null && (
                             <div className="text-primary font-semibold">
-                              ₹{(result.price || 0).toLocaleString()}
-                              <span className="text-gray-500 text-sm font-normal">/night</span>
+                              ₹{(result.price ?? 0).toLocaleString('en-IN')}
+                              <span className="text-muted-foreground text-sm font-normal">/night</span>
                             </div>
                           )}
                         </div>
@@ -300,9 +302,9 @@ export default function SearchPage() {
             </>
           ) : (
             <div className="text-center py-16">
-              <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">Search for anything</h3>
-              <p className="text-gray-500">Find hotels, homestays, temples, and services</p>
+              <Search className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-foreground/80 mb-2">Search for anything</h3>
+              <p className="text-muted-foreground">Find hotels, homestays, temples, and services</p>
             </div>
           )}
         </div>

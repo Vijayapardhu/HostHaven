@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../../config/database';
 import { config } from '../../config';
@@ -128,7 +129,7 @@ export class AuthService {
     }
 
     if (!user.passwordHash) {
-      const error = new Error('This account uses Google sign-in. Please continue with Google.');
+      const error = new Error('Invalid email or password');
       (error as any).code = ERROR_CODES.OAUTH_ONLY_ACCOUNT;
       throw error;
     }
@@ -196,7 +197,7 @@ export class AuthService {
     }
 
     if (!user.passwordHash) {
-      const error = new Error('This account uses Google sign-in. Please continue with Google.');
+      const error = new Error('Invalid email or password');
       (error as any).code = ERROR_CODES.OAUTH_ONLY_ACCOUNT;
       throw error;
     }
@@ -255,8 +256,7 @@ export class AuthService {
       },
     });
 
-    const vendorAppUrl = process.env.VENDOR_URL || 'http://localhost:5174';
-    const resetUrl = `${vendorAppUrl}/reset-password?token=${resetToken}`;
+    const resetUrl = `${config.app.vendorUrl}/reset-password?token=${resetToken}`;
 
     await sendEmail({
       to: user.email,
@@ -420,9 +420,25 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      const error = new Error('Account has been disabled');
+      const error = new Error('Account has been disabled. Please contact support.');
       (error as any).code = ERROR_CODES.ACCOUNT_DISABLED;
       throw error;
+    }
+
+    if (user.twoFactorEnabled) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: 0,
+          lastLoginAt: new Date(),
+          lastLoginIp: data.ipAddress,
+        },
+      });
+
+      return {
+        twoFactorRequired: true,
+        userId: user.id,
+      };
     }
 
     const tokens = await this.createUserSession(user, data.ipAddress, data.userAgent, undefined);
@@ -659,7 +675,7 @@ export class AuthService {
         ipAddress,
         userAgent,
         deviceType: userAgent?.includes('Mobile') ? 'mobile' : 'desktop',
-        expiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000), // 100 years - effectively permanent
+        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
       },
     });
 
@@ -766,9 +782,14 @@ export class AuthService {
       data: { passwordHash: newHash },
     });
 
-    logger.info({ userId }, 'Password changed successfully');
+    await prisma.session.updateMany({
+      where: { userId, isActive: true },
+      data: { isActive: false },
+    });
 
-    return { message: 'Password changed successfully' };
+    logger.info({ userId }, 'Password changed successfully. All sessions invalidated.');
+
+    return { message: 'Password changed successfully. Please login again.' };
   }
 
   async setupTwoFactor(userId: string) {
@@ -781,10 +802,20 @@ export class AuthService {
     }
 
     const secret = generateSecret();
+
+    // Generate 8 one-time backup codes
+    const backupCodes: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      const code = crypto.randomBytes(4).toString('hex').toUpperCase().match(/.{4}/g)!.join('-');
+      backupCodes.push(code);
+    }
     
     await prisma.user.update({
       where: { id: userId },
-      data: { twoFactorSecret: secret } as any,
+      data: {
+        twoFactorSecret: secret,
+        twoFactorBackupCodes: JSON.stringify(backupCodes),
+      } as any,
     });
 
     const qrCodeUrl = generateQRCode(user.email, secret);
@@ -792,8 +823,30 @@ export class AuthService {
     return {
       secret,
       qrCodeUrl,
-      message: "2FA secret generated. Scan QR code with authenticator app.",
+      backupCodes,
+      message: "2FA secret generated. Save your backup codes in a secure place.",
     };
+  }
+
+  private async consumeBackupCode(userId: string, code: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { twoFactorBackupCodes: true },
+    });
+
+    if (!user?.twoFactorBackupCodes) return false;
+
+    const codes: string[] = JSON.parse(user.twoFactorBackupCodes);
+    const idx = codes.indexOf(code);
+    if (idx === -1) return false;
+
+    codes.splice(idx, 1);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorBackupCodes: codes.length > 0 ? JSON.stringify(codes) : null } as any,
+    });
+
+    return true;
   }
 
   async verifyTwoFactor(userId: string, code: string) {
@@ -806,7 +859,7 @@ export class AuthService {
         throw error;
       }
 
-      const isValid = verifyToken(user.twoFactorSecret, code);
+      const isValid = verifyToken(user.twoFactorSecret, code) || await this.consumeBackupCode(userId, code);
       
       if (!isValid) {
         const error = new Error("Invalid verification code");
@@ -816,7 +869,7 @@ export class AuthService {
 
       await prisma.user.update({
         where: { id: userId },
-        data: { twoFactorEnabled: true, twoFactorSecret: null } as any,
+        data: { twoFactorEnabled: true } as any,
       });
 
       logger.info({ userId }, "2FA enabled successfully");
@@ -828,6 +881,33 @@ export class AuthService {
     }
   }
 
+  async verifyTwoFactorLogin(userId: string, code: string, ipAddress: string, userAgent: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+      const error = new Error('2FA not enabled or not set up');
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const isValid = verifyToken(user.twoFactorSecret, code) || await this.consumeBackupCode(userId, code);
+
+    if (!isValid) {
+      const error = new Error('Invalid verification code');
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    const tokens = await this.createUserSession(user, ipAddress, userAgent, undefined);
+
+    logger.info({ userId }, '2FA login verified');
+
+    return {
+      user: this.sanitizeUser(user),
+      tokens,
+    };
+  }
+
   async disableTwoFactor(userId: string, code: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     
@@ -837,7 +917,12 @@ export class AuthService {
       throw error;
     }
 
-    const secret = user.twoFactorSecret || generateSecret();
+    const secret = user.twoFactorSecret;
+    if (!secret) {
+      const error = new Error("2FA secret not found. Please re-setup 2FA.");
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
     const isValid = verifyToken(secret, code);
     
     if (!isValid) {

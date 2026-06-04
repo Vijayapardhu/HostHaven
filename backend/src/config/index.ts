@@ -26,6 +26,7 @@ const requiredEnvVars = [
   'JWT_REFRESH_SECRET',
   'RAZORPAY_KEY_ID',
   'RAZORPAY_KEY_SECRET',
+  'DATABASE_URL',
 ]
 
 for (const key of requiredEnvVars) {
@@ -57,8 +58,8 @@ export const config = {
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET as string,
     refreshSecret: process.env.JWT_REFRESH_SECRET as string,
-    accessExpires: process.env.JWT_ACCESS_EXPIRES || '365d',
-    refreshExpires: process.env.JWT_REFRESH_EXPIRES || '365d',
+    accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
+    refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
   },
 
   google: {

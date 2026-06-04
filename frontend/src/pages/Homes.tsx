@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Star, MapPin, Search, Home, Users, Bed } from "lucide-react";
 import Layout from "@/components/layout/Layout";
@@ -37,7 +37,7 @@ interface CityData {
 }
 
 const Homes = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const checkInParam = searchParams.get("checkIn");
   const checkOutParam = searchParams.get("checkOut");
   const roomsParam = searchParams.get("rooms");
@@ -47,6 +47,15 @@ const Homes = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [searchQuery]);
+
   const [selectedLocation, setSelectedLocation] = useState("all");
   const [locations, setLocations] = useState<string[]>(["all"]);
   const [page, setPage] = useState(1);
@@ -64,8 +73,11 @@ const Homes = () => {
           limit: "12",
           sortBy: sortBy === "newest" ? "createdAt" : sortBy,
         };
-        if (searchQuery) params.search = searchQuery;
+        if (debouncedSearch) params.search = debouncedSearch;
         if (selectedLocation && selectedLocation !== "all") params.city = selectedLocation;
+        if (checkInParam) params.checkIn = checkInParam;
+        if (checkOutParam) params.checkOut = checkOutParam;
+        if (guestsParam) params.guests = guestsParam;
         const result = await api.properties.getAll(params);
         setHomes(result.data || []);
         setTotalPages(result.meta?.totalPages || 1);
@@ -77,7 +89,7 @@ const Homes = () => {
     };
 
     fetchHomes();
-  }, [page, searchQuery, selectedLocation, sortBy]);
+  }, [page, debouncedSearch, selectedLocation, sortBy]);
 
   useEffect(() => {
     const fetchCities = async () => {
@@ -193,6 +205,13 @@ const Homes = () => {
                     onClick={() => {
                       setPage(1);
                       setSelectedLocation(loc);
+                      const newParams = new URLSearchParams(searchParams);
+                      if (loc === "all") {
+                        newParams.delete("destination");
+                      } else {
+                        newParams.set("destination", loc.toLowerCase());
+                      }
+                      setSearchParams(newParams);
                     }}
                     className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedLocation === loc
                         ? "gradient-gold text-primary-foreground shadow-gold"
@@ -284,7 +303,7 @@ const Homes = () => {
                         <div>
                           <p className="text-sm text-muted-foreground">Starting from</p>
                           <p className="text-xl font-semibold text-foreground">
-                            ₹{(home.basePrice || 0).toLocaleString()}
+                            ₹{(home.basePrice || 0).toLocaleString('en-IN')}
                             <span className="text-muted-foreground font-normal text-sm">/night</span>
                           </p>
                         </div>

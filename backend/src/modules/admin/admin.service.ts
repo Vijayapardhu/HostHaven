@@ -8,6 +8,7 @@ import { config } from "../../config";
 import type { PlatformSettingsInput } from "./admin-settings.schema";
 import { auditLogger } from "../../lib/auditLogger";
 import { syncAmenityCatalog } from '../../utils/amenities.util';
+import { hashPassword } from '../../utils/hash.util';
 
 let financeRazorpayClient: Razorpay | null = null;
 
@@ -844,10 +845,10 @@ export class AdminService {
          supportCompanyName: advanced.contact.supportCompanyName,
        },
        social: advanced.social ?? DEFAULT_ADVANCED_SETTINGS.social,
-       tax: {
-         enabled: advanced.tax?.enabled ?? false,
-         percent: advanced.tax?.percent ?? 12,
-       },
+        tax: {
+          enabled: advanced.tax?.enabled ?? false,
+          percent: advanced.tax?.percent ?? 0,
+        },
      };
    }
 
@@ -1102,6 +1103,7 @@ Crawl-delay: 1
     if (data.advancedSettings !== undefined) {
       payload.featureFlags = {
         ...featureFlagsPayload,
+        ...(existing.featureFlags as any || {}),
         advancedSettings: data.advancedSettings,
       } as Prisma.InputJsonValue;
     }
@@ -1529,9 +1531,10 @@ Crawl-delay: 1
     const limit = filters.limit || 10;
     const skip = (page - 1) * limit;
 
-    const where: any = {
-      role: filters.role ?? { notIn: ["VENDOR", "ADMIN"] },
-    };
+    const where: any = {};
+    if (filters.role) {
+      where.role = filters.role;
+    }
 
     if (filters.search) {
       where.OR = [
@@ -1755,8 +1758,9 @@ Crawl-delay: 1
       where: { id: userId },
       data: { passwordResetToken: resetToken, passwordResetExpires: expires },
     });
+    // Token sent via email only — never returned in API response
     logger.info({ userId }, "Password reset initiated by admin");
-    return { id: userId, resetToken, expiresAt: expires };
+    return { id: userId, expiresAt: expires };
   }
 
   async getUserSessions(userId: string) {
@@ -3732,7 +3736,51 @@ Crawl-delay: 1
     };
   }
 
-  async calculateCommission(bookingId: string) {
+  async calculateCommission(bookingId?: string, serviceBookingId?: string) {
+    if (serviceBookingId) {
+      const serviceBooking = await prisma.serviceBooking.findUnique({
+        where: { id: serviceBookingId },
+      });
+
+      if (!serviceBooking || !serviceBooking.totalAmount) return;
+
+      // Service model lacks a vendorId; fall back to platform-level vendor
+      const vendor = await prisma.vendor.findFirst({
+        where: { commissionRate: { gt: 0 } },
+        orderBy: { commissionRate: 'desc' },
+      });
+
+      if (!vendor) return;
+
+      const commissionRate = vendor.commissionRate;
+      const bookingAmount = serviceBooking.totalAmount;
+      const commissionAmount = bookingAmount.mul(commissionRate).div(100);
+      const vendorEarning = bookingAmount.sub(commissionAmount);
+
+      await prisma.commissionLedger.upsert({
+        where: { serviceBookingId },
+        update: {
+          commissionRate,
+          commissionAmount,
+          vendorEarning,
+          bookingAmount,
+        },
+        create: {
+          serviceBookingId,
+          vendorId: vendor.id,
+          bookingAmount,
+          commissionRate,
+          commissionAmount,
+          vendorEarning,
+        },
+      });
+
+      logger.info({ serviceBookingId, vendorId: vendor.id }, "Commission calculated for service booking");
+      return;
+    }
+
+    if (!bookingId) return;
+
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: { property: { include: { vendor: true } } },
@@ -3967,7 +4015,6 @@ Crawl-delay: 1
 
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.images !== undefined) updateData.images = data.images as any;
-    if (data.roomImages !== undefined) updateData.images = data.roomImages as any;
     if (data.video !== undefined) updateData.video = data.video || null;
 
     const updated = await prisma.room.update({
@@ -4971,6 +5018,10 @@ Crawl-delay: 1
 
         switch (entity.toLowerCase()) {
           case 'users':
+            if (createData.password) {
+              createData.passwordHash = await hashPassword(createData.password);
+              delete createData.password;
+            }
             await prisma.user.create({ data: createData as any });
             break;
           case 'vendors':

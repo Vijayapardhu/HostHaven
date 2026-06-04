@@ -27,17 +27,13 @@ const AuthCallback = () => {
     }
 
     if (accessToken && refreshToken) {
-      // Store using new combined format
-      const expiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
       const authData = {
         accessToken,
         refreshToken,
-        user: null, // Will be fetched on app load
-        expiresAt,
+        user: null,
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000),
       };
       localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
-      
-      // Also keep old keys for backward compatibility
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
 
@@ -48,7 +44,8 @@ const AuthCallback = () => {
           : "You have been logged in successfully.",
       });
 
-      navigate("/");
+      // Reload so AuthContext picks up the new tokens
+      window.location.href = "/";
     } else {
       toast({
         title: "Authentication failed",

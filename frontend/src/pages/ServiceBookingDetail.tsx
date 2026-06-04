@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, MapPin, Clock, Download, Loader2, Briefcase } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Clock, Download, Loader2, Briefcase, XCircle } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -212,15 +212,15 @@ const ServiceBookingDetail = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Amount</span>
-                    <span>₹{booking.totalAmount?.toLocaleString()}</span>
+                    <span>₹{booking.totalAmount?.toLocaleString('en-IN')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Advance Paid</span>
-                    <span className="text-green-600">-₹{booking.advanceAmount?.toLocaleString()}</span>
+                    <span className="text-green-600">-₹{booking.advanceAmount?.toLocaleString('en-IN')}</span>
                   </div>
                   <div className="flex justify-between font-semibold pt-2 border-t">
                     <span>Remaining Amount</span>
-                    <span>₹{booking.remainingAmount?.toLocaleString()}</span>
+                    <span>₹{booking.remainingAmount?.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>
@@ -239,6 +239,24 @@ const ServiceBookingDetail = () => {
                   )}
                   Download Invoice
                 </Button>
+                {(booking.status === "PENDING" || booking.status === "ADVANCE_PAID" || booking.status === "CONFIRMED") && (
+                  <Button
+                    variant="destructive"
+                    onClick={async () => {
+                      if (!confirm("Are you sure you want to cancel this booking?")) return;
+                      try {
+                        await api.serviceBookings.cancelMyBooking(id!);
+                        fetchBooking();
+                      } catch (error) {
+                        handleError(error, 'booking');
+                      }
+                    }}
+                    className="flex-1"
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancel Booking
+                  </Button>
+                )}
               </div>
 
               <p className="text-xs text-muted-foreground mt-4 text-center">

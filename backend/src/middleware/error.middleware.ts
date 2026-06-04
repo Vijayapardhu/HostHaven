@@ -22,7 +22,11 @@ export const errorHandler = (
     request: {
       method: request.method,
       url: request.url,
-      headers: request.headers,
+      headers: {
+        'user-agent': request.headers['user-agent'],
+        'content-type': request.headers['content-type'],
+        'x-request-id': request.headers['x-request-id'],
+      },
     },
   }, 'Request error');
 
@@ -77,7 +81,7 @@ export const errorHandler = (
     return reply.status(error.statusCode).send({
       success: false,
       error: {
-        code: ERROR_CODES.INTERNAL_ERROR,
+        code: error.statusCode === 429 ? ERROR_CODES.RATE_LIMIT_EXCEEDED : ERROR_CODES.INTERNAL_ERROR,
         message,
       },
       timestamp: new Date().toISOString(),

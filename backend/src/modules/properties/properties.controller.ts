@@ -264,13 +264,13 @@ export const PropertiesController = {
 
   async search(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { q, limit } = request.query as { q?: string; limit?: string };
+      const { search, type, limit } = request.query as { search?: string; type?: string; limit?: string };
       
-      if (!q) {
+      if (!search) {
         return sendSuccess(reply, []);
       }
 
-      const properties = await propertiesService.search(q, parseInt(limit || '10'));
+      const properties = await propertiesService.search(search, parseInt(limit || '10'), type);
       return sendSuccess(reply, properties);
     } catch (error: any) {
       logger.error({ error }, 'Search properties failed');

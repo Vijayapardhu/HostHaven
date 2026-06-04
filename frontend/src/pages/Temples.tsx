@@ -8,6 +8,14 @@ import { api } from "@/lib/api";
 import WishlistButton from "@/components/WishlistButton";
 import SEOHead from "@/components/SEOHead";
 import { formatCity } from "@/lib/utils";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Temple {
   id: string;
@@ -37,11 +45,14 @@ const getTempleImage = (temple: Temple) => {
   return "https://images.unsplash.com/photo-1621427642694-46e7f7e4db14?w=800";
 };
 
+const TEMPLES_PER_PAGE = 12;
+
 const Temples = () => {
   const [temples, setTemples] = useState<Temple[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("ALL");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     setIsLoading(true);
@@ -54,8 +65,6 @@ const Temples = () => {
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
-
-  const cities = useMemo(() => ["ALL", ...Array.from(new Set(temples.map((temple) => temple.city).filter(Boolean)))], [temples]);
 
   const filteredTemples = useMemo(() => {
     return temples.filter((temple) => {
@@ -78,6 +87,15 @@ const Temples = () => {
         .some((value) => String(value).toLowerCase().includes(query));
     });
   }, [temples, selectedCity, searchQuery]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, selectedCity]);
+
+  const totalPages = Math.ceil(filteredTemples.length / TEMPLES_PER_PAGE);
+  const paginatedTemples = filteredTemples.slice((page - 1) * TEMPLES_PER_PAGE, page * TEMPLES_PER_PAGE);
+
+  const cities = useMemo(() => ["ALL", ...Array.from(new Set(temples.map((temple) => temple.city).filter(Boolean)))], [temples]);
 
   const selectedCityLabel = selectedCity === "ALL" ? "Andhra Pradesh" : formatCity(selectedCity);
   const seoTitle = selectedCity === "ALL" ? "Sacred Temples in Andhra Pradesh" : `Temples in ${selectedCityLabel}`;
@@ -139,7 +157,7 @@ const Temples = () => {
             <p className="text-center text-muted-foreground py-16">No temples found.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {filteredTemples.map((temple) => (
+              {paginatedTemples.map((temple) => (
                 <Link
                   key={temple.id}
                   to={`/temples/${temple.slug || temple.id}`}
@@ -188,6 +206,51 @@ const Temples = () => {
                   </div>
                 </Link>
               ))}
+            </div>
+          )}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 mt-10">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="px-6"
+              >
+                Prev
+              </Button>
+              <div className="flex items-center gap-2">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (page <= 3) {
+                    pageNum = i + 1;
+                  } else if (page >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = page - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => { setPage(pageNum); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${page === pageNum ? "bg-primary text-white" : "bg-card text-muted-foreground hover:bg-muted border"}`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="px-6"
+              >
+                Next
+              </Button>
             </div>
           )}
         </div>

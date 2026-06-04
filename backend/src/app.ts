@@ -78,7 +78,7 @@ export const buildApp = async () => {
       : { level: config.logging.level },
     requestIdHeader: "x-request-id",
     requestIdLogLabel: "requestId",
-    bodyLimit: 500 * 1024 * 1024, // 500MB for large video uploads
+    bodyLimit: 50 * 1024 * 1024, // 50MB for video uploads
   });
 
   fastify.addHook('preParsing', async (request, _reply, payload) => {
@@ -98,14 +98,14 @@ export const buildApp = async () => {
 
   // Register cookie for session management
   await fastify.register(cookie, {
-    secret: config.jwt.accessSecret,
+    secret: process.env.COOKIE_SECRET || config.jwt.accessSecret,
     hook: 'onRequest',
   });
 
 // Register multipart for file uploads
   await fastify.register(multipart, {
     limits: {
-      fileSize: 500 * 1024 * 1024, // 500MB per file (increased for videos)
+      fileSize: 50 * 1024 * 1024, // 50MB per file (for videos)
       files: 20, // Maximum 20 files per request
     },
   });
@@ -219,7 +219,7 @@ export const buildApp = async () => {
     keyGenerator: (request) => {
       return request.user?.id || request.ip;
     },
-    skipOnError: true,
+    skipOnError: false,
   });
 
   // Swagger documentation

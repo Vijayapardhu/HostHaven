@@ -12,11 +12,10 @@ export function PushNotificationBanner() {
   const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-      return;
-    }
-    setIsSupported(true);
+    setIsSupported("Notification" in window);
+  }, []);
 
+  useEffect(() => {
     if (Notification.permission === "granted") {
       setIsEnabled(true);
       return;
@@ -25,22 +24,23 @@ export function PushNotificationBanner() {
     const dismissed = localStorage.getItem("push-notification-dismissed");
     const shownThisSession = sessionStorage.getItem("push-notification-shown");
 
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
     if (dismissed === "true") {
       if (isAuthenticated && !sessionStorage.getItem("push-notification-login-shown")) {
-        setTimeout(() => {
+        timers.push(setTimeout(() => {
           setShowBanner(true);
           sessionStorage.setItem("push-notification-login-shown", "true");
-        }, 3000);
+        }, 3000));
       }
-      return;
-    }
-
-    if (!shownThisSession) {
-      setTimeout(() => {
+    } else if (!shownThisSession) {
+      timers.push(setTimeout(() => {
         setShowBanner(true);
         sessionStorage.setItem("push-notification-shown", "true");
-      }, 4000);
+      }, 4000));
     }
+
+    return () => timers.forEach(clearTimeout);
   }, [isAuthenticated]);
 
   const handleEnable = async () => {

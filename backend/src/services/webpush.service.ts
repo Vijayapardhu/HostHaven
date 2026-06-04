@@ -3,9 +3,13 @@ import { logger } from '../utils/logger.util';
 import prisma from '../config/database';
 import { config } from '../config';
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BAIN_yNFBud4AQ1M9BUCKwuQnNxVIwnznWXcl7JmUKF84JR0TWRBWY0LJxl-bGW8arLqX1ysiByMZaEk6Ti5m3E';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'RUE9sFbe8Wx504JSGaujwutJMCcfGZHBVYjsodSG48o';
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@hosthaven.com';
+
+if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  throw new Error('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables are required for push notifications');
+}
 
 webpush.setVapidDetails(
   VAPID_SUBJECT,
@@ -43,7 +47,7 @@ const getNotificationBadge = (): string => {
 
 class WebPushService {
   async getVapidPublicKey(): Promise<string> {
-    return VAPID_PUBLIC_KEY;
+    return VAPID_PUBLIC_KEY!;
   }
 
   async saveSubscription(userId: string, subscription: PushSubscription): Promise<void> {

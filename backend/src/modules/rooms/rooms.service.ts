@@ -341,6 +341,7 @@ export class RoomsService {
       where: {
         propertyId,
         isActive: true,
+        isDeleted: false,
       },
       orderBy: { pricePerNight: 'asc' },
     });

@@ -1,4 +1,6 @@
+import Razorpay from "razorpay";
 import prisma from "../../config/database";
+import { config } from "../../config";
 import { ERROR_CODES } from "../../constants/error-codes";
 import { logger } from "../../utils/logger.util";
 import { generateBookingNumber, generateInvoiceId } from "../../utils/crypto.util";
@@ -199,6 +201,60 @@ export class ServiceBookingsService {
     return this.serialize(booking);
   }
 
+  async cancelMyBooking(id: string, userId: string) {
+    const booking = await prisma.serviceBooking.findFirst({
+      where: { id, userId },
+    });
+
+    if (!booking) {
+      const error = new Error("Service booking not found");
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
+    }
+
+    if (booking.status === "CANCELLED") {
+      const error = new Error("Booking is already cancelled");
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    if (booking.status === "COMPLETED") {
+      const error = new Error("Cannot cancel a completed booking");
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    }
+
+    // Process refund if payment was made
+    if (booking.razorpayPaymentId && booking.advanceAmount.gt(0)) {
+      const razorpayClient = new Razorpay({
+        key_id: config.razorpay.keyId,
+        key_secret: config.razorpay.keySecret,
+      });
+
+      await razorpayClient.payments.refund(
+        booking.razorpayPaymentId,
+        {
+          amount: Math.round(Number(booking.advanceAmount) * 100),
+          speed: "normal",
+          notes: { reason: "Service booking cancelled by user" },
+        },
+      );
+    }
+
+    const updated = await prisma.serviceBooking.update({
+      where: { id },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+        cancellationReason: "Cancelled by user",
+      },
+    });
+
+    logger.info({ serviceBookingId: id }, "Service booking cancelled by user");
+
+    return this.serialize(updated);
+  }
+
   async refund(id: string, amount: number, reason?: string) {
     const booking = await prisma.serviceBooking.findUnique({ where: { id } });
 
@@ -206,6 +262,26 @@ export class ServiceBookingsService {
       const error = new Error("Service booking not found");
       (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
       throw error;
+    }
+
+    if (booking.razorpayPaymentId) {
+      try {
+        const razorpayClient = new Razorpay({
+          key_id: config.razorpay.keyId,
+          key_secret: config.razorpay.keySecret,
+        });
+
+        await razorpayClient.payments.refund(
+          booking.razorpayPaymentId,
+          {
+            amount: Math.round(amount * 100),
+            speed: "normal",
+            notes: { reason: reason || "Service booking cancelled" },
+          },
+        );
+      } catch (refundError) {
+        logger.error({ error: refundError, serviceBookingId: id }, "Razorpay refund failed for service booking");
+      }
     }
 
     const updated = await prisma.serviceBooking.update({
@@ -219,12 +295,12 @@ export class ServiceBookingsService {
 
     logger.info(
       { serviceBookingId: id, amount },
-      "Service booking refund requested",
+      "Service booking refund processed",
     );
 
     return {
       booking: this.serialize(updated),
-      message: "Refund recorded",
+      message: "Refund processed",
     };
   }
 

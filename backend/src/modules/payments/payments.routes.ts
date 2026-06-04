@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { PaymentsController } from './payments.controller';
-import { requireRole } from '../../middleware/auth.middleware';
+import { requireRole, requireVerified } from '../../middleware/auth.middleware';
 import { config } from '../../config';
 
 const writeRateLimit = {
@@ -26,10 +26,13 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
   // Protected routes
   fastify.addHook('preHandler', fastify.authenticate);
 
-  fastify.post('/create-order', { config: { rateLimit: writeRateLimit } }, PaymentsController.createOrder);
-  fastify.post('/create-service-order', { config: { rateLimit: writeRateLimit } }, PaymentsController.createServiceOrder);
-  fastify.post('/vendor/create-order', { preHandler: [requireRole('VENDOR')], config: { rateLimit: writeRateLimit } }, PaymentsController.createVendorOrder);
-  fastify.post('/verify', { config: { rateLimit: writeRateLimit } }, PaymentsController.verifyPayment);
-  fastify.post('/verify-service', { config: { rateLimit: writeRateLimit } }, PaymentsController.verifyServicePayment);
+  const requireVerifiedHandler = [requireVerified];
+  const requireVendorVerifiedHandler = [requireRole('VENDOR'), requireVerified];
+
+  fastify.post('/create-order', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, PaymentsController.createOrder);
+  fastify.post('/create-service-order', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, PaymentsController.createServiceOrder);
+  fastify.post('/vendor/create-order', { preHandler: requireVendorVerifiedHandler, config: { rateLimit: writeRateLimit } }, PaymentsController.createVendorOrder);
+  fastify.post('/verify', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, PaymentsController.verifyPayment);
+  fastify.post('/verify-service', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, PaymentsController.verifyServicePayment);
   fastify.get('/:id', PaymentsController.getPayment);
 }

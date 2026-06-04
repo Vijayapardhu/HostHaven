@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Star, MapPin, Search } from "lucide-react";
 import Layout from "@/components/layout/Layout";
@@ -48,6 +48,15 @@ const Hotels = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [searchQuery]);
+
   const [selectedLocation, setSelectedLocation] = useState(() => {
     if (citySlug) {
       return citySlug.toUpperCase();
@@ -103,9 +112,12 @@ const Hotels = () => {
           limit: "12",
           sortBy: sortBy === "newest" ? "createdAt" : sortBy,
         };
-        if (searchQuery) params.search = searchQuery;
+        if (debouncedSearch) params.search = debouncedSearch;
         // Only send city if it's a valid city (not 'all' or undefined)
         if (selectedLocation && selectedLocation !== "all") params.city = selectedLocation;
+        if (checkInParam) params.checkIn = checkInParam;
+        if (checkOutParam) params.checkOut = checkOutParam;
+        if (guestsParam) params.guests = guestsParam;
         const result = await api.properties.getAll(params);
         setHotels(result.data || []);
         setTotalPages(result.meta?.totalPages || 1);
@@ -117,7 +129,7 @@ const Hotels = () => {
     };
 
     fetchHotels();
-  }, [page, searchQuery, selectedLocation, sortBy]);
+  }, [page, debouncedSearch, selectedLocation, sortBy]);
 
   const filteredHotels = useMemo(() => hotels, [hotels]);
 
@@ -314,7 +326,7 @@ const Hotels = () => {
                         <div>
                           <p className="text-sm text-muted-foreground">Starting from</p>
                           <p className="text-xl font-semibold text-foreground">
-                            ₹{(hotel.basePrice || 0).toLocaleString()}
+                            ₹{(hotel.basePrice || 0).toLocaleString('en-IN')}
                             <span className="text-muted-foreground font-normal text-sm">/night</span>
                           </p>
                         </div>

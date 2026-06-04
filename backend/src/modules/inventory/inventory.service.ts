@@ -198,38 +198,40 @@ export class InventoryService {
       throw error;
     }
 
-    const activeLocks = await prisma.inventoryLock.aggregate({
-      where: {
-        roomId,
-        lockUntil: { gte: new Date() },
-        OR: [
-          {
-            checkInDate: { lt: checkOut },
-            checkOutDate: { gt: checkIn },
-          },
-        ],
-      },
-      _sum: { quantity: true },
-    });
-
-    const lockedRooms = activeLocks._sum.quantity || 0;
-    if (lockedRooms + quantity > room.totalRooms) {
-      const error = new Error('Room not available');
-      (error as any).code = ERROR_CODES.ROOM_NOT_AVAILABLE;
-      throw error;
-    }
-
     const lockUntil = new Date(Date.now() + 10 * 60 * 1000);
 
-    const lock = await prisma.inventoryLock.create({
-      data: {
-        roomId,
-        userId,
-        quantity,
-        checkInDate: checkIn,
-        checkOutDate: checkOut,
-        lockUntil,
-      },
+    const lock = await prisma.$transaction(async (tx) => {
+      const activeLocks = await tx.inventoryLock.aggregate({
+        where: {
+          roomId,
+          lockUntil: { gte: new Date() },
+          OR: [
+            {
+              checkInDate: { lt: checkOut },
+              checkOutDate: { gt: checkIn },
+            },
+          ],
+        },
+        _sum: { quantity: true },
+      });
+
+      const lockedRooms = activeLocks._sum.quantity || 0;
+      if (lockedRooms + quantity > room.totalRooms) {
+        const error = new Error('Room not available');
+        (error as any).code = ERROR_CODES.ROOM_NOT_AVAILABLE;
+        throw error;
+      }
+
+      return tx.inventoryLock.create({
+        data: {
+          roomId,
+          userId,
+          quantity,
+          checkInDate: checkIn,
+          checkOutDate: checkOut,
+          lockUntil,
+        },
+      });
     });
 
     return {

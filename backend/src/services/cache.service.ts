@@ -64,11 +64,18 @@ class CacheService {
 
   async invalidate(pattern: string): Promise<number> {
     try {
-      const keys = await redis.keys(pattern);
-      if (keys.length > 0) {
-        await redis.del(...keys);
-      }
-      return keys.length;
+      let cursor = '0';
+      let deletedCount = 0;
+      do {
+        const result = await redis.scan(cursor, { match: pattern, count: 100 });
+        cursor = result[0];
+        const keys = result[1];
+        if (keys.length > 0) {
+          await redis.del(...keys);
+          deletedCount += keys.length;
+        }
+      } while (cursor !== '0');
+      return deletedCount;
     } catch (error) {
       logger.error({ error, pattern }, 'Cache invalidate error');
       return 0;

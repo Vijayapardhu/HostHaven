@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ const Signup = () => {
     email: "",
     password: "",
     confirmPassword: "",
+    phone: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +49,42 @@ const Signup = () => {
       toast({
         title: "Password too short",
         description: "Password must be at least 8 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/[A-Z]/.test(formData.password)) {
+      toast({
+        title: "Password needs uppercase",
+        description: "Password must contain at least one uppercase letter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/[a-z]/.test(formData.password)) {
+      toast({
+        title: "Password needs lowercase",
+        description: "Password must contain at least one lowercase letter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/[0-9]/.test(formData.password)) {
+      toast({
+        title: "Password needs a number",
+        description: "Password must contain at least one number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!/[^A-Za-z0-9]/.test(formData.password)) {
+      toast({
+        title: "Password needs a special character",
+        description: "Password must contain at least one special character.",
         variant: "destructive",
       });
       return;
@@ -235,6 +272,7 @@ const Signup = () => {
                       onChange={handleChange}
                       className="pl-10 h-12 bg-muted/50 border-2 border-transparent rounded-xl focus:border-primary/50 transition-all"
                       required
+                      autoComplete="name"
                     />
                   </div>
                 </div>
@@ -257,6 +295,31 @@ const Signup = () => {
                       onChange={handleChange}
                       className="pl-10 h-12 bg-muted/50 border-2 border-transparent rounded-xl focus:border-primary/50 transition-all"
                       required
+                      autoComplete="email"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-primary" />
+                  Phone Number
+                </label>
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-gold rounded-xl opacity-0 group-hover:opacity-20 blur transition duration-300" />
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      type="tel"
+                      name="phone"
+                      placeholder="9876543210"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      className="pl-10 h-12 bg-muted/50 border-2 border-transparent rounded-xl focus:border-primary/50 transition-all"
+                      autoComplete="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                     />
                   </div>
                 </div>
@@ -280,6 +343,7 @@ const Signup = () => {
                       className="pl-10 pr-12 h-12 bg-muted/50 border-2 border-transparent rounded-xl focus:border-primary/50 transition-all"
                       required
                       minLength={8}
+                      autoComplete="new-password"
                     />
                     <motion.button
                       whileHover={{ scale: 1.1 }}

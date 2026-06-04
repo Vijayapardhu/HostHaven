@@ -21,3 +21,7 @@ export const updateSupportTicketSchema = z.object({
   status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']),
   adminNotes: z.string().max(2000).optional(),
 });
+
+export const addNoteSchema = z.object({
+  content: z.string().min(1).max(2000),
+});

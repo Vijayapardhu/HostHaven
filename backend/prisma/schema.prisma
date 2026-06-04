@@ -131,8 +131,9 @@ model User {
   failedLoginAttempts Int @default(0)
   lockedUntil   DateTime?
   
-  twoFactorEnabled Boolean @default(false)
-  twoFactorSecret  String?
+  twoFactorEnabled    Boolean @default(false)
+  twoFactorSecret     String?
+  twoFactorBackupCodes String?
   
   // Relations
   vendor        Vendor?
@@ -161,6 +162,7 @@ model User {
 
   @@index([email])
   @@index([googleId])
+  @@index([role])
   @@map("users")
 }
 
@@ -177,7 +179,8 @@ model Session {
   expiresAt    DateTime
   isActive     Boolean  @default(true)
   
-  createdAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   
   @@index([userId])
   @@index([refreshToken])
@@ -363,6 +366,7 @@ model InventoryLock {
 
   @@index([roomId, lockUntil])
   @@index([roomId, checkInDate, checkOutDate])
+  @@index([userId])
   @@map("inventory_locks")
 }
 
@@ -601,6 +605,7 @@ model Booking {
   @@index([userId])
   @@index([propertyId])
   @@index([status])
+  @@index([roomId])
   @@index([checkInDate, checkOutDate])
   @@map("bookings")
 }
@@ -696,16 +701,21 @@ model Payout {
   commissionEntries CommissionLedger[]
   
   createdAt       DateTime @default(now())
-  
+  updatedAt       DateTime @updatedAt
+
   @@index([vendorId])
+  @@index([status])
   @@map("payouts")
 }
 
 model CommissionLedger {
   id               String   @id @default(uuid())
 
-  bookingId        String   @unique
-  booking          Booking  @relation(fields: [bookingId], references: [id])
+  bookingId        String?  @unique
+  booking          Booking? @relation(fields: [bookingId], references: [id])
+
+  serviceBookingId String?  @unique
+  serviceBooking   ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
 
   vendorId         String
   vendor           Vendor   @relation(fields: [vendorId], references: [id])
@@ -719,8 +729,10 @@ model CommissionLedger {
   payout           Payout?  @relation(fields: [payoutId], references: [id])
 
   createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([vendorId])
+  @@index([payoutId])
   @@map("commission_ledger")
 }
 
@@ -947,13 +959,15 @@ model ServiceBooking {
   razorpayPaymentId String?
   razorpayOrderId String?
 
-  status          ServiceBookingStatus @default(ADVANCE_PAID)
+  status          ServiceBookingStatus @default(PENDING)
   isDeleted       Boolean              @default(false)
   deletedAt       DateTime?
 
   adminContactedAt DateTime?
   cancelledAt      DateTime?
   cancellationReason String?
+
+  commissionLedger CommissionLedger?
 
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt

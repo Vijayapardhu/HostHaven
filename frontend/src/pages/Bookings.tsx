@@ -40,7 +40,7 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Elem
   ADVANCE_PAID: { color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: CheckCircle },
   COMPLETED: { color: "text-green-700", bg: "bg-green-50 border-green-200", icon: CheckCircle },
   CHECKED_IN: { color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: Home },
-  CHECKED_OUT: { color: "text-gray-700", bg: "bg-gray-50 border-gray-200", icon: CheckCircle },
+  CHECKED_OUT: { color: "text-foreground/80", bg: "bg-muted/50 border-border", icon: CheckCircle },
   CANCELLED: { color: "text-red-700", bg: "bg-red-50 border-red-200", icon: XCircle },
   REFUNDED: { color: "text-purple-700", bg: "bg-purple-50 border-purple-200", icon: XCircle },
 };
@@ -48,6 +48,7 @@ const statusConfig: Record<string, { color: string; bg: string; icon: React.Elem
 const tabs = [
   { key: "all", label: "All" },
   { key: "PENDING", label: "Pending" },
+  { key: "ADVANCE_PAID", label: "Advance Paid" },
   { key: "CONFIRMED", label: "Confirmed" },
   { key: "CHECKED_IN", label: "Checked In" },
   { key: "CHECKED_OUT", label: "Completed" },
@@ -128,8 +129,8 @@ const Bookings = () => {
           <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
             <Calendar className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Your Bookings</h1>
-          <p className="text-gray-500 mb-8 text-center max-w-md">
+          <h1 className="text-3xl font-bold text-foreground mb-3">Your Bookings</h1>
+          <p className="text-muted-foreground mb-8 text-center max-w-md">
             Log in to view your booking history, track reservations, and manage your upcoming stays.
           </p>
           <Link to="/login">
@@ -169,12 +170,12 @@ const Bookings = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-8">
+      <div className="min-h-screen bg-gradient-to-b from-muted/50 to-card py-8">
         <div className="container mx-auto px-4">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">My Bookings</h1>
-            <p className="text-gray-500">Manage your hotel stays and service bookings</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">My Bookings</h1>
+            <p className="text-muted-foreground">Manage your hotel stays and service bookings</p>
           </div>
 
           {/* Status Tabs */}
@@ -190,12 +191,12 @@ const Bookings = () => {
                   className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
                     isActive
                       ? "bg-primary text-white shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+                      : "bg-card text-muted-foreground hover:bg-muted border border-border"
                   }`}
                 >
                   {tab.label}
                   {showCount && (
-                    <span className={`text-xs ${isActive ? "bg-white/20" : "bg-gray-100"} px-1.5 py-0.5 rounded-full`}>
+                    <span className={`text-xs ${isActive ? "bg-card/20" : "bg-muted"} px-1.5 py-0.5 rounded-full`}>
                       {count}
                     </span>
                   )}
@@ -210,12 +211,12 @@ const Bookings = () => {
               <Loader2 className="w-10 h-10 animate-spin text-primary" />
             </div>
           ) : bookings.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-2xl shadow-sm border">
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Calendar className="w-12 h-12 text-gray-400" />
+            <div className="text-center py-20 bg-card rounded-2xl shadow-sm border">
+              <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                <Calendar className="w-12 h-12 text-muted-foreground/70" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">No bookings found</h2>
-              <p className="text-gray-500 mb-8">
+              <h2 className="text-xl font-semibold text-foreground mb-2">No bookings found</h2>
+              <p className="text-muted-foreground mb-8">
                 {statusFilter === "all" 
                   ? "You haven't made any bookings yet" 
                   : `No ${statusFilter.toLowerCase().replace("_", " ")} bookings`}
@@ -241,10 +242,10 @@ const Bookings = () => {
                     <Link
                       key={booking.id}
                       to={booking.type === "service" ? `/service-bookings/${booking.id}` : `/bookings/${booking.id}`}
-                      className="group bg-white rounded-2xl shadow-sm border overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+                      className="group bg-card rounded-2xl shadow-sm border overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
                     >
                       {/* Image */}
-                      <div className="relative h-40 bg-gray-100">
+                      <div className="relative h-40 bg-muted">
                         {booking.type === "service" ? (
                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
                             <Briefcase className="w-16 h-16 text-primary/40" />
@@ -256,8 +257,8 @@ const Bookings = () => {
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50">
-                            <Home className="w-16 h-16 text-gray-300" />
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                            <Home className="w-16 h-16 text-muted-foreground/40" />
                           </div>
                         )}
                         
@@ -276,21 +277,21 @@ const Bookings = () => {
 
                       {/* Content */}
                       <div className="p-4">
-                        <h3 className="font-semibold text-gray-900 mb-1 truncate group-hover:text-primary transition-colors">
+                        <h3 className="font-semibold text-foreground mb-1 truncate group-hover:text-primary transition-colors">
                           {booking.type === "service" 
                             ? booking.service?.name || "Service Booking"
                             : booking.property?.name || "Property"
                           }
                         </h3>
                         
-                        <div className="flex items-center gap-1 text-sm text-gray-500 mb-3">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
                           <MapPin className="w-3.5 h-3.5" />
                           {booking.type === "service" ? booking.location || "Location" : booking.property?.city || "City"}
                         </div>
 
                         {/* Dates/Time */}
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                          <Calendar className="w-4 h-4 text-gray-400" />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                          <Calendar className="w-4 h-4 text-muted-foreground/70" />
                           {booking.type === "service" ? (
                             <span>{formatDate(booking.serviceDate || booking.createdAt)}</span>
                           ) : (
@@ -301,18 +302,18 @@ const Bookings = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                          <span className="font-bold text-lg text-gray-900">
+                        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                          <span className="font-bold text-lg text-foreground">
                             {formatPrice(booking.totalAmount)}
                           </span>
-                          <span className="text-sm text-gray-500">
+                          <span className="text-sm text-muted-foreground">
                             {booking.bookingNumber}
                           </span>
                         </div>
 
                         {/* Review Prompt */}
                         {(booking.status === "CHECKED_OUT" || booking.status === "COMPLETED") && !booking.isReviewed && (
-                          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                          <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                             <div className="flex items-center gap-1 text-amber-500">
                               <Star className="w-4 h-4 fill-current" />
                               <span className="text-sm font-medium">Rate this stay</span>
@@ -363,7 +364,7 @@ const Bookings = () => {
                           className={`w-8 h-8 md:w-10 md:h-10 rounded-full text-sm font-medium transition-all ${
                             page === pageNum
                               ? "bg-primary text-white"
-                              : "bg-white text-gray-600 hover:bg-gray-100 border"
+                              : "bg-card text-muted-foreground hover:bg-muted border"
                           }`}
                         >
                           {pageNum}

@@ -16,7 +16,16 @@ const connection = config.redis.enabled
   : null;
 
 export const emailQueue = config.redis.enabled
-  ? new Queue('email-queue', { connection: connection as any })
+  ? new Queue('email-queue', {
+    connection: connection as any,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000,
+      },
+    },
+  })
   : null;
 
 export const queueService = config.redis.enabled

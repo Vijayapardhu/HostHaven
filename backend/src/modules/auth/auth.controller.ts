@@ -59,13 +59,18 @@ export const AuthController = {
         userAgent: request.headers['user-agent'] || '',
       });
 
-      // Set persistent cookies (365 days)
+      if ((result as any).twoFactorRequired) {
+        return sendSuccess(reply, { twoFactorRequired: true, userId: (result as any).userId });
+      }
+
+      // Session cookie if "Remember Me" is unchecked, 365-day cookie if checked
+      const cookieMaxAge = data.rememberMe ? 365 * 24 * 60 * 60 * 1000 : undefined;
       const cookieOptions = {
         httpOnly: true,
         secure: config.app.nodeEnv === 'production',
         sameSite: 'lax' as const,
         path: '/',
-        maxAge: 365 * 24 * 60 * 60 * 1000, // 365 days in milliseconds
+        ...(cookieMaxAge ? { maxAge: cookieMaxAge } : {}),
       };
 
       // Set access token cookie
@@ -110,13 +115,14 @@ export const AuthController = {
         userAgent: request.headers['user-agent'] || '',
       });
 
-      // Set persistent cookies (365 days)
+      // Session cookie if "Remember Me" is unchecked, 365-day cookie if checked
+      const cookieMaxAge = data.rememberMe ? 365 * 24 * 60 * 60 * 1000 : undefined;
       const cookieOptions = {
         httpOnly: true,
         secure: config.app.nodeEnv === 'production',
         sameSite: 'lax' as const,
         path: '/',
-        maxAge: 365 * 24 * 60 * 60 * 1000,
+        ...(cookieMaxAge ? { maxAge: cookieMaxAge } : {}),
       };
 
       reply.setCookie('access_token', result.tokens.accessToken, cookieOptions);
@@ -177,11 +183,31 @@ export const AuthController = {
         request.headers['user-agent'] || ''
       );
 
-      // Redirect to frontend with tokens
+      if ((result as any).twoFactorRequired) {
+        const challengeUrl = new URL(`${config.app.frontendUrl}/login/2fa`);
+        challengeUrl.searchParams.set('userId', (result as any).userId);
+        return reply.redirect(challengeUrl.toString());
+      }
+
+      const loginResult = result as { tokens: { accessToken: string; refreshToken: string }; isNewUser: boolean };
+
+      // Set tokens as HTTP-only cookies (secure, not in URL)
+      const cookieOptions = {
+        httpOnly: true,
+        secure: config.app.nodeEnv === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      };
+      reply.setCookie('access_token', loginResult.tokens.accessToken, cookieOptions);
+      reply.setCookie('refresh_token', loginResult.tokens.refreshToken, {
+        ...cookieOptions,
+        path: '/v1/auth/refresh',
+      });
+
+      // Redirect to frontend with a minimal non-sensitive marker
       const frontendUrl = new URL(`${config.app.frontendUrl}/auth/callback`);
-      frontendUrl.searchParams.set('accessToken', result.tokens.accessToken);
-      frontendUrl.searchParams.set('refreshToken', result.tokens.refreshToken);
-      frontendUrl.searchParams.set('isNewUser', String(result.isNewUser));
+      frontendUrl.searchParams.set('isNewUser', String(loginResult.isNewUser));
 
       return reply.redirect(frontendUrl.toString());
     } catch (error: any) {
@@ -461,8 +487,8 @@ export const AuthController = {
         return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Current and new password are required', 400);
       }
 
-      if (newPassword.length < 6) {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'New password must be at least 6 characters', 400);
+      if (newPassword.length < 8) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'New password must be at least 8 characters', 400);
       }
 
       const result = await authService.changePassword(userId, currentPassword, newPassword);
@@ -508,6 +534,43 @@ export const AuthController = {
         return sendError(reply, error.code, error.message, 400);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to verify 2FA', 500);
+    }
+  },
+
+  async verifyTwoFactorLogin(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { userId, code } = request.body as { userId: string; code: string };
+      if (!userId || !code) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'userId and code are required', 400);
+      }
+      const result = await authService.verifyTwoFactorLogin(
+        userId,
+        code,
+        request.ip,
+        request.headers['user-agent'] || '',
+      );
+
+      const cookieOptions = {
+        httpOnly: true,
+        secure: config.app.nodeEnv === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+      };
+
+      reply.setCookie('access_token', result.tokens.accessToken, cookieOptions);
+      reply.setCookie('refresh_token', result.tokens.refreshToken, {
+        ...cookieOptions,
+        path: '/v1/auth/refresh',
+      });
+
+      return sendSuccess(reply, result);
+    } catch (error: any) {
+      logger.error({ error }, '2FA login verification failed');
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, '2FA verification failed', 500);
     }
   },
 

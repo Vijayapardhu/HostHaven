@@ -14,6 +14,7 @@ export default async function servicesRoutes(fastify: FastifyInstance) {
   fastify.post("/bookings", { preHandler: [auth] }, ServiceBookingsController.create);
   fastify.get("/bookings/my", { preHandler: [auth] }, ServiceBookingsController.getMyBookings);
   fastify.get("/bookings/my/:id", { preHandler: [auth] }, ServiceBookingsController.getMyBookingById);
+  fastify.put("/bookings/my/:id/cancel", { preHandler: [auth] }, ServiceBookingsController.cancelMyBooking);
   fastify.get("/bookings/my/:id/invoice", { preHandler: [auth] }, ServiceBookingsController.getInvoice);
 
   // Service bookings - Admin only - static BEFORE dynamic

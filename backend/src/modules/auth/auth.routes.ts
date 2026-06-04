@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { AuthController } from './auth.controller';
+import { requireVerified } from '../../middleware/auth.middleware';
 import { config } from '../../config';
 
 const authRateLimit = {
@@ -47,15 +48,19 @@ export default async function authRoutes(fastify: FastifyInstance) {
   fastify.get('/google/callback', AuthController.googleCallback);
   fastify.post('/google', AuthController.googleLogin);
 
+  // 2FA login verification (no auth required - used to complete login flow)
+  fastify.post('/2fa/login-verify', { config: { rateLimit: authRateLimit } }, AuthController.verifyTwoFactorLogin);
+
   // Protected routes
+  const requireVerifiedHandler = [fastify.authenticate, requireVerified];
   fastify.get('/me', { preHandler: [fastify.authenticate], config: { rateLimit: readRateLimit } }, AuthController.me);
   fastify.get('/session', { preHandler: [fastify.authenticate], config: { rateLimit: readRateLimit } }, AuthController.session);
   fastify.post('/logout', { preHandler: [fastify.authenticate] }, AuthController.logout);
   fastify.post('/logout-all', { preHandler: [fastify.authenticate] }, AuthController.logoutAll);
-  fastify.post('/change-password', { preHandler: [fastify.authenticate], config: { rateLimit: writeRateLimit } }, AuthController.changePassword);
-  fastify.post('/2fa/setup', { preHandler: [fastify.authenticate], config: { rateLimit: writeRateLimit } }, AuthController.setupTwoFactor);
-  fastify.post('/2fa/verify', { preHandler: [fastify.authenticate], config: { rateLimit: writeRateLimit } }, AuthController.verifyTwoFactor);
-  fastify.delete('/2fa', { preHandler: [fastify.authenticate], config: { rateLimit: writeRateLimit } }, AuthController.disableTwoFactor);
+  fastify.post('/change-password', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, AuthController.changePassword);
+  fastify.post('/2fa/setup', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, AuthController.setupTwoFactor);
+  fastify.post('/2fa/verify', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, AuthController.verifyTwoFactor);
+  fastify.delete('/2fa', { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, AuthController.disableTwoFactor);
   fastify.post('/link-google', { preHandler: [fastify.authenticate] }, AuthController.linkGoogle);
   fastify.delete('/unlink-google', { preHandler: [fastify.authenticate] }, AuthController.unlinkGoogle);
 

@@ -99,7 +99,104 @@ class ApiService {
     return headers;
   }
 
-  private async handleResponse<T>(response: Response): Promise<T> {
+  private isRefreshing = false;
+  private refreshSubscribers: Array<(token: string) => void> = [];
+
+  private onRefreshed(token: string) {
+    this.refreshSubscribers.forEach((cb) => cb(token));
+    this.refreshSubscribers = [];
+  }
+
+  private addRefreshSubscriber(cb: (token: string) => void) {
+    this.refreshSubscribers.push(cb);
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (!refreshToken) return null;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      const data = await response.json();
+      if (data.success && data.data?.accessToken) {
+        localStorage.setItem("accessToken", data.data.accessToken);
+        localStorage.setItem("refreshToken", data.data.refreshToken || refreshToken);
+        return data.data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async handleResponse<T>(response: Response, endpoint?: string, originalBody?: any): Promise<T> {
+    if (response.status === 401 && endpoint !== "/auth/refresh" && endpoint !== "/auth/login") {
+      if (!this.isRefreshing) {
+        this.isRefreshing = true;
+        const newToken = await this.refreshAccessToken();
+        this.isRefreshing = false;
+
+        if (newToken) {
+          this.onRefreshed(newToken);
+          const retryHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${newToken}`,
+          };
+          const retryInit: RequestInit & { headers: Record<string, string> } = {
+            method: response.method || "GET",
+            headers: retryHeaders,
+          };
+          if (originalBody) {
+            retryInit.body = JSON.stringify(originalBody);
+          }
+          const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, retryInit);
+          const retryData: ApiResponse<T> = await retryResponse.json();
+          if (retryData.success) {
+            return retryData.data as T;
+          }
+        }
+
+        // Refresh failed, clear tokens
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("vendorToken");
+        window.location.href = "/login";
+        throw new Error("Session expired");
+      } else {
+        // Another refresh is in progress, queue this request
+        return new Promise((resolve, reject) => {
+          this.addRefreshSubscriber(async (token: string) => {
+            try {
+              const retryHeaders: Record<string, string> = {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              };
+              const retryInit: RequestInit & { headers: Record<string, string> } = {
+                method: response.method || "GET",
+                headers: retryHeaders,
+              };
+              if (originalBody) {
+                retryInit.body = JSON.stringify(originalBody);
+              }
+              const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, retryInit);
+              const retryData: ApiResponse<T> = await retryResponse.json();
+              if (retryData.success) {
+                resolve(retryData.data as T);
+              } else {
+                reject(new Error("Session expired"));
+              }
+            } catch {
+              reject(new Error("Session expired"));
+            }
+          });
+        });
+      }
+    }
+
     const data: ApiResponse<T> = await response.json();
 
     if (!response.ok || !data.success) {
@@ -119,10 +216,40 @@ class ApiService {
       headers: this.getHeaders(includeAuth),
     });
 
-    return this.handleResponse<T>(response);
+    return this.handleResponse<T>(response, endpoint);
   }
 
-  // For paginated endpoints where meta is sent as a sibling of data in the response envelope
+  async post<T>(
+    endpoint: string,
+    body?: any,
+    includeAuth: boolean = false,
+  ): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: "POST",
+      headers: this.getHeaders(includeAuth),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    return this.handleResponse<T>(response, endpoint, body);
+  }
+
+  async put<T>(
+    endpoint: string,
+    body?: any,
+    includeAuth: boolean = true,
+  ): Promise<T> {
+    const headers = this.getHeaders(includeAuth);
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: "PUT",
+      headers: body ? headers : Object.fromEntries(
+        Object.entries(headers).filter(([key]) => key !== 'Content-Type')
+      ),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    return this.handleResponse<T>(response, endpoint, body);
+  }
+
   private async getPage<T>(
     endpoint: string,
     includeAuth: boolean = true,
@@ -142,37 +269,6 @@ class ApiService {
     return { data: json.data as T, meta: json.meta };
   }
 
-  async post<T>(
-    endpoint: string,
-    body?: any,
-    includeAuth: boolean = false,
-  ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: "POST",
-      headers: this.getHeaders(includeAuth),
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
-    return this.handleResponse<T>(response);
-  }
-
-  async put<T>(
-    endpoint: string,
-    body?: any,
-    includeAuth: boolean = true,
-  ): Promise<T> {
-    const headers = this.getHeaders(includeAuth);
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: "PUT",
-      headers: body ? headers : Object.fromEntries(
-        Object.entries(headers).filter(([key]) => key !== 'Content-Type')
-      ),
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
-    return this.handleResponse<T>(response);
-  }
-
   async delete<T>(
     endpoint: string,
     includeAuth: boolean = true,
@@ -187,7 +283,7 @@ class ApiService {
     }
     const response = await fetch(`${this.baseUrl}${endpoint}`, options);
 
-    return this.handleResponse<T>(response);
+    return this.handleResponse<T>(response, endpoint, body);
   }
 
   // Auth endpoints
@@ -269,6 +365,7 @@ class ApiService {
       formData.append("folder", "hosthaven/avatars");
 
       const token = localStorage.getItem("accessToken");
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch(
         `${this.baseUrl}/uploads/single?folder=hosthaven/avatars`,
         {
@@ -408,6 +505,10 @@ class ApiService {
     getInvoice: (id: string) => {
       return this.get<any>(`/services/bookings/my/${id}/invoice`, true);
     },
+
+    cancelMyBooking: (id: string) => {
+      return this.put<any>(`/services/bookings/my/${id}/cancel`, undefined, true);
+    },
   };
 
   payments = {
@@ -469,6 +570,28 @@ class ApiService {
 
     getById: (bookingId: string) =>
       this.get<any>(`/bookings/${bookingId}`, true),
+
+    checkPrice: (data: {
+      propertyId: string;
+      roomId?: string;
+      checkIn: string;
+      checkOut: string;
+      guests: number;
+      extraBeds?: number;
+    }) => this.post<{
+      baseAmount: number;
+      extraBedAmount: number;
+      taxAmount: number;
+      totalAmount: number;
+      nights: number;
+      breakdown: {
+        roomPrice: number;
+        nights: number;
+        extraBeds: number;
+        extraBedPricePerNight: number;
+        taxRate: string;
+      };
+    }>("/bookings/check-price", data, true),
 
     downloadInvoice: async (bookingId: string): Promise<Blob> => {
       const headers = this.getHeaders(true);

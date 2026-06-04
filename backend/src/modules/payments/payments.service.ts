@@ -814,6 +814,33 @@ export class PaymentsService {
           logger.info({ event, orderId }, "Duplicate payment.failed webhook ignored");
           return { success: true };
         }
+        const failedBooking = await prisma.booking.findUnique({
+          where: { id: payment.bookingId },
+          include: { room: true },
+        });
+        const inventoryOps: any[] = [];
+        if (failedBooking?.roomId && failedBooking.room) {
+          const dates: Date[] = [];
+          const cur = new Date(failedBooking.checkInDate);
+          while (cur < failedBooking.checkOutDate) {
+            dates.push(new Date(cur));
+            cur.setDate(cur.getDate() + 1);
+          }
+          for (const date of dates) {
+            inventoryOps.push(
+              prisma.inventoryDay.upsert({
+                where: { roomId_date: { roomId: failedBooking.roomId, date } },
+                update: { availableRooms: { increment: 1 } },
+                create: {
+                  roomId: failedBooking.roomId,
+                  date,
+                  totalRooms: failedBooking.room.totalRooms,
+                  availableRooms: failedBooking.room.totalRooms,
+                },
+              }),
+            );
+          }
+        }
         await prisma.$transaction([
           prisma.payment.update({
             where: { id: payment.id },
@@ -827,6 +854,7 @@ export class PaymentsService {
             where: { id: payment.bookingId },
             data: { status: "CANCELLED" },
           }),
+          ...inventoryOps,
         ]);
         break;
 

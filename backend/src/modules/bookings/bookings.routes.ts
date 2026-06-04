@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { BookingsController } from "./bookings.controller";
-import { requireRole } from "../../middleware/auth.middleware";
+import { requireRole, requireVerified } from "../../middleware/auth.middleware";
 import { config } from "../../config";
 
 const writeRateLimit = {
@@ -11,8 +11,10 @@ const writeRateLimit = {
 export default async function bookingsRoutes(fastify: FastifyInstance) {
   fastify.addHook("preHandler", fastify.authenticate);
 
+  const requireVerifiedHandler = [requireVerified];
+
   // Static routes FIRST - customer routes
-  fastify.post("/", { config: { rateLimit: writeRateLimit } }, BookingsController.create);
+  fastify.post("/", { preHandler: requireVerifiedHandler, config: { rateLimit: writeRateLimit } }, BookingsController.create);
   fastify.post("/check-price", { config: { rateLimit: writeRateLimit } }, BookingsController.checkPrice);
   fastify.get("/", BookingsController.getUserBookings);
 

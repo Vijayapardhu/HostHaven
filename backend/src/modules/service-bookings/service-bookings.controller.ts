@@ -116,6 +116,25 @@ export const ServiceBookingsController = {
     }
   },
 
+  async cancelMyBooking(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { id } = serviceBookingIdSchema.parse(request.params);
+      const userId = (request as any).user.id;
+
+      const booking = await serviceBookingsService.cancelMyBooking(id, userId);
+      return sendSuccess(reply, booking);
+    } catch (error: any) {
+      logger.error({ error }, 'Cancel service booking failed');
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to cancel booking', 500);
+    }
+  },
+
   async getMyBookingById(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = serviceBookingIdSchema.parse(request.params);

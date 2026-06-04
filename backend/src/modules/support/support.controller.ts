@@ -7,6 +7,7 @@ import {
   supportFilterSchema,
   supportTicketIdSchema,
   updateSupportTicketSchema,
+  addNoteSchema,
 } from './support.schema';
 import supportService from './support.service';
 
@@ -108,10 +109,7 @@ export const SupportController = {
   async addNote(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { id } = supportTicketIdSchema.parse(request.params);
-      const { content } = request.body as { content: string };
-      if (!content || !content.trim()) {
-        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Note content is required', 400);
-      }
+      const { content } = addNoteSchema.parse(request.body);
       const adminName = (request as any).user?.name || 'Admin';
       const ticket = await supportService.addNote(id, content.trim(), adminName);
       return sendSuccess(reply, ticket);

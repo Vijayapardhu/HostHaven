@@ -4,6 +4,7 @@ import { requireRole } from '../../middleware/auth.middleware';
 import { webPushService } from '../../services/webpush.service';
 import { sendSuccess, sendError } from '../../utils/response.util';
 import { logger } from '../../utils/logger.util';
+import { ERROR_CODES } from '../../constants/error-codes';
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url(),
@@ -20,7 +21,7 @@ export default async function pushRoutes(fastify: FastifyInstance) {
       return sendSuccess(reply, { publicKey });
     } catch (error) {
       logger.error({ error }, 'Failed to get VAPID key');
-      return sendError(reply, 'INTERNAL_ERROR', 'Failed to get VAPID key', 500);
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to get VAPID key', 500);
     }
   });
 
@@ -38,9 +39,9 @@ export default async function pushRoutes(fastify: FastifyInstance) {
       } catch (error: any) {
         logger.error({ error }, 'Failed to save subscription');
         if (error.name === 'ZodError') {
-          return sendError(reply, 'VALIDATION_ERROR', 'Invalid subscription data', 400);
+          return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid subscription data', 400);
         }
-        return sendError(reply, 'INTERNAL_ERROR', 'Failed to save subscription', 500);
+        return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to save subscription', 500);
       }
     }
   );
@@ -54,7 +55,7 @@ export default async function pushRoutes(fastify: FastifyInstance) {
         const { endpoint } = request.body as { endpoint: string };
         
         if (!endpoint) {
-          return sendError(reply, 'VALIDATION_ERROR', 'Endpoint is required', 400);
+          return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Endpoint is required', 400);
         }
         
         await webPushService.removeSubscription(userId, endpoint);
@@ -62,7 +63,7 @@ export default async function pushRoutes(fastify: FastifyInstance) {
         return sendSuccess(reply, { message: 'Subscription removed' });
       } catch (error) {
         logger.error({ error }, 'Failed to remove subscription');
-        return sendError(reply, 'INTERNAL_ERROR', 'Failed to remove subscription', 500);
+        return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to remove subscription', 500);
       }
     }
   );

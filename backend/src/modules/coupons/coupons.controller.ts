@@ -327,6 +327,21 @@ export class CouponsController {
 
       const finalAmount = Math.max(0, bookingAmount - discountAmount);
 
+      // Record coupon usage and increment usage count
+      await prisma.$transaction([
+        prisma.couponUsage.create({
+          data: {
+            couponId: coupon.id,
+            userId,
+            discountAmount: Math.min(discountAmount, bookingAmount),
+          },
+        }),
+        prisma.coupon.update({
+          where: { id: coupon.id },
+          data: { usageCount: { increment: 1 } },
+        }),
+      ]);
+
       return sendSuccess(reply, {
         couponCode: coupon.code,
         discountAmount: Math.min(discountAmount, bookingAmount),

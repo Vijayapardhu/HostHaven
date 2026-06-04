@@ -11,7 +11,7 @@ const prismaClientSingleton = () => {
     log: isDevelopment
       ? ['query', 'error', 'warn']
       : ['error'],
-    errorFormat: 'pretty',
+    errorFormat: isDevelopment ? 'pretty' : 'minimal',
   });
 };
 

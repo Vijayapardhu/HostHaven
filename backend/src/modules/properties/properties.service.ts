@@ -26,6 +26,9 @@ export class PropertiesService {
     lng?: number;
     radius?: number;
     vendorId?: string;
+    checkIn?: string;
+    checkOut?: string;
+    guests?: number;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 10;
@@ -145,18 +148,9 @@ try {
             select: {
               id: true,
               name: true,
-              type: true,
-              description: true,
               pricePerNight: true,
-              weekendPrice: true,
               capacity: true,
-              extraBedCapacity: true,
-              amenities: true,
               images: true,
-              video: true,
-              totalRooms: true,
-              availableRooms: true,
-              isActive: true,
             },
           },
           templeDetails: filters.type === 'TEMPLE',
@@ -477,6 +471,7 @@ try {
     if (property.slug) {
       await cacheService.del(cacheService.keys.property(property.slug));
     }
+    await cacheService.invalidate('hosthaven:properties:list:*');
 
     logger.info({ propertyId }, 'Property updated');
 
@@ -502,6 +497,7 @@ try {
     if (property.slug) {
       await cacheService.del(cacheService.keys.property(property.slug));
     }
+    await cacheService.invalidate('hosthaven:properties:list:*');
 
     logger.info({ propertyId }, 'Property deleted');
 
@@ -778,16 +774,23 @@ try {
     });
   }
 
-  async search(query: string, limit: number = 10) {
+  async search(query: string, limit: number = 10, type?: string) {
+    const where: any = {
+      status: 'ACTIVE',
+      OR: [
+        { name: { contains: query, mode: 'insensitive' } },
+        { city: { contains: query, mode: 'insensitive' } },
+        { state: { contains: query, mode: 'insensitive' } },
+        { address: { contains: query, mode: 'insensitive' } },
+      ],
+    };
+
+    if (type) {
+      where.type = type;
+    }
+
     const properties = await prisma.property.findMany({
-      where: {
-        status: 'ACTIVE',
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { state: { contains: query, mode: 'insensitive' } },
-          { address: { contains: query, mode: 'insensitive' } },
-        ],
-      },
+      where,
       take: limit,
     });
 
