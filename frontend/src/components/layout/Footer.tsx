@@ -83,27 +83,7 @@ const Footer = ({ className = "" }: FooterProps) => {
               <p className="text-cream-light/50 text-[11px] md:text-xs">We're here to help you anytime</p>
             </div>
           </div>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-5 text-gold-light">Quick Links</h4>
-            <ul className="space-y-3">
-              {[{ name: "Hotels", path: "/hotels" }, { name: "Homestays", path: "/homes" }, { name: "Temples", path: "/temples" }, { name: "Services", path: "/services" }, { name: "Contact", path: "/contact" }].map((link) => (
-                <li key={link.name}>
-                  <Link
-                    to={link.path}
-                    className="text-cream-light/70 hover:text-gold-light transition-colors text-sm flex items-center gap-2 group"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div> {/* End Support Hours */}
-
-        </div> {/* End grid */}
+        </div>
 
         <div className="mt-12 pt-8 border-t border-cream-light/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-cream-light/50 text-xs">
