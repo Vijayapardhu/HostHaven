@@ -115,8 +115,8 @@ const Hotels = () => {
         if (debouncedSearch) params.search = debouncedSearch;
         // Only send city if it's a valid city (not 'all' or undefined)
         if (selectedLocation && selectedLocation !== "all") params.city = selectedLocation;
-        if (checkInParam) params.checkIn = checkInParam;
-        if (checkOutParam) params.checkOut = checkOutParam;
+        if (checkInParam) params.checkIn = checkInParam.includes('T') ? checkInParam : `${checkInParam}T00:00:00.000Z`;
+        if (checkOutParam) params.checkOut = checkOutParam.includes('T') ? checkOutParam : `${checkOutParam}T00:00:00.000Z`;
         if (guestsParam) params.guests = guestsParam;
         const result = await api.properties.getAll(params);
         setHotels(result.data || []);
