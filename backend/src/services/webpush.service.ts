@@ -8,14 +8,14 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@hosthaven.com';
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-  throw new Error('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY environment variables are required for push notifications');
+  logger.warn('VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY not set — push notifications disabled');
+} else {
+  webpush.setVapidDetails(
+    VAPID_SUBJECT,
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
 }
-
-webpush.setVapidDetails(
-  VAPID_SUBJECT,
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
 
 export interface PushSubscription {
   endpoint: string;
