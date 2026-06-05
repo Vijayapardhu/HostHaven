@@ -323,7 +323,7 @@ const Services = () => {
         serviceId: selectedService.id,
         serviceName: selectedService.name,
         serviceCategory: selectedService.category,
-        serviceDate: new Date(`${form.serviceDate}T00:00:00`).toISOString(),
+        serviceDate: `${form.serviceDate}T00:00:00.000Z`,
         serviceTime: form.serviceTime,
         location: form.location,
         notes: form.notes,
