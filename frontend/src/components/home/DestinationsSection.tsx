@@ -50,8 +50,8 @@ const DestinationsSection = ({ items }: Props) => {
             View All <ChevronRight aria-hidden="true" className="w-4 h-4" />
           </Link>
         </div>
-        <motion.div
-          className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
+          <motion.div
+          className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-6"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
@@ -65,7 +65,7 @@ const DestinationsSection = ({ items }: Props) => {
             >
               <Link
                 to={dest.link}
-                className="group relative block rounded-xl overflow-hidden aspect-[4/5] shadow-card"
+                className="group relative block rounded-xl overflow-hidden aspect-[4/5] md:aspect-[4/5] shadow-card"
               >
                 <img
                   src={dest.image}
@@ -77,24 +77,24 @@ const DestinationsSection = ({ items }: Props) => {
                 <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/95 via-heritage-brown/30 to-transparent group-hover:via-heritage-brown/40 transition-all duration-500" />
                 <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-500" />
                 
-                <div className="absolute top-3 left-3">
-                  <span className="bg-white/15 backdrop-blur-sm border border-white/20 text-cream-light text-[10px] font-medium px-2.5 py-1 rounded-full">
+                <div className="absolute top-2 left-2 md:top-3 md:left-3">
+                  <span className="bg-white/15 backdrop-blur-sm border border-white/20 text-cream-light text-[10px] font-medium px-2 py-0.5 md:px-2.5 md:py-1 rounded-full">
                     {dest.count}
                   </span>
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                  <div className="flex items-center gap-1.5 text-cream-light/70 text-xs mb-1.5">
-                    <MapPin aria-hidden="true" className="w-3 h-3" />
+                <div className="absolute bottom-0 left-0 right-0 p-3 md:p-6">
+                  <div className="flex items-center gap-1 text-cream-light/70 text-[10px] md:text-xs mb-1">
+                    <MapPin aria-hidden="true" className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     <span>Andhra Pradesh</span>
                   </div>
-                  <h3 className="font-serif font-bold text-lg md:text-2xl text-cream-light group-hover:text-gold-light transition-colors duration-300 mb-2">
+                  <h3 className="font-serif font-bold text-sm md:text-2xl text-cream-light group-hover:text-gold-light transition-colors duration-300 line-clamp-1">
                     {dest.name}
                   </h3>
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-300 -translate-y-1 group-hover:translate-y-0 group-focus-within:translate-y-0">
-                    <span className="bg-primary text-primary-foreground text-xs font-medium px-4 py-1.5 rounded-lg inline-flex items-center gap-1.5">
+                    <span className="bg-primary text-primary-foreground text-[10px] md:text-xs font-medium px-2 md:px-4 py-1 md:py-1.5 rounded-lg inline-flex items-center gap-1">
                       Explore Destinations
-                      <ChevronRight aria-hidden="true" className="w-3.5 h-3.5" />
+                      <ChevronRight aria-hidden="true" className="w-2.5 h-2.5 md:w-3.5 md:h-3.5" />
                     </span>
                   </div>
                 </div>

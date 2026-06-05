@@ -145,24 +145,24 @@ export default function SearchBarSection() {
   );
 
   const dateTrigger = (
-    <button className="flex items-center gap-3 px-4 py-3 bg-muted/50 rounded-xl text-left hover:bg-muted transition-colors w-full">
-      <CalendarDays className="w-5 h-5 text-primary flex-shrink-0" />
+    <button className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-3 bg-muted/50 rounded-xl text-left hover:bg-muted transition-colors w-full">
+      <CalendarDays className="w-4 h-4 md:w-5 md:h-5 text-primary flex-shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Check In — Check Out</p>
-        <p className={cn("text-sm font-semibold", dateRange.from ? "text-foreground" : "text-muted-foreground")}>
+        <p className={cn("text-sm font-semibold truncate", dateRange.from ? "text-foreground" : "text-muted-foreground")}>
           {dateRange.from ? (
-            <span className="flex items-center gap-2">
-              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md text-xs font-bold">
-                {format(dateRange.from, "EEE, MMM dd")}
+            <span className="flex items-center gap-1 md:gap-2">
+              <span className="bg-primary/10 text-primary px-1.5 md:px-2 py-0.5 rounded-md text-[11px] md:text-xs font-bold whitespace-nowrap">
+                {format(dateRange.from, "MMM dd")}
               </span>
-              <span className="flex items-center text-muted-foreground">
-                <svg className="w-6 h-3" viewBox="0 0 24 12" fill="none">
+              <span className="flex items-center text-muted-foreground flex-shrink-0">
+                <svg className="w-4 h-3 md:w-6 md:h-3" viewBox="0 0 24 12" fill="none">
                   <line x1="2" y1="6" x2="22" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   <path d="M18 2L22 6L18 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
-              <span className={cn("px-2 py-0.5 rounded-md text-xs font-bold", dateRange.to ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                {dateRange.to ? format(dateRange.to, "EEE, MMM dd") : "Select"}
+              <span className={cn("px-1.5 md:px-2 py-0.5 rounded-md text-[11px] md:text-xs font-bold whitespace-nowrap", dateRange.to ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                {dateRange.to ? format(dateRange.to, "MMM dd") : "Select"}
               </span>
             </span>
           ) : (
@@ -170,7 +170,7 @@ export default function SearchBarSection() {
           )}
         </p>
       </div>
-      <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      <ChevronDown className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground flex-shrink-0" />
     </button>
   );
 

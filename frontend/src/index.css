@@ -5,10 +5,16 @@
 @tailwind utilities;
 
 @layer base {
-  /* Scrollbar styling */
+  * {
+    @apply border-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   html {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
+    overflow-x: hidden;
+    width: 100%;
   }
   
   html::-webkit-scrollbar {
@@ -24,7 +30,33 @@
     background-color: hsl(var(--border));
     border-radius: 3px;
   }
-  
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', 'DM Sans', sans-serif;
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+
+  #root {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  img, video, canvas, svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  input, button, select, textarea, a {
+    font-size: max(16px, 1rem);
+  }
+
+  button, a, [role="button"], input, select, textarea {
+    min-height: 44px;
+  }
+
   :root {
     --background: 40 25% 94%;
     --foreground: 30 10% 15%;
@@ -143,15 +175,15 @@
   }
 
   h1 {
-    @apply text-4xl md:text-5xl font-bold leading-tight;
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight;
   }
 
   h2 {
-    @apply text-2xl md:text-3xl font-bold leading-snug;
+    @apply text-xl sm:text-2xl md:text-3xl font-bold leading-snug;
   }
 
   h3 {
-    @apply text-xl md:text-2xl font-semibold leading-snug;
+    @apply text-lg sm:text-xl md:text-2xl font-semibold leading-snug;
   }
 
   .font-sans {
@@ -197,6 +229,46 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(0.75rem, 4vw, 1.5rem);
+    padding-right: clamp(0.75rem, 4vw, 1.5rem);
+    max-width: 100%;
+  }
+
+  @media (max-width: 480px) {
+    .container {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+    .hide-mobile { display: none !important; }
+    .text-mobile-sm { font-size: 0.8125rem !important; }
+  }
+
+  @media (min-width: 481px) and (max-width: 768px) {
+    .container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    .hide-tablet { display: none !important; }
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .container {
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+  }
+
+  @media (min-width: 1025px) {
+    .container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
   }
 }
 

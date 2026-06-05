@@ -14,8 +14,8 @@ const CategoryNav = () => {
 
   return (
     <section className="py-4 bg-card border-y border-border sticky top-16 md:top-20 z-30">
-      <div className="container mx-auto px-4">
-        <div className="flex justify-center gap-2 md:gap-8">
+      <div className="container mx-auto px-0 md:px-4">
+        <div className="flex items-center gap-1 md:justify-center md:gap-8 overflow-x-auto overflow-y-hidden scrollbar-hide px-3 md:px-0 -mx-0">
           {categories.map((cat) => {
             const Icon = cat.icon;
             const isActive = location.pathname === cat.path;
