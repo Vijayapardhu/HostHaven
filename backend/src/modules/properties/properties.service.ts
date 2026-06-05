@@ -63,11 +63,12 @@ export class PropertiesService {
       const normalizedCity = requestedCity === 'VETAPALEM' ? 'VETLAPALEM' : requestedCity;
 
       // Only apply city filter if it exists in platform cities to avoid enum mismatch errors
-try {
+ try {
         const activeCities = await getActiveCities();
-        if (activeCities.length > 0) {
-          if (activeCities.includes(normalizedCity)) {
-            where.city = normalizedCity as any;
+        const activeUpper = activeCities.map(c => c.trim().toUpperCase());
+        if (activeUpper.length > 0) {
+          if (activeUpper.includes(normalizedCity)) {
+            where.city = normalizedCity;
           } else {
             logger.warn({ requestedCity, normalizedCity, activeCities }, 'Skipping city filter because it is not in active cities');
           }
