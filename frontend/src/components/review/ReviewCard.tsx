@@ -1,5 +1,6 @@
 import { Star, CheckCircle2, MessageSquare, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import { FocusTrap } from "@/components/ui/FocusTrap";
 
 export interface Review {
   id: string;
@@ -148,7 +149,7 @@ export function ReviewCard({ review }: ReviewCardProps) {
         
         <div className="flex items-center gap-1 flex-shrink-0">
           <StarRating value={review.rating} size="md" />
-          <span className="text-sm font-semibold ml-1">{review.rating.toFixed(1)}</span>
+          <span className="text-sm font-semibold ml-1">{Number(review.rating).toFixed(1)}</span>
         </div>
       </div>
 
@@ -226,39 +227,46 @@ export function ReviewCard({ review }: ReviewCardProps) {
 
       {/* Image Viewer Modal */}
       {isImageOpen && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setIsImageOpen(false)}
-        >
-          <button
+        <FocusTrap active={isImageOpen}>
+          <div 
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
             onClick={() => setIsImageOpen(false)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Image Viewer"
           >
-            <X className="w-6 h-6" />
-          </button>
-          
-          {review.images && review.images.length > 1 && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedImageIndex((prev) => (prev - 1 + review.images!.length) % review.images!.length);
-                }}
-                className="absolute left-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
-              >
-                <ChevronLeft className="w-8 h-8" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedImageIndex((prev) => (prev + 1) % review.images!.length);
-                }}
-                className="absolute right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
-              >
-                <ChevronRight className="w-8 h-8" />
-              </button>
-            </>
-          )}
+            <button
+              onClick={() => setIsImageOpen(false)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+              aria-label="Close"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            {review.images && review.images.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedImageIndex((prev) => (prev - 1 + review.images!.length) % review.images!.length);
+                  }}
+                  className="absolute left-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="w-8 h-8" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedImageIndex((prev) => (prev + 1) % review.images!.length);
+                  }}
+                  className="absolute right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="w-8 h-8" />
+                </button>
+              </>
+            )}
           
           <img
             src={review.images?.[selectedImageIndex]}
@@ -271,6 +279,7 @@ export function ReviewCard({ review }: ReviewCardProps) {
             {selectedImageIndex + 1} / {review.images?.length}
           </div>
         </div>
+      </FocusTrap>
       )}
     </div>
   );

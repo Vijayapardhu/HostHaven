@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, MapPin, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
 interface FeaturedItem {
@@ -41,10 +40,12 @@ const FeaturedCard = ({ item }: FeaturedCardProps) => (
       <img
         src={getItemImage(item)}
         alt={item.name}
+        loading="lazy"
+        onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600"; }}
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
       />
       <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1">
-        <Star className="w-4 h-4 text-primary fill-primary" />
+        <Star aria-hidden="true" className="w-4 h-4 text-primary fill-primary" />
         <span className="text-sm font-medium">{item.rating || 0}</span>
       </div>
     </div>
@@ -53,17 +54,17 @@ const FeaturedCard = ({ item }: FeaturedCardProps) => (
         {item.name}
       </h3>
       <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">
-        <MapPin className="w-4 h-4" />
+        <MapPin aria-hidden="true" className="w-4 h-4" />
         {item.city || item.location || ""}
       </div>
       <div className="flex items-center justify-between mt-3">
         <p className="font-semibold text-foreground">
-          ₹{(item.basePrice || item.price || 0).toLocaleString()}
+          ₹{(item.price ?? item.basePrice ?? 0).toLocaleString('en-IN')}
           <span className="text-muted-foreground font-normal text-sm">/night</span>
         </p>
-        <Button variant="goldOutline" size="sm">
+        <span className="inline-flex items-center justify-center h-8 px-4 rounded-md text-xs font-medium border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 transition-colors">
           Book
-        </Button>
+        </span>
       </div>
     </div>
   </Link>
@@ -86,11 +87,9 @@ const FeaturedSection = ({ title, subtitle, items, viewAllLink }: FeaturedSectio
           </h2>
           <p className="text-muted-foreground mt-1">{subtitle}</p>
         </div>
-        <Link to={viewAllLink}>
-          <Button variant="ghost" className="text-primary hover:text-primary/80">
-            View All
-            <ArrowRight className="w-4 h-4" />
-          </Button>
+        <Link to={viewAllLink} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+          View All
+          <ArrowRight aria-hidden="true" className="w-4 h-4" />
         </Link>
       </div>
       {items.length > 0 ? (

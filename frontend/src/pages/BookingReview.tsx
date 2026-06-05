@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-
 interface PropertyRoom {
   id: string;
   name: string;
@@ -29,6 +28,21 @@ interface PropertyData {
   rooms?: PropertyRoom[];
 }
 
+interface PriceData {
+  baseAmount: number;
+  extraBedAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  nights: number;
+  breakdown: {
+    roomPrice: number;
+    nights: number;
+    extraBeds: number;
+    extraBedPricePerNight: number;
+    taxRate: string;
+  };
+}
+
 const BookingReview = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -38,6 +52,9 @@ const BookingReview = () => {
 
   const [property, setProperty] = useState<PropertyData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [priceData, setPriceData] = useState<PriceData | null>(null);
+  const [isPriceLoading, setIsPriceLoading] = useState(false);
 
   // Form state
   const [guestName, setGuestName] = useState("");
@@ -78,14 +95,37 @@ const BookingReview = () => {
     [property, roomId]
   );
 
-  const nights = useMemo(() => {
-    if (!checkIn || !checkOut) return 0;
-    const diffTime = Math.abs(checkOut.getTime() - checkIn.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }, [checkIn, checkOut]);
+  useEffect(() => {
+    if (!id || !checkIn || !checkOut || !selectedRoom?.id) return;
+    setIsPriceLoading(true);
+    api.bookings
+      .checkPrice({
+        propertyId: id,
+        roomId: selectedRoom.id,
+        checkIn: checkIn.toISOString(),
+        checkOut: checkOut.toISOString(),
+        guests: guestsCount,
+      })
+      .then((data) => setPriceData(data))
+      .catch(() => {
+        toast({
+          title: "Price unavailable",
+          description: "Could not fetch updated pricing.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => setIsPriceLoading(false));
+  }, [id, checkIn, checkOut, selectedRoom?.id, guestsCount, toast]);
 
-  const roomPrice = selectedRoom?.pricePerNight || property?.basePrice || 0;
-  const totalAmount = nights * roomPrice;
+  const nights = priceData?.nights ?? 0;
+  const roomPrice = selectedRoom?.pricePerNight ?? property?.basePrice ?? 0;
+  const totalAmount = priceData?.baseAmount ?? (nights * roomPrice);
+  const taxAmount = priceData?.taxAmount ?? 0;
+  const grandTotal = priceData?.totalAmount ?? totalAmount;
+  const taxPercent = priceData?.breakdown?.taxRate
+    ? parseFloat(priceData.breakdown.taxRate)
+    : 12;
+  const taxEnabled = priceData ? (priceData.taxAmount > 0) : false;
 
   const handleNext = () => {
     if (!guestName.trim() || !guestPhone.trim()) {
@@ -106,11 +146,10 @@ const BookingReview = () => {
       return;
     }
 
-    const params = new URLSearchParams(searchParams);
-    params.set("guestName", guestName);
-    params.set("guestPhone", guestPhone);
-
-    navigate(`/booking/${id}/checkout?${params.toString()}`);
+    setIsProcessing(true);
+    navigate(`/booking/${id}/checkout?${searchParams.toString()}`, {
+      state: { guestName, guestPhone },
+    });
   };
 
   if (isLoading || !property) {
@@ -149,6 +188,7 @@ const BookingReview = () => {
                 </h2>
                 <Card className="border-border shadow-sm overflow-hidden rounded-2xl">
                   <CardContent className="p-6 space-y-5">
+                    <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="space-y-5">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-muted-foreground ml-1">Primary Guest Name</label>
                       <div className="relative">
@@ -158,6 +198,7 @@ const BookingReview = () => {
                           className="pl-10 h-12 bg-muted/30 border-border focus:bg-background transition-all"
                           value={guestName}
                           onChange={(e) => setGuestName(e.target.value)}
+                          autoComplete="name"
                         />
                       </div>
                     </div>
@@ -172,10 +213,12 @@ const BookingReview = () => {
                           onChange={(e) => setGuestPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                           inputMode="numeric"
                           maxLength={10}
+                          autoComplete="tel"
                         />
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1 ml-1">We'll send booking updates to this number.</p>
                     </div>
+                  </form>
                   </CardContent>
                 </Card>
               </div>
@@ -220,27 +263,55 @@ const BookingReview = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{selectedRoom?.name} × {nights} Nights</span>
-                      <span className="font-medium">₹{totalAmount.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Taxes & Fees</span>
-                      <span className="font-medium text-green-600">Included</span>
-                    </div>
-                    <div className="pt-3 flex justify-between items-end">
-                      <span className="text-lg font-bold">Total Amount</span>
-                      <div className="text-right">
-                        <p className="text-2xl font-black text-primary">₹{totalAmount.toLocaleString()}</p>
+                    {isPriceLoading ? (
+                      <div className="space-y-3 py-2">
+                        <div className="h-4 bg-muted rounded animate-pulse" />
+                        <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                        <div className="h-6 bg-muted rounded animate-pulse w-1/2 mt-4" />
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">{selectedRoom?.name} × {nights} Night{nights > 1 ? "s" : ""}</span>
+                          <span className="font-medium">₹{totalAmount.toLocaleString('en-IN')}</span>
+                        </div>
+                        {taxEnabled ? (
+                          <>
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>GST ({taxPercent}%)</span>
+                              <span>₹{taxAmount.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground pl-3">
+                              <span>CGST ({(taxPercent / 2).toFixed(1)}%)</span>
+                              <span>₹{Math.round(taxAmount / 2).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground pl-3">
+                              <span>SGST ({(taxPercent / 2).toFixed(1)}%)</span>
+                              <span>₹{Math.round(taxAmount / 2).toLocaleString('en-IN')}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Taxes & Fees</span>
+                            <span className="font-medium text-green-600">Included</span>
+                          </div>
+                        )}
+                        <div className="pt-3 flex justify-between items-end border-t">
+                          <span className="text-lg font-bold">Total Amount</span>
+                          <div className="text-right">
+                            <p className="text-2xl font-black text-primary">₹{(taxEnabled ? grandTotal : totalAmount).toLocaleString('en-IN')}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <Button
                     className="w-full h-14 text-lg font-bold rounded-2xl bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all active:scale-95"
                     onClick={handleNext}
+                    disabled={isProcessing}
                   >
-                    Continue to Payment
+                    {isProcessing ? "Processing..." : "Continue to Payment"}
                   </Button>
                   <p className="text-center text-[10px] text-muted-foreground font-medium flex items-center justify-center gap-1">
                     <CheckCircle2 className="w-3 h-3" /> Secure SSL encrypted booking

@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import heritageImage from "@/assets/heritage-welcome.jpg";
 
 interface HeritageBannerConfig {
@@ -31,6 +30,8 @@ const HeritageBanner = ({ config }: HeritageBannerProps) => {
           <img
             src={image}
             alt="Andhra Heritage Welcome"
+            loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).src = heritageImage; }}
             className="w-full h-[300px] md:h-[400px] object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-heritage-brown/90 via-heritage-brown/60 to-transparent" />
@@ -44,11 +45,9 @@ const HeritageBanner = ({ config }: HeritageBannerProps) => {
                 <p className="text-cream-light/80 mb-6 text-sm md:text-base">
                   {subtitle}
                 </p>
-                <Link to={ctaLink}>
-                  <Button variant="gold" size="lg">
-                    {ctaText}
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
+                <Link to={ctaLink} className="inline-flex items-center justify-center gap-2 h-12 px-8 rounded-xl bg-gradient-to-r from-gold to-gold-dark text-heritage-brown hover:from-gold-dark hover:to-gold font-semibold shadow-lg shadow-gold/30 text-sm transition-all duration-200">
+                  {ctaText}
+                  <ArrowRight aria-hidden="true" className="w-5 h-5" />
                 </Link>
               </div>
             </div>

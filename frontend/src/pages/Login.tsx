@@ -87,7 +87,7 @@ const Login = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-card/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 p-8 space-y-6"
+            className="bg-card/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 p-4 md:p-8 space-y-6"
           >
             {/* Header */}
             <div className="text-center space-y-2">
@@ -148,6 +148,7 @@ const Login = () => {
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-10 h-12 bg-muted/50 border-2 border-transparent rounded-xl focus:border-primary/50 transition-all"
                       required
+                      autoComplete="email"
                     />
                   </div>
                 </div>
@@ -169,6 +170,7 @@ const Login = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-12 h-12 bg-muted/50 border-2 border-transparent rounded-xl focus:border-primary/50 transition-all"
                       required
+                      autoComplete="current-password"
                     />
                     <motion.button
                       whileHover={{ scale: 1.1 }}

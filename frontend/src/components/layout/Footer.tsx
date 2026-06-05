@@ -105,7 +105,7 @@ const Footer = ({ className = "" }: FooterProps) => {
           <div className="flex items-center gap-6 text-xs text-cream-light/50">
             <Link to="/terms" className="hover:text-gold-light transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-gold-light transition-colors">Privacy</Link>
-            <Link to="/support" className="hover:text-gold-light transition-colors">Support</Link>
+            <Link to="/profile/support" className="hover:text-gold-light transition-colors">Support</Link>
           </div>
         </div>
       </div>

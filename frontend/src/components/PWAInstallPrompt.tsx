@@ -31,20 +31,27 @@ export function PWAInstallPrompt() {
             !(window as any).MSStream &&
             !("chrome" in window);
 
+        const timers: ReturnType<typeof setTimeout>[] = [];
+
         if (ios && !(navigator as any).standalone) {
             setIsIOS(true);
-            setTimeout(() => setShowBanner(true), 3000);
-            return;
-        }
-
-        const show = () => setTimeout(() => setShowBanner(true), 1500);
-
-        if (window.__pwaInstallPrompt) {
-            show();
+            timers.push(setTimeout(() => setShowBanner(true), 3000));
         } else {
-            window.addEventListener("pwa-install-ready", show, { once: true });
-            return () => window.removeEventListener("pwa-install-ready", show);
+            const show = () => {
+                timers.push(setTimeout(() => setShowBanner(true), 1500));
+            };
+            if (window.__pwaInstallPrompt) {
+                show();
+            } else {
+                window.addEventListener("pwa-install-ready", show, { once: true });
+                return () => {
+                    window.removeEventListener("pwa-install-ready", show);
+                    timers.forEach(clearTimeout);
+                };
+            }
         }
+
+        return () => timers.forEach(clearTimeout);
     }, []);
 
     const handleInstall = async () => {

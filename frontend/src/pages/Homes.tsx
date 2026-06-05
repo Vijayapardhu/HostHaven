@@ -150,7 +150,7 @@ const Homes = () => {
         <div className="container mx-auto px-4">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
+            <h1 className="text-2xl md:text-4xl font-serif font-bold text-foreground">
               Homestays in Andhra Pradesh
             </h1>
             <p className="text-muted-foreground mt-2">
@@ -182,7 +182,7 @@ const Homes = () => {
                   className="pl-10 h-12 bg-muted border-0 rounded-xl"
                 />
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 overflow-x-auto flex-nowrap md:flex-wrap pb-2">
                 <select
                   title="Sort homes"
                   aria-label="Sort homes"
@@ -213,7 +213,7 @@ const Homes = () => {
                       }
                       setSearchParams(newParams);
                     }}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedLocation === loc
+                    className={`text-xs md:text-sm px-2 md:px-3 py-1 rounded-lg md:rounded-xl font-medium transition-all ${selectedLocation === loc
                         ? "gradient-gold text-primary-foreground shadow-gold"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
@@ -236,7 +236,7 @@ const Homes = () => {
           ) : filteredHomes.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">No homes match your filters.</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredHomes.map((home) => {
                 const image = getHomeImage(home.images);
                 const maxGuests = home.rooms?.length
@@ -257,7 +257,7 @@ const Homes = () => {
                     to={`/homes/${home.slug || home.id}${detailQuery ? `?${detailQuery}` : ''}`}
                     className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300"
                   >
-                    <div className="relative h-52 overflow-hidden">
+                    <div className="relative h-48 md:h-52 overflow-hidden">
                       <img
                         src={image}
                         alt={home.name}
@@ -281,8 +281,8 @@ const Homes = () => {
                         <span className="text-xs text-muted-foreground">({home.reviewCount})</span>
                       </div>
                     </div>
-                    <div className="p-5">
-                      <h3 className="font-serif font-semibold text-xl text-foreground group-hover:text-primary transition-colors">
+                    <div className="p-3 md:p-5">
+                      <h3 className="font-serif font-semibold text-lg md:text-xl text-foreground group-hover:text-primary transition-colors">
                         {home.name}
                       </h3>
                       <div className="flex items-center gap-1 text-muted-foreground text-sm mt-1">

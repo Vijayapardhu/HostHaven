@@ -1,5 +1,4 @@
 import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface PartnerConfig {
   title: string;
@@ -37,14 +36,9 @@ const BecomePartner = ({ config }: Props) => {
                   {subtitle}
                 </p>
               </div>
-              <a href={ctaLink} target="_blank" rel="noopener noreferrer" className="w-full md:w-auto flex-shrink-0">
-                <Button
-                  size="lg"
-                  className="h-12 rounded-xl px-8 w-full md:w-auto bg-gradient-to-r from-gold to-gold-dark text-heritage-brown hover:from-gold-dark hover:to-gold font-semibold shadow-lg shadow-gold/30"
-                >
-                  {ctaText}
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
+              <a href={ctaLink} target="_blank" rel="noopener noreferrer" className="w-full md:w-auto flex-shrink-0 inline-flex items-center justify-center h-12 rounded-xl px-8 bg-gradient-to-r from-gold to-gold-dark text-heritage-brown hover:from-gold-dark hover:to-gold font-semibold shadow-lg shadow-gold/30 text-sm transition-all duration-200">
+                {ctaText}
+                <ArrowRight aria-hidden="true" className="w-4 h-4 ml-2" />
               </a>
             </div>
           </div>

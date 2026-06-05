@@ -241,7 +241,7 @@ const EditProfile = () => {
           {/* Personal Information */}
           <div className="bg-card rounded-2xl shadow-card p-6 mb-6">
             <h2 className="font-semibold text-foreground mb-4">Personal Information</h2>
-            <div className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveProfile(); }} className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                   <User className="w-4 h-4" /> Full Name
@@ -250,6 +250,7 @@ const EditProfile = () => {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder="Your full name"
+                  autoComplete="name"
                 />
               </div>
               <div>
@@ -260,6 +261,7 @@ const EditProfile = () => {
                   value={user.email}
                   disabled
                   className="bg-muted/50"
+                  autoComplete="email"
                 />
                 <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
               </div>
@@ -273,16 +275,17 @@ const EditProfile = () => {
                   placeholder="9876543210"
                   inputMode="numeric"
                   maxLength={10}
+                  autoComplete="tel"
                 />
               </div>
               <Button
-                onClick={handleSaveProfile}
+                type="submit"
                 disabled={isSaving}
                 className="w-full"
               >
                 {isSaving ? "Saving..." : "Save Changes"}
               </Button>
-            </div>
+            </form>
           </div>
 
           {/* Saved Addresses */}

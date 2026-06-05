@@ -210,7 +210,7 @@ const Signup = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-card/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 p-8 space-y-5"
+            className="bg-card/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 p-4 md:p-8 space-y-5"
           >
             {/* Header */}
             <div className="text-center space-y-2">

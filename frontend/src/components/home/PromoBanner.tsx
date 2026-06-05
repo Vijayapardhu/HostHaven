@@ -23,7 +23,9 @@ const PromoBanner = ({ config }: PromoBannerProps) => {
           <div className="relative">
             <img 
               src={banner.imageUrl} 
-              alt={banner.title || "Promo"} 
+              alt={banner.title || "Promotional banner"} 
+              loading="lazy"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               className="w-full h-[200px] md:h-[320px] object-cover group-hover:scale-105 transition-transform duration-700"
             />
             {banner.title && (

@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { Car, Bike, Wrench, ArrowRight, Star, Heart, Clock, Settings2, RefreshCcw, ShieldCheck, Map, Home, Building, Phone, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import type { ServiceCardItem } from "@/hooks/useHomepageConfig";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -38,15 +37,13 @@ const ServicesPreview = ({ items }: Props) => {
             </h2>
             <p className="text-sm text-muted-foreground mt-1">Convenient travel services for your journey</p>
           </div>
-          <Link to="/services">
-            <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
-              View All
-              <ArrowRight className="w-4 h-4" />
-            </Button>
+          <Link to="/services" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+            View All
+            <ArrowRight aria-hidden="true" className="w-4 h-4" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
           {services.map((service) => {
             const Icon = service.icon;
             return (
@@ -56,7 +53,7 @@ const ServicesPreview = ({ items }: Props) => {
                 className="group bg-card rounded-2xl p-5 md:p-7 shadow-card border border-border/50 hover:shadow-card-hover hover:-translate-y-1 hover:border-primary/20 transition-all duration-300"
               >
                 <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-primary to-gold flex items-center justify-center mb-4 group-hover:shadow-gold transition-all duration-300 group-hover:scale-110">
-                  <Icon className="w-6 h-6 md:w-8 md:h-8 text-primary-foreground" />
+                  <Icon aria-hidden="true" className="w-6 h-6 md:w-8 md:h-8 text-primary-foreground" />
                 </div>
                 <h3 className="font-semibold text-base md:text-lg text-foreground mb-2 group-hover:text-primary transition-colors">
                   {service.name}

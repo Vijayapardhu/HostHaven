@@ -454,23 +454,23 @@ const BookingDetails = () => {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Room Charges</span>
-                    <span>₹{typeof booking.baseAmount === 'number' ? booking.baseAmount.toLocaleString() : '0'}</span>
+                    <span>₹{typeof booking.baseAmount === 'number' ? booking.baseAmount.toLocaleString('en-IN') : '0'}</span>
                   </div>
                   {booking.taxAmount > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">GST (12%)</span>
-                      <span>₹{typeof booking.taxAmount === 'number' ? booking.taxAmount.toLocaleString() : '0'}</span>
+                      <span>₹{typeof booking.taxAmount === 'number' ? booking.taxAmount.toLocaleString('en-IN') : '0'}</span>
                     </div>
                   )}
                   {booking.discountAmount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount</span>
-                      <span>-₹{typeof booking.discountAmount === 'number' ? booking.discountAmount.toLocaleString() : '0'}</span>
+                      <span>-₹{typeof booking.discountAmount === 'number' ? booking.discountAmount.toLocaleString('en-IN') : '0'}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-semibold text-lg pt-3 border-t">
                     <span>Total Paid</span>
-                    <span>₹{typeof booking.totalAmount === 'number' ? booking.totalAmount.toLocaleString() : '0'}</span>
+                    <span>₹{typeof booking.totalAmount === 'number' ? booking.totalAmount.toLocaleString('en-IN') : '0'}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     *Inclusive of all taxes

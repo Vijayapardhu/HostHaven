@@ -19,10 +19,7 @@ const DestinationsSection = ({ items }: Props) => {
     name: item.name || "",
     image: item.imageUrl || "",
     link: item.link || `/hotels?destination=${item.name?.toLowerCase()}`,
-    count: item.name === "Vijayawada" ? "48+ Properties" : 
-           item.name === "Nandyal" ? "32+ Properties" : 
-           item.name === "Vetapalem" ? "18+ Properties" : 
-           item.name === "Tirupati" ? "56+ Properties" : "24+ Properties",
+    count: item.propertyCount ? `${item.propertyCount}+ Properties` : "Available Now",
   }));
 
   const containerVariants = {
@@ -50,11 +47,11 @@ const DestinationsSection = ({ items }: Props) => {
             to="/hotels"
             className="hidden md:flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
           >
-            View All <ChevronRight className="w-4 h-4" />
+            View All <ChevronRight aria-hidden="true" className="w-4 h-4" />
           </Link>
         </div>
         <motion.div
-          className="grid grid-cols-3 gap-3 md:gap-6"
+          className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
@@ -73,6 +70,8 @@ const DestinationsSection = ({ items }: Props) => {
                 <img
                   src={dest.image}
                   alt={dest.name}
+                  loading="lazy"
+                  onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=600"; }}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-heritage-brown/95 via-heritage-brown/30 to-transparent group-hover:via-heritage-brown/40 transition-all duration-500" />
@@ -86,16 +85,16 @@ const DestinationsSection = ({ items }: Props) => {
 
                 <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
                   <div className="flex items-center gap-1.5 text-cream-light/70 text-xs mb-1.5">
-                    <MapPin className="w-3 h-3" />
+                    <MapPin aria-hidden="true" className="w-3 h-3" />
                     <span>Andhra Pradesh</span>
                   </div>
                   <h3 className="font-serif font-bold text-lg md:text-2xl text-cream-light group-hover:text-gold-light transition-colors duration-300 mb-2">
                     {dest.name}
                   </h3>
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-y-1 group-hover:translate-y-0">
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-300 -translate-y-1 group-hover:translate-y-0 group-focus-within:translate-y-0">
                     <span className="bg-primary text-primary-foreground text-xs font-medium px-4 py-1.5 rounded-lg inline-flex items-center gap-1.5">
                       Explore Destinations
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ChevronRight aria-hidden="true" className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>

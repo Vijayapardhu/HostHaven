@@ -23,6 +23,7 @@ const CategoryNav = () => {
               <Link
                 key={cat.path}
                 to={cat.path}
+                aria-current={isActive ? "page" : undefined}
                 className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
                   isActive
                     ? "text-primary"
@@ -32,13 +33,13 @@ const CategoryNav = () => {
                 <div
                   className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all ${
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-gold"
+                      ? "bg-primary text-primary-foreground shadow-gold ring-2 ring-primary/30"
                       : "bg-muted"
                   }`}
                 >
-                  <Icon className="w-5 h-5 md:w-6 md:h-6" />
+                  <Icon aria-hidden="true" className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <span className="text-xs font-medium">{cat.name}</span>
+                <span className={`text-xs font-medium ${isActive ? "font-bold" : ""}`}>{cat.name}</span>
               </Link>
             );
           })}

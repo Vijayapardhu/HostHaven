@@ -133,7 +133,9 @@ const HomeDetails = () => {
   });
   const [guests, setGuests] = useState(() => {
     const param = searchParams.get("guests");
-    return param ? parseInt(param) : 1;
+    if (!param) return 1;
+    const parsed = parseInt(param);
+    return isNaN(parsed) ? 1 : parsed;
   });
 
   // Booking flow hook
@@ -251,7 +253,8 @@ const HomeDetails = () => {
   }
 
   const currencyStr = home.currency || "₹";
-  const lowestPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.pricePerNight)) : home.basePrice;
+  const lowestPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.pricePerNight ?? Infinity)) : (home.basePrice ?? 0);
+  const safeLowest = lowestPrice === Infinity ? 0 : (lowestPrice ?? 0);
 
   const wishlistItem = {
     id: home.id,
@@ -427,7 +430,7 @@ const HomeDetails = () => {
 
         {/* Desktop: Grid gallery */}
         <div className="hidden md:block">
-          <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[50vh] max-h-[500px]">
+          <div className="grid grid-cols-4 grid-rows-2 gap-2 h-48 md:h-64 lg:h-96">
             <div className="col-span-2 row-span-2 relative rounded-l-2xl overflow-hidden group cursor-pointer" onClick={() => setShowGallery(true)}>
               <img src={homeImages[0]} alt={home.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
@@ -517,7 +520,7 @@ const HomeDetails = () => {
                       <span className="text-muted-foreground">• {home.bookingCount} bookings</span>
                     )}
                   </div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2">
                     {home.name}
                   </h1>
                   <div className="flex items-center gap-2 text-muted-foreground">
@@ -600,7 +603,7 @@ const HomeDetails = () => {
                 {/* Amenities */}
                 <section>
                   <h2 className="text-xl font-bold mb-4">What this place offers</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {home.amenities.map((amenity) => (
                       <div key={amenity} className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
                         <div className="text-primary">{getAmenityIcon(amenity)}</div>
@@ -710,13 +713,13 @@ const HomeDetails = () => {
               <div className="bg-gradient-to-r from-primary to-primary/80 p-4 text-white">
                 <div className="flex items-baseline justify-between">
                   <div>
-                    <span className="text-3xl font-bold">{currencyStr}{lowestPrice.toLocaleString()}</span>
+                    <span className="text-3xl font-bold">{currencyStr}{safeLowest.toLocaleString('en-IN')}</span>
                     <span className="text-white/80"> /night</span>
                   </div>
                   {nights > 0 && (
                     <div className="text-right">
                       <span className="text-sm">Total: </span>
-                      <span className="font-bold">{currencyStr}{(lowestPrice * nights).toLocaleString()}</span>
+                      <span className="font-bold">{currencyStr}{(safeLowest * nights).toLocaleString('en-IN')}</span>
                     </div>
                   )}
                 </div>
@@ -815,16 +818,16 @@ const HomeDetails = () => {
                 {nights > 0 && (
                   <div className="space-y-2 py-3 border-t">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{currencyStr}{lowestPrice} x {nights} night{nights > 1 ? "s" : ""}</span>
-                      <span>{currencyStr}{(lowestPrice * nights).toLocaleString()}</span>
+                      <span className="text-muted-foreground">{currencyStr}{safeLowest.toLocaleString('en-IN')} x {nights} night{nights > 1 ? "s" : ""}</span>
+                      <span>{currencyStr}{(safeLowest * nights).toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Taxes & fees</span>
-                      <span>{currencyStr}{Math.round(lowestPrice * nights * 0.12).toLocaleString()}</span>
+                      <span>{currencyStr}{Math.round(safeLowest * nights * 0.12).toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between font-bold pt-2 border-t">
                       <span>Total</span>
-                      <span>{currencyStr}{Math.round(lowestPrice * nights * 1.12).toLocaleString()}</span>
+                      <span>{currencyStr}{Math.round(safeLowest * nights * 1.12).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 )}

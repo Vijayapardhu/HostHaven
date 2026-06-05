@@ -50,7 +50,7 @@ interface Service {
 /** Compute the advance amount to be paid from backend fields */
 const computeAdvance = (service: Service): number => {
   if (service.advanceAmount) return Number(service.advanceAmount);
-  const price = Number(service.price || service.basePrice || 0);
+  const price = Number(service.price ?? service.basePrice ?? 0);
   const value = Number(service.advanceValue ?? 30);
   if (service.advanceType === 'fixed') return value;
   // default: percentage
@@ -328,7 +328,7 @@ const Services = () => {
         location: form.location,
         notes: form.notes,
         advanceAmount: advanceAmount,
-        totalAmount: Number(selectedService.price || selectedService.basePrice || advanceAmount),
+        totalAmount: Number(selectedService.price ?? selectedService.basePrice ?? advanceAmount),
       });
 
       // 2. Create Razorpay order on backend
@@ -381,7 +381,7 @@ const Services = () => {
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
           <p className="font-medium">Advance Amount: ₹{computeAdvance(selectedService)}</p>
           <p className="text-xs text-muted-foreground">
-            Full service price: ₹{Number(selectedService.price || selectedService.basePrice || 0)}
+            Full service price: ₹{Number(selectedService.price ?? selectedService.basePrice ?? 0)}
             {selectedService.priceUnit ? ` / ${selectedService.priceUnit.replace("_", " ")}` : ""}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -488,7 +488,7 @@ const Services = () => {
               />
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto flex-nowrap">
               <button
                 onClick={() => setSelectedLocation("all")}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
@@ -514,7 +514,7 @@ const Services = () => {
               ))}
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex gap-2 overflow-x-auto flex-nowrap pt-1">
               <button
                 onClick={() => setSelectedCategory("all")}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
@@ -555,7 +555,7 @@ const Services = () => {
                 const images = getAllImages(service);
                 const currentImageIndex = currentImageIndices[service.id] || 0;
                 const hasMultipleImages = images.length > 1;
-                const fullPrice = Number(service.price || service.basePrice || 0);
+                const fullPrice = Number(service.price ?? service.basePrice ?? 0);
                 const primaryLocation = service.city || service.location || service.locations?.[0] || "Andhra Pradesh";
                 return (
                   <div
@@ -572,7 +572,7 @@ const Services = () => {
                     }}
                     className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 cursor-pointer h-full flex flex-col border border-border/40"
                   >
-                    <div className="relative h-52 overflow-hidden" onClick={(e) => { e.stopPropagation(); openFullscreen(service, currentImageIndex); }}>
+                    <div className="relative h-40 md:h-52 overflow-hidden" onClick={(e) => { e.stopPropagation(); openFullscreen(service, currentImageIndex); }}>
                       <div className="absolute inset-0">
                         {images.map((img, index) => (
                           <img
@@ -621,7 +621,7 @@ const Services = () => {
                         </span>
                       </div>
                       <div className="absolute bottom-4 left-4 right-4">
-                        <h3 className="font-serif font-semibold text-xl text-cream-light leading-tight">
+                        <h3 className="font-serif font-semibold text-lg md:text-xl text-cream-light leading-tight">
                           {service.name}
                         </h3>
                         <p className="mt-1 flex items-center gap-1.5 text-sm text-cream-light/85">
@@ -635,7 +635,7 @@ const Services = () => {
                         </div>
                       )}
                     </div>
-                    <div className="p-5 flex-1 flex flex-col">
+                    <div className="p-4 md:p-5 flex-1 flex flex-col">
                       <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{service.description}</p>
                       {features.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-1 mb-4">
@@ -655,17 +655,17 @@ const Services = () => {
                         </div>
                       )}
                       <div className="mt-auto pt-4 border-t border-border">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Starting from</p>
-                            <p className="text-xl font-semibold text-foreground">
-                              ₹{fullPrice.toLocaleString()}
-                              <span className="text-muted-foreground font-normal text-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs md:text-sm text-muted-foreground">Starting from</p>
+                            <p className="text-lg md:text-xl font-semibold text-foreground break-words">
+                              ₹{fullPrice.toLocaleString('en-IN')}
+                              <span className="text-muted-foreground font-normal text-xs md:text-sm">
                                 {service.priceUnit ? ` / ${formatLabel(service.priceUnit)}` : ""}
                               </span>
                             </p>
-                            <p className="text-xs text-primary mt-1">
-                              Advance: ₹{computeAdvance(service).toLocaleString()}
+                            <p className="text-xs text-primary mt-0.5">
+                              Advance: ₹{computeAdvance(service).toLocaleString('en-IN')}
                             </p>
                           </div>
                           {service.duration ? (

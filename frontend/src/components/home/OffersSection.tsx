@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Tag, Copy, Check, Gift, Percent, Star, ArrowRight } from "lucide-react";
 
 interface Offer {
@@ -40,9 +41,19 @@ const offers: Offer[] = [
 const OfferCard = ({ offer }: { offer: Offer }) => {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
+  const handleCopy = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+    } catch {
+      const input = document.createElement("input");
+      input.value = code;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      setCopied(true);
+    }
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -62,14 +73,15 @@ const OfferCard = ({ offer }: { offer: Offer }) => {
         <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/50 mt-3">
           <div className="flex items-center gap-2">
             <div className="bg-muted rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <Tag className="w-3.5 h-3.5 text-primary" />
+              <Tag aria-hidden="true" className="w-3.5 h-3.5 text-primary" />
               <code className="text-sm font-bold text-foreground tracking-wider">{offer.code}</code>
             </div>
             <button
               onClick={() => handleCopy(offer.code)}
+              aria-label={copied ? "Copied" : "Copy promo code"}
               className="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center justify-center"
             >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check aria-hidden="true" className="w-3.5 h-3.5" /> : <Copy aria-hidden="true" className="w-3.5 h-3.5" />}
             </button>
           </div>
           <span className="text-[10px] text-muted-foreground">{offer.validUntil}</span>
@@ -86,15 +98,15 @@ const OffersSection = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Gift className="w-5 h-5 text-primary" />
+              <Gift aria-hidden="true" className="w-5 h-5 text-primary" />
               <h2 className="text-2xl font-bold text-foreground">Offers & Deals</h2>
             </div>
             <p className="text-sm text-muted-foreground">Exclusive discounts and promo codes for your stay</p>
           </div>
-          <button className="hidden md:flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+          <Link to="/#offers" className="hidden md:flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
             View All Offers
-            <ArrowRight className="w-4 h-4" />
-          </button>
+            <ArrowRight aria-hidden="true" className="w-4 h-4" />
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -105,15 +117,15 @@ const OffersSection = () => {
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <Percent className="w-3.5 h-3.5 text-green-500" />
+            <Percent aria-hidden="true" className="w-3.5 h-3.5 text-green-500" />
             Best price guaranteed
           </div>
           <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 text-amber-500" />
+            <Star aria-hidden="true" className="w-3.5 h-3.5 text-amber-500" />
             Member exclusive deals
           </div>
           <div className="flex items-center gap-1.5">
-            <Tag className="w-3.5 h-3.5 text-primary" />
+            <Tag aria-hidden="true" className="w-3.5 h-3.5 text-primary" />
             No hidden charges
           </div>
         </div>

@@ -114,7 +114,9 @@ const HotelDetails = () => {
   });
   const [guests, setGuests] = useState(() => {
     const param = searchParams.get("guests");
-    return param ? parseInt(param) : 2;
+    if (!param) return 2;
+    const parsed = parseInt(param);
+    return isNaN(parsed) ? 2 : parsed;
   });
   
   // URL params
@@ -234,7 +236,8 @@ const HotelDetails = () => {
     );
   }
 
-  const lowestPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.pricePerNight)) : hotel.basePrice;
+  const lowestPrice = rooms.length > 0 ? Math.min(...rooms.map(r => r.pricePerNight ?? Infinity)) : (hotel.basePrice ?? 0);
+  const safeLowest = lowestPrice === Infinity ? 0 : (lowestPrice ?? 0);
 
   const wishlistItem = {
     id: hotel.id,
@@ -411,7 +414,7 @@ const HotelDetails = () => {
 
         {/* Desktop: Grid gallery */}
         <div className="hidden md:block">
-          <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[50vh] max-h-[500px]">
+          <div className="grid grid-cols-4 grid-rows-2 gap-2 h-48 md:h-64 lg:h-96">
             <div className="col-span-2 row-span-2 relative rounded-l-2xl overflow-hidden group cursor-pointer" onClick={() => setShowGallery(true)}>
               <img src={hotelImages[0]} alt={hotel.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
@@ -498,7 +501,7 @@ const HotelDetails = () => {
                     </div>
                     <span className="text-muted-foreground">({hotel.reviewCount} reviews)</span>
                   </div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground mb-2">
                     {hotel.name}
                   </h1>
                   <div className="flex items-center gap-2 text-muted-foreground">
@@ -576,7 +579,7 @@ const HotelDetails = () => {
                 {/* Amenities */}
                 <section>
                   <h2 className="text-xl font-bold mb-4">What this place offers</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {hotel.amenities.map((amenity) => (
                       <div key={amenity} className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
                         <div className="text-primary">{getAmenityIcon(amenity)}</div>
@@ -651,13 +654,13 @@ const HotelDetails = () => {
               <div className="bg-gradient-to-r from-primary to-primary/80 p-4 text-white">
                 <div className="flex items-baseline justify-between">
                   <div>
-                    <span className="text-3xl font-bold">₹{lowestPrice.toLocaleString()}</span>
+                    <span className="text-3xl font-bold">₹{safeLowest.toLocaleString('en-IN')}</span>
                     <span className="text-white/80"> /night</span>
                   </div>
                   {nights > 0 && (
                     <div className="text-right">
                       <span className="text-sm">Total: </span>
-                      <span className="font-bold">₹{(lowestPrice * nights).toLocaleString()}</span>
+                      <span className="font-bold">₹{(safeLowest * nights).toLocaleString('en-IN')}</span>
                     </div>
                   )}
                 </div>
@@ -756,16 +759,16 @@ const HotelDetails = () => {
                 {nights > 0 && (
                   <div className="space-y-2 py-3 border-t">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">₹{lowestPrice} x {nights} night{nights > 1 ? "s" : ""}</span>
-                      <span>₹{(lowestPrice * nights).toLocaleString()}</span>
+                      <span className="text-muted-foreground">₹{safeLowest.toLocaleString('en-IN')} x {nights} night{nights > 1 ? "s" : ""}</span>
+                      <span>₹{(safeLowest * nights).toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Taxes & fees</span>
-                      <span>₹{Math.round(lowestPrice * nights * 0.12).toLocaleString()}</span>
+                      <span>₹{Math.round(safeLowest * nights * 0.12).toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between font-bold pt-2 border-t">
                       <span>Total</span>
-                      <span>₹{Math.round(lowestPrice * nights * 1.12).toLocaleString()}</span>
+                      <span>₹{Math.round(safeLowest * nights * 1.12).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 )}

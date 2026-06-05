@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { format, addDays, differenceInDays } from "date-fns";
 import { Search, CalendarDays, MapPin, Users, Minus, Plus, Crosshair, ChevronDown, ShieldCheck, BadgeCheck } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -16,6 +17,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -43,8 +45,10 @@ export default function SearchBarSection() {
   const isMobile = useIsMobile();
 
   const [location, setLocation] = useState("");
-  const [checkIn, setCheckIn] = useState<Date | undefined>(addDays(new Date(), 1));
-  const [checkOut, setCheckOut] = useState<Date | undefined>(addDays(new Date(), 2));
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: addDays(new Date(), 1),
+    to: addDays(new Date(), 2),
+  });
   const [guests, setGuests] = useState(2);
   const [rooms, setRooms] = useState(1);
 
@@ -53,10 +57,20 @@ export default function SearchBarSection() {
     const checkOutParam = searchParams.get("checkOut");
     const guestsParam = searchParams.get("guests");
     const roomsParam = searchParams.get("rooms");
-    if (checkInParam) setCheckIn(new Date(checkInParam));
-    if (checkOutParam) setCheckOut(new Date(checkOutParam));
-    if (guestsParam) setGuests(parseInt(guestsParam));
-    if (roomsParam) setRooms(parseInt(roomsParam));
+    if (checkInParam || checkOutParam) {
+      setDateRange({
+        from: checkInParam ? new Date(checkInParam) : undefined,
+        to: checkOutParam ? new Date(checkOutParam) : undefined,
+      });
+    }
+    if (guestsParam) {
+      const parsed = parseInt(guestsParam);
+      if (!isNaN(parsed)) setGuests(parsed);
+    }
+    if (roomsParam) {
+      const parsed = parseInt(roomsParam);
+      if (!isNaN(parsed)) setRooms(parsed);
+    }
   }, []);
 
   const [propertyType, setPropertyType] = useState<PropertyType>("hotels");
@@ -64,7 +78,7 @@ export default function SearchBarSection() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
 
-  const totalNights = checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 1;
+  const totalNights = dateRange.from && dateRange.to ? differenceInDays(dateRange.to, dateRange.from) : 1;
 
   const updateGuests = (delta: number) => {
     setGuests((prev) => Math.max(1, Math.min(10, prev + delta)));
@@ -77,8 +91,8 @@ export default function SearchBarSection() {
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (location) params.set("search", location);
-    if (checkIn) params.set("checkIn", format(checkIn, "yyyy-MM-dd"));
-    if (checkOut) params.set("checkOut", format(checkOut, "yyyy-MM-dd"));
+    if (dateRange.from) params.set("checkIn", format(dateRange.from, "yyyy-MM-dd"));
+    if (dateRange.to) params.set("checkOut", format(dateRange.to, "yyyy-MM-dd"));
     params.set("rooms", rooms.toString());
     params.set("guests", guests.toString());
     const query = params.toString();
@@ -102,74 +116,32 @@ export default function SearchBarSection() {
   const handleNearMe = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        () => navigate("/search?nearby=1"),
-        () => setLocation("Current Location")
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          navigate(`/search?lat=${latitude}&lng=${longitude}`);
+        },
+        () => {
+          setLocation("Current Location");
+          navigate("/search?nearby=1");
+        }
       );
+    } else {
+      setLocation("Current Location");
     }
   };
 
-  const DateContent = () => (
-    <div className="flex gap-4">
-      <div className="flex-1">
-        <Calendar
-          mode="single"
-          selected={checkIn}
-          onSelect={(date) => {
-            setCheckIn(date);
-            if (date && checkOut && date >= checkOut) {
-              setCheckOut(addDays(date, 1));
-            }
-          }}
-          disabled={(date) => date < new Date()}
-          initialFocus
-        />
-      </div>
-      <div className="flex-1">
-        <Calendar
-          mode="single"
-          selected={checkOut}
-          onSelect={(date) => {
-            setCheckOut(date);
-            if (isMobile) setIsDatePickerOpen(false);
-          }}
-          disabled={(date) => date < (checkIn || new Date()) || date === checkIn}
-          initialFocus
-        />
-      </div>
-    </div>
-  );
-
-  const MobileDateContent = () => (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-foreground mb-2">Check In</p>
-        <Calendar
-          mode="single"
-          selected={checkIn}
-          onSelect={(date) => {
-            setCheckIn(date);
-            if (date && checkOut && date >= checkOut) {
-              setCheckOut(addDays(date, 1));
-            }
-          }}
-          disabled={(date) => date < new Date()}
-          initialFocus
-        />
-      </div>
-      <div>
-        <p className="text-sm font-medium text-foreground mb-2">Check Out</p>
-        <Calendar
-          mode="single"
-          selected={checkOut}
-          onSelect={(date) => {
-            setCheckOut(date);
-            setIsDatePickerOpen(false);
-          }}
-          disabled={(date) => date < (checkIn || new Date()) || date === checkIn}
-          initialFocus
-        />
-      </div>
-    </div>
+  const DateContent = ({ closeOnSelect = false }: { closeOnSelect?: boolean }) => (
+    <Calendar
+      mode="range"
+      selected={dateRange}
+      onSelect={(range) => {
+        if (range) setDateRange(range);
+        if (closeOnSelect && range?.from && range?.to) setIsDatePickerOpen(false);
+      }}
+      disabled={(date) => date < new Date()}
+      numberOfMonths={isMobile ? 1 : 2}
+      initialFocus
+    />
   );
 
   const dateTrigger = (
@@ -177,15 +149,20 @@ export default function SearchBarSection() {
       <CalendarDays className="w-5 h-5 text-primary flex-shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Check In — Check Out</p>
-        <p className={cn("text-sm font-semibold", checkIn ? "text-foreground" : "text-muted-foreground")}>
-          {checkIn ? (
+        <p className={cn("text-sm font-semibold", dateRange.from ? "text-foreground" : "text-muted-foreground")}>
+          {dateRange.from ? (
             <span className="flex items-center gap-2">
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md text-xs font-bold">
-                {format(checkIn, "EEE, MMM dd")}
+                {format(dateRange.from, "EEE, MMM dd")}
               </span>
-              <span className="text-muted-foreground">→</span>
-              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md text-xs font-bold">
-                {checkOut ? format(checkOut, "EEE, MMM dd") : "Select"}
+              <span className="flex items-center text-muted-foreground">
+                <svg className="w-6 h-3" viewBox="0 0 24 12" fill="none">
+                  <line x1="2" y1="6" x2="22" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M18 2L22 6L18 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <span className={cn("px-2 py-0.5 rounded-md text-xs font-bold", dateRange.to ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                {dateRange.to ? format(dateRange.to, "EEE, MMM dd") : "Select"}
               </span>
             </span>
           ) : (
@@ -212,6 +189,7 @@ export default function SearchBarSection() {
                   <input
                     type="text"
                     placeholder="Where are you going?"
+                    aria-label="Search destination"
                     className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
@@ -242,6 +220,7 @@ export default function SearchBarSection() {
                   <button
                     key={key}
                     onClick={() => setPropertyType(key as PropertyType)}
+                    aria-pressed={propertyType === key}
                     className={cn(
                       "flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-medium transition-all",
                       propertyType === key
@@ -249,7 +228,7 @@ export default function SearchBarSection() {
                         : "bg-muted/50 text-muted-foreground hover:bg-muted"
                     )}
                   >
-                    <span className="text-lg">{icon}</span>
+                    <span className="text-lg" aria-hidden="true">{icon}</span>
                     <span>{label}</span>
                   </button>
                 ))}
@@ -267,8 +246,8 @@ export default function SearchBarSection() {
                       {totalNights > 0 && `${totalNights} night${totalNights > 1 ? "s" : ""}`}
                     </DrawerDescription>
                   </DrawerHeader>
-                  <div className="px-4 pb-4">
-                    {MobileDateContent()}
+                  <div className="px-4 pb-4 flex justify-center">
+                    {DateContent({ closeOnSelect: true })}
                   </div>
                   <DrawerFooter>
                     <Button onClick={() => setIsDatePickerOpen(false)} className="w-full">Done</Button>
@@ -359,6 +338,7 @@ export default function SearchBarSection() {
                   <button
                     key={key}
                     onClick={() => setPropertyType(key as PropertyType)}
+                    aria-pressed={propertyType === key}
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
                       propertyType === key
@@ -366,7 +346,7 @@ export default function SearchBarSection() {
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     )}
                   >
-                    <span>{icon}</span>
+                    <span aria-hidden="true">{icon}</span>
                     {label}
                   </button>
                 ))}
@@ -380,6 +360,7 @@ export default function SearchBarSection() {
                   <input
                     type="text"
                     placeholder="Where are you going?"
+                    aria-label="Search destination"
                     className="flex-1 bg-transparent border-none outline-none text-sm font-medium placeholder:text-muted-foreground"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
@@ -403,14 +384,16 @@ export default function SearchBarSection() {
                   <DialogTrigger asChild>
                     {dateTrigger}
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-lg">
                     <DialogHeader>
                       <DialogTitle>Select Dates</DialogTitle>
-                      {totalNights > 0 && (
-                        <p className="text-sm text-muted-foreground">{totalNights} night{totalNights > 1 ? "s" : ""}</p>
-                      )}
+                      <DialogDescription>
+                        {totalNights > 0 ? `${totalNights} night${totalNights > 1 ? "s" : ""} selected` : "Choose your check-in and check-out dates"}
+                      </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">{DateContent()}</div>
+                    <div className="py-4 flex justify-center">
+                      {DateContent({ closeOnSelect: false })}
+                    </div>
                   </DialogContent>
                 </Dialog>
 

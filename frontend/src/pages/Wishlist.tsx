@@ -99,11 +99,11 @@ const Wishlist = () => {
                         {item.location}
                       </div>
                       <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                        {item.price ? (
+                        {item.price != null ? (
                           <div>
                             <p className="text-sm text-muted-foreground">Starting from</p>
                             <p className="text-xl font-semibold text-foreground">
-                              ₹{item.price.toLocaleString()}
+                              ₹{item.price.toLocaleString('en-IN')}
                               <span className="text-muted-foreground font-normal text-sm">/night</span>
                             </p>
                           </div>

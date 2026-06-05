@@ -179,7 +179,7 @@ const Bookings = () => {
           </div>
 
           {/* Status Tabs */}
-          <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex gap-2 overflow-x-auto flex-nowrap pb-4 mb-6 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
             {tabs.map((tab) => {
               const isActive = statusFilter === tab.key;
               const count = getStatusCount(tab.key);
@@ -276,7 +276,7 @@ const Bookings = () => {
                       </div>
 
                       {/* Content */}
-                      <div className="p-4">
+                      <div className="p-3 md:p-4">
                         <h3 className="font-semibold text-foreground mb-1 truncate group-hover:text-primary transition-colors">
                           {booking.type === "service" 
                             ? booking.service?.name || "Service Booking"

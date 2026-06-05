@@ -132,7 +132,7 @@ const Temples = () => {
               />
             </div>
 
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 overflow-x-auto flex-nowrap">
               {cities.map((city) => (
                 <button
                   key={city}
@@ -163,7 +163,7 @@ const Temples = () => {
                   to={`/temples/${temple.slug || temple.id}`}
                   className="group bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 border border-border/40"
                 >
-                  <div className="relative h-52 sm:h-56 md:h-52 lg:h-56 overflow-hidden">
+                  <div className="relative h-40 md:h-48 overflow-hidden">
                     <img
                       src={getTempleImage(temple)}
                       alt={temple.name}
@@ -186,7 +186,7 @@ const Temples = () => {
                           {temple.templeType}
                         </span>
                       )}
-                      <h3 className="font-serif font-semibold text-xl text-cream-light leading-tight">{temple.name}</h3>
+                      <h3 className="font-serif font-semibold text-lg md:text-xl text-cream-light leading-tight">{temple.name}</h3>
                     </div>
                   </div>
 

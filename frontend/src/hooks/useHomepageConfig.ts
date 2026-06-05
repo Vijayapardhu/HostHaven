@@ -18,6 +18,7 @@ export interface DestinationItem {
   imageUrl: string;
   link: string;
   isActive: boolean;
+  propertyCount?: number;
 }
 
 export interface FeatureCardItem {

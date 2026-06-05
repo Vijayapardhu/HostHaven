@@ -145,7 +145,7 @@ const ServiceBookingDetail = () => {
           </button>
 
           <div className="max-w-3xl mx-auto">
-            <div className="bg-card rounded-xl shadow-card p-6">
+              <div className="bg-card rounded-xl shadow-card p-4 md:p-6">
               <div className="flex items-start justify-between mb-6">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
@@ -225,7 +225,7 @@ const ServiceBookingDetail = () => {
                 </div>
               </div>
 
-              <div className="flex gap-4 mt-6">
+              <div className="flex flex-col md:flex-row gap-3 md:gap-4 mt-6">
                 <Button
                   variant="outline"
                   onClick={handleDownloadInvoice}

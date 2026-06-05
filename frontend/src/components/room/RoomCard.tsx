@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, X, Lock, Loader2, ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FocusTrap } from "@/components/ui/FocusTrap";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -76,21 +77,18 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
 
   // Check for stored booking intent on mount (after login redirect)
   useEffect(() => {
-    if (isAuthenticated) {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const intent: BookingIntent = JSON.parse(stored);
-          if (intent.roomId === room.id && intent.needsVideoWatch) {
-            // User just logged in and needs to watch video
-            sessionStorage.removeItem(STORAGE_KEY);
-            // Small delay to ensure component is ready
-            setTimeout(() => setShowVideo(true), 100);
-          }
-        } catch (e) {
-          console.error("Failed to parse booking intent", e);
-        }
+    if (!isAuthenticated) return;
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    try {
+      const intent: BookingIntent = JSON.parse(stored);
+      if (intent.roomId === room.id && intent.needsVideoWatch) {
+        sessionStorage.removeItem(STORAGE_KEY);
+        const timer = setTimeout(() => setShowVideo(true), 100);
+        return () => clearTimeout(timer);
       }
+    } catch (e) {
+      console.error("Failed to parse booking intent", e);
     }
   }, [isAuthenticated, room.id]);
 
@@ -217,6 +215,7 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
                 <div 
                   className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer group-hover:bg-black/50 transition"
                   onClick={handlePlayVideo}
+                  aria-label="Play video"
                 >
                   <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
                     <Play className="w-6 h-6 text-primary ml-1" />
@@ -276,7 +275,7 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
             <div className="mt-4 flex items-center justify-between">
               <div>
                 <p className="text-xl font-semibold text-foreground">
-                  ₹{room.pricePerNight.toLocaleString()}
+                  ₹{(room.pricePerNight ?? 0).toLocaleString('en-IN')}
                   <span className="text-muted-foreground font-normal text-sm">/night</span>
                 </p>
               </div>
@@ -301,14 +300,16 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
 
       {/* Video Modal */}
       {showVideo && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-2xl bg-black rounded-xl overflow-hidden">
-            <button
-              onClick={handleCloseVideo}
-              className="absolute top-3 right-3 z-10 bg-white/20 hover:bg-white/30 rounded-full p-2 transition"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
+        <FocusTrap active={showVideo}>
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Video Tour">
+            <div className="relative w-full max-w-2xl bg-black rounded-xl overflow-hidden">
+              <button
+                onClick={handleCloseVideo}
+                className="absolute top-3 right-3 z-10 bg-white/20 hover:bg-white/30 rounded-full p-2 transition"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
             <video
               ref={videoRef}
               src={room.video}
@@ -349,17 +350,19 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
             </div>
           </div>
         </div>
+      </FocusTrap>
       )}
 
       {/* Login Prompt Modal */}
       {showLoginPrompt && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-card rounded-xl p-6 max-w-sm w-full shadow-xl">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Login Required</h3>
+        <FocusTrap active={showLoginPrompt}>
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Login Required">
+            <div className="bg-card rounded-xl p-6 max-w-sm w-full shadow-xl">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Lock className="w-8 h-8 text-primary" />
+                </div>
+                <h3 id="login-prompt-title" className="text-lg font-semibold mb-2">Login Required</h3>
               <p className="text-muted-foreground text-sm mb-6">
                 {room.video 
                   ? "Watch the room video tour and book your stay by logging in to your account."
@@ -378,6 +381,7 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
                   variant="outline"
                   className="w-full"
                   onClick={() => setShowLoginPrompt(false)}
+                  aria-label="Cancel"
                 >
                   Cancel
                 </Button>
@@ -385,37 +389,41 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
             </div>
           </div>
         </div>
+      </FocusTrap>
       )}
 
       {/* Room Image Gallery Modal */}
       {showRoomGallery && (
-        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setShowRoomGallery(false)}>
-          <button
-            onClick={() => setShowRoomGallery(false)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
-            title="Close gallery"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setCurrentRoomImageIndex((prev) => (prev - 1 + roomImages.length) % roomImages.length); }}
-            className="absolute left-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
-          >
-            <ChevronLeft className="w-8 h-8" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setCurrentRoomImageIndex((prev) => (prev + 1) % roomImages.length); }}
-            className="absolute right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
-          >
-            <ChevronRight className="w-8 h-8" />
-          </button>
+        <FocusTrap active={showRoomGallery}>
+          <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setShowRoomGallery(false)} role="dialog" aria-modal="true" aria-label="Image Gallery">
+            <button
+              onClick={() => setShowRoomGallery(false)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+              aria-label="Close"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrentRoomImageIndex((prev) => (prev - 1 + roomImages.length) % roomImages.length); }}
+              className="absolute left-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrentRoomImageIndex((prev) => (prev + 1) % roomImages.length); }}
+              className="absolute right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
           <img 
             src={roomImages[currentRoomImageIndex]} 
             alt={`${room.name} ${currentRoomImageIndex + 1}`} 
             className="max-w-full max-h-full object-contain" 
             onClick={(e) => e.stopPropagation()}
           />
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2" role="tablist" aria-label="Image navigation">
             {roomImages.map((_, idx) => (
               <button
                 key={idx}
@@ -424,6 +432,7 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
                   "w-2 h-2 rounded-full transition-all",
                   idx === currentRoomImageIndex ? "w-8 bg-white" : "bg-white/50"
                 )}
+                aria-label={`Go to image ${idx + 1}`}
               />
             ))}
           </div>
@@ -431,6 +440,7 @@ export function RoomCard({ room, hotelId, checkIn, checkOut, guests, onBookNow }
             {currentRoomImageIndex + 1} / {roomImages.length}
           </div>
         </div>
+      </FocusTrap>
       )}
     </>
   );

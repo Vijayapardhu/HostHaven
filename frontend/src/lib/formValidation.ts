@@ -362,7 +362,7 @@ export function getFieldConstraints(fieldName: string): {
   const constraints: any = {};
 
   if ('min' in rule && typeof rule.min === 'number') {
-    if (fieldName.includes('rice') || fieldName.includes('Price') || fieldName === 'refundAmount') {
+    if (fieldName.includes('price') || fieldName.includes('Price') || fieldName === 'refundAmount') {
       constraints.min = rule.min;
       constraints.type = 'number';
     } else {
@@ -371,7 +371,7 @@ export function getFieldConstraints(fieldName: string): {
   }
 
   if ('max' in rule && typeof rule.max === 'number') {
-    if (fieldName.includes('rice') || fieldName.includes('Price') || fieldName === 'refundAmount') {
+    if (fieldName.includes('price') || fieldName.includes('Price') || fieldName === 'refundAmount') {
       constraints.max = rule.max;
     } else {
       constraints.maxLength = rule.max;

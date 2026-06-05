@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
 interface RecommendationItem {
@@ -47,10 +46,10 @@ const RecommendationsSection = () => {
             <p className="text-sm text-muted-foreground mt-1">Handpicked stays based on your preferences</p>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
           {recommendations.map((item) => {
-            const price = item.basePrice || item.price || 0;
-            const originalPrice = item.originalPrice || Math.round(price * 1.2);
+            const price = item.price ?? item.basePrice ?? 0;
+            const originalPrice = item.originalPrice ?? Math.round(price * 1.2);
             const reviews = item.reviewCount || item.reviews || 0;
             const itemRating = Math.round(item.rating || 0);
             return (
@@ -63,13 +62,15 @@ const RecommendationsSection = () => {
                   <img
                     src={getImage(item)}
                     alt={item.name}
+                    loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600"; }}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                   />
                   <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-2.5 py-1 flex items-center gap-1 shadow-sm">
-                    <Star className="w-3.5 h-3.5 text-primary fill-primary" />
-                    <span className="text-xs font-bold text-foreground">{item.rating?.toFixed(1)}</span>
+                    <Star aria-hidden="true" className="w-3.5 h-3.5 text-primary fill-primary" />
+                    <span className="text-xs font-bold text-foreground">{typeof item.rating === 'number' ? item.rating.toFixed(1) : Number(item.rating) || 0}</span>
                   </div>
-                  {originalPrice > price && (
+                  {originalPrice > price && originalPrice > 0 && (
                     <div className="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full">
                       {Math.round(((originalPrice - price) / originalPrice) * 100)}% OFF
                     </div>
@@ -80,10 +81,11 @@ const RecommendationsSection = () => {
                     {item.name}
                   </h3>
                   <div className="flex items-center gap-1.5 mt-2">
-                    <div className="flex items-center">
+                    <div className="flex items-center" aria-label={`${itemRating} out of 5 stars`}>
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star
                           key={i}
+                          aria-hidden="true"
                           className={`w-3 h-3 ${
                             i < itemRating
                               ? "text-primary fill-primary"
@@ -96,21 +98,15 @@ const RecommendationsSection = () => {
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
                     <span className="font-bold text-base md:text-lg text-foreground">
-                      ₹{price.toLocaleString()}
+                      ₹{price.toLocaleString('en-IN')}
                     </span>
                     {originalPrice > price && (
                       <span className="text-xs text-muted-foreground line-through">
-                        ₹{originalPrice.toLocaleString()}
+                        ₹{originalPrice.toLocaleString('en-IN')}
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">/night</span>
                   </div>
-                  <Button 
-                    size="sm" 
-                    className="w-full mt-3 h-9 text-xs md:text-sm font-semibold rounded-xl"
-                  >
-                    View Details
-                  </Button>
                 </div>
               </Link>
             );

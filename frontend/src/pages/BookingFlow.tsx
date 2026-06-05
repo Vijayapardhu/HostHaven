@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CalendarDays, Users, BedDouble } from "lucide-react";
+import { DateRange } from "react-day-picker";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,19 +44,23 @@ const BookingFlow = () => {
   const checkOutParam = searchParams.get("checkOut");
   const guestsParam = searchParams.get("guests");
 
-  const [checkIn, setCheckIn] = useState<Date | undefined>(
-    checkInParam ? new Date(checkInParam) : undefined
-  );
-  const [checkOut, setCheckOut] = useState<Date | undefined>(
-    checkOutParam ? new Date(checkOutParam) : undefined
-  );
-  const [guests, setGuests] = useState(guestsParam ? parseInt(guestsParam) : 2);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: checkInParam ? new Date(checkInParam) : undefined,
+    to: checkOutParam ? new Date(checkOutParam) : undefined,
+  });
+  const [guests, setGuests] = useState(() => {
+    if (!guestsParam) return 2;
+    const parsed = parseInt(guestsParam);
+    return isNaN(parsed) ? 2 : parsed;
+  });
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
 
-  const [isCheckInOpen, setIsCheckInOpen] = useState(false);
-  const [isCheckOutOpen, setIsCheckOutOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isGuestsOpen, setIsGuestsOpen] = useState(false);
   const [isRoomOpen, setIsRoomOpen] = useState(false);
+
+  const checkIn = dateRange?.from;
+  const checkOut = dateRange?.to;
 
   useEffect(() => {
     if (!id) return;
@@ -100,7 +105,7 @@ const BookingFlow = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   }, [checkIn, checkOut]);
 
-  const roomPrice = selectedRoom?.pricePerNight || property?.basePrice || 0;
+  const roomPrice = selectedRoom?.pricePerNight ?? property?.basePrice ?? 0;
   const totalAmount = nights > 0 ? roomPrice * nights : 0;
 
   const from = searchParams.get("from") || "hotels";
@@ -157,14 +162,9 @@ const BookingFlow = () => {
                   <p className="font-semibold flex items-center gap-2 mt-1"><BedDouble className="w-4 h-4" /> {selectedRoom?.name || "Select room"}</p>
                 </button>
 
-                <button className="w-full text-left border rounded-xl p-4 hover:bg-muted/40 transition" onClick={() => setIsCheckInOpen(true)}>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Check-in</p>
-                  <p className="font-semibold flex items-center gap-2 mt-1"><CalendarDays className="w-4 h-4" /> {checkIn ? format(checkIn, "MMM dd, yyyy") : "Select check-in"}</p>
-                </button>
-
-                <button className="w-full text-left border rounded-xl p-4 hover:bg-muted/40 transition" onClick={() => setIsCheckOutOpen(true)}>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Check-out</p>
-                  <p className="font-semibold flex items-center gap-2 mt-1"><CalendarDays className="w-4 h-4" /> {checkOut ? format(checkOut, "MMM dd, yyyy") : "Select check-out"}</p>
+                <button className="w-full text-left border rounded-xl p-4 hover:bg-muted/40 transition" onClick={() => setIsDatePickerOpen(true)}>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Dates</p>
+                  <p className="font-semibold flex items-center gap-2 mt-1"><CalendarDays className="w-4 h-4" /> {checkIn ? `${format(checkIn, "MMM dd")} - ${checkOut ? format(checkOut, "MMM dd, yyyy") : "..."}` : "Select dates"}</p>
                 </button>
 
                 <button className="w-full text-left border rounded-xl p-4 hover:bg-muted/40 transition" onClick={() => setIsGuestsOpen(true)}>
@@ -218,48 +218,30 @@ const BookingFlow = () => {
               className={`w-full text-left rounded-xl border p-3 transition ${room.id === selectedRoom?.id ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}
             >
               <p className="font-medium">{room.name}</p>
-              <p className="text-sm text-muted-foreground">Up to {room.capacity + (room.extraBedCapacity || 0)} guests • ₹{room.pricePerNight.toLocaleString()}/night</p>
+              <p className="text-sm text-muted-foreground">Up to {room.capacity + (room.extraBedCapacity || 0)} guests • ₹{(room.pricePerNight ?? 0).toLocaleString('en-IN')}/night</p>
             </button>
           ))}
         </div>
       </BookingPickerDialog>
 
       <BookingPickerDialog
-        open={isCheckInOpen}
-        onOpenChange={setIsCheckInOpen}
-        title="Select check-in"
+        open={isDatePickerOpen}
+        onOpenChange={setIsDatePickerOpen}
+        title="Select dates"
+        description="Choose your check-in and check-out dates"
       >
         <div className="flex justify-center">
           <Calendar
-            mode="single"
-            selected={checkIn}
-            onSelect={(date) => {
-              setCheckIn(date);
-              setIsCheckInOpen(false);
-              if (checkOut && date && checkOut <= date) {
-                setCheckOut(undefined);
+            mode="range"
+            selected={dateRange}
+            onSelect={(range) => {
+              setDateRange(range);
+              if (range?.from && range?.to) {
+                setTimeout(() => setIsDatePickerOpen(false), 300);
               }
             }}
             disabled={(date) => date < new Date()}
-            initialFocus
-          />
-        </div>
-      </BookingPickerDialog>
-
-      <BookingPickerDialog
-        open={isCheckOutOpen}
-        onOpenChange={setIsCheckOutOpen}
-        title="Select check-out"
-      >
-        <div className="flex justify-center">
-          <Calendar
-            mode="single"
-            selected={checkOut}
-            onSelect={(date) => {
-              setCheckOut(date);
-              setIsCheckOutOpen(false);
-            }}
-            disabled={(date) => date <= (checkIn || new Date())}
+            numberOfMonths={2}
             initialFocus
           />
         </div>

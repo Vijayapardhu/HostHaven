@@ -67,13 +67,14 @@ const Security = () => {
             <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
               <Lock className="w-4 h-4" /> Change Password
             </h3>
-            <div className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }} className="space-y-4">
               <div className="relative">
                 <Input
                   type={showPassword ? "text" : "password"}
                   placeholder="Current password"
                   value={passwords.current}
                   onChange={(e) => setPasswords({...passwords, current: e.target.value})}
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -88,18 +89,20 @@ const Security = () => {
                 placeholder="New password"
                 value={passwords.new}
                 onChange={(e) => setPasswords({...passwords, new: e.target.value})}
+                autoComplete="new-password"
               />
               <Input
                 type={showPassword ? "text" : "password"}
                 placeholder="Confirm new password"
                 value={passwords.confirm}
                 onChange={(e) => setPasswords({...passwords, confirm: e.target.value})}
+                autoComplete="new-password"
               />
-              <Button onClick={handleChangePassword} className="w-full" disabled={isChangingPassword}>
+              <Button type="submit" className="w-full" disabled={isChangingPassword}>
                 {isChangingPassword ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 {isChangingPassword ? "Updating..." : "Update Password"}
               </Button>
-            </div>
+            </form>
           </div>
         </div>
       </div>
