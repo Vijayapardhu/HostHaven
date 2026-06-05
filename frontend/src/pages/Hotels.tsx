@@ -38,7 +38,7 @@ interface CityData {
 const Hotels = () => {
   const { city: citySlug } = useParams<{ city?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const destinationParam = searchParams.get("destination");
+  const destinationParam = searchParams.get("destination") || searchParams.get("search");
   const checkInParam = searchParams.get("checkIn");
   const checkOutParam = searchParams.get("checkOut");
   const roomsParam = searchParams.get("rooms");
@@ -135,7 +135,7 @@ const Hotels = () => {
     };
 
     fetchHotels();
-  }, [page, debouncedSearch, selectedLocation, sortBy]);
+  }, [page, debouncedSearch, selectedLocation, sortBy, checkInParam, checkOutParam, guestsParam]);
 
   const filteredHotels = useMemo(() => hotels, [hotels]);
 

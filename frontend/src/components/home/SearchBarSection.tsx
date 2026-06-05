@@ -111,7 +111,7 @@ export default function SearchBarSection() {
 
   const handleSearch = () => {
     const params = new URLSearchParams();
-    if (location) params.set("search", location);
+    if (location) params.set("destination", location);
     if (dateRange.from) params.set("checkIn", format(dateRange.from, "yyyy-MM-dd"));
     if (dateRange.to) params.set("checkOut", format(dateRange.to, "yyyy-MM-dd"));
     params.set("rooms", rooms.toString());

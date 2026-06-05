@@ -42,6 +42,7 @@ const Homes = () => {
   const checkOutParam = searchParams.get("checkOut");
   const roomsParam = searchParams.get("rooms");
   const guestsParam = searchParams.get("guests");
+  const destinationParam = searchParams.get("destination") || searchParams.get("search");
 
   const [homes, setHomes] = useState<RentalHome[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +57,10 @@ const Homes = () => {
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [searchQuery]);
 
-  const [selectedLocation, setSelectedLocation] = useState("all");
+  const [selectedLocation, setSelectedLocation] = useState(() => {
+    if (destinationParam) return destinationParam.trim().toUpperCase();
+    return "all";
+  });
   const [locations, setLocations] = useState<string[]>(["all"]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -95,7 +99,7 @@ const Homes = () => {
     };
 
     fetchHomes();
-  }, [page, debouncedSearch, selectedLocation, sortBy]);
+  }, [page, debouncedSearch, selectedLocation, sortBy, checkInParam, checkOutParam, guestsParam]);
 
   useEffect(() => {
     const fetchCities = async () => {
