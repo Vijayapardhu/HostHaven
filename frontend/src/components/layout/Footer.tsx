@@ -101,53 +101,9 @@ const Footer = ({ className = "" }: FooterProps) => {
                 </li>
               ))}
             </ul>
-          </div>
+          </div> {/* End Support Hours */}
 
-          {/* Explore */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-5 text-gold-light">Explore</h4>
-            <ul className="space-y-3">
-              {["Vijayawada", "Nandyal", "Vetapalem", "Tirupati"].map((place) => (
-                <li key={place}>
-                  <Link
-                    to={`/search?q=${place}`}
-                    className="text-cream-light/70 hover:text-gold-light transition-colors text-sm flex items-center gap-2 group"
-                  >
-                    <span className="w-1 h-1 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-                    {place}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-5 text-gold-light">Contact Us</h4>
-            <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <MapPin className="w-4 h-4 text-primary" />
-                </div>
-                <span className="text-cream-light/70 text-sm leading-relaxed">
-                  {settings.contact.supportAddress}
-                </span>
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Phone className="w-4 h-4 text-primary" />
-                </div>
-                <span className="text-cream-light/70 text-sm">{settings.contact.supportPhone}</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-4 h-4 text-primary" />
-                </div>
-                <span className="text-cream-light/70 text-sm">{settings.contact.supportEmail}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
+        </div> {/* End grid */}
 
         <div className="mt-12 pt-8 border-t border-cream-light/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-cream-light/50 text-xs">
