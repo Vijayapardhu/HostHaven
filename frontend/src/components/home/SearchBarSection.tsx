@@ -71,6 +71,27 @@ export default function SearchBarSection() {
       const parsed = parseInt(roomsParam);
       if (!isNaN(parsed)) setRooms(parsed);
     }
+
+    // Auto-detect location on mount
+    if (!location && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&zoom=10&accept-language=en`,
+              { headers: { 'User-Agent': 'HostHaven/1.0' } }
+            );
+            const data = await res.json();
+            const city = data.address?.city || data.address?.town || data.address?.village || data.address?.state_district || '';
+            if (city) setLocation(city);
+          } catch {
+            // Silently fail — user can type manually
+          }
+        },
+        () => { /* Permission denied or error — silent */ },
+        { timeout: 5000, enableHighAccuracy: false }
+      );
+    }
   }, []);
 
   const [propertyType, setPropertyType] = useState<PropertyType>("hotels");
