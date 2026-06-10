@@ -54,6 +54,15 @@ export interface AdvancedSettings {
     enabled: boolean;
     percent: number;
   };
+  colors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    foreground: string;
+    card: string;
+    heritage: string;
+  };
 }
 
 export const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
@@ -262,3 +271,4 @@ export const settingsService = {
     return unwrapData<{ id: string; deleted: boolean }>(response);
   },
 };
+

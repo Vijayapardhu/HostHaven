@@ -13,6 +13,16 @@ export interface PublicTaxSettings {
   percent: number;
 }
 
+export interface PublicColorsSettings {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  foreground: string;
+  card: string;
+  heritage: string;
+}
+
 export interface PublicPlatformSettings {
   platformName: string;
   supportEmail: string;
@@ -25,7 +35,18 @@ export interface PublicPlatformSettings {
     xUrl?: string;
   };
   tax?: PublicTaxSettings;
+  colors?: PublicColorsSettings;
 }
+
+export const DEFAULT_COLORS: PublicColorsSettings = {
+  primary: "38 92% 50%",
+  secondary: "40 30% 90%",
+  accent: "30 80% 55%",
+  background: "40 25% 94%",
+  foreground: "30 10% 15%",
+  card: "40 40% 98%",
+  heritage: "30 25% 25%",
+};
 
 export const DEFAULT_PUBLIC_SETTINGS: PublicPlatformSettings = {
   platformName: 'HostHaven',
@@ -39,6 +60,7 @@ export const DEFAULT_PUBLIC_SETTINGS: PublicPlatformSettings = {
     supportCompanyName: 'HostHaven Travels Pvt. Ltd.',
   },
   social: {},
+  colors: DEFAULT_COLORS,
 };
 
 export async function getPublicPlatformSettings(): Promise<PublicPlatformSettings> {

@@ -257,6 +257,15 @@ type AdvancedSettings = {
     enabled: boolean;
     percent: number;
   };
+  colors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    background?: string;
+    foreground?: string;
+    card?: string;
+    heritage?: string;
+  };
 };
 
 type CmsPageRecord = {
@@ -295,6 +304,15 @@ const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
     supportAddress: "Vijayawada, Andhra Pradesh, India",
     supportHours: "24/7 Customer Support",
     supportCompanyName: "HostHaven Travels Pvt. Ltd.",
+  },
+  colors: {
+    primary: "38 92% 50%",
+    secondary: "40 30% 90%",
+    accent: "30 80% 55%",
+    background: "40 25% 94%",
+    foreground: "30 10% 15%",
+    card: "40 40% 98%",
+    heritage: "30 25% 25%",
   },
 };
 
@@ -443,6 +461,15 @@ const mergeAdvancedSettings = (value: unknown): AdvancedSettings => {
           ? contactSource.supportCompanyName.trim()
           : DEFAULT_ADVANCED_SETTINGS.contact.supportCompanyName,
     },
+    colors: isRecord(value) && isRecord(value.colors) ? {
+      primary: typeof value.colors.primary === "string" ? value.colors.primary : DEFAULT_ADVANCED_SETTINGS.colors?.primary,
+      secondary: typeof value.colors.secondary === "string" ? value.colors.secondary : DEFAULT_ADVANCED_SETTINGS.colors?.secondary,
+      accent: typeof value.colors.accent === "string" ? value.colors.accent : DEFAULT_ADVANCED_SETTINGS.colors?.accent,
+      background: typeof value.colors.background === "string" ? value.colors.background : DEFAULT_ADVANCED_SETTINGS.colors?.background,
+      foreground: typeof value.colors.foreground === "string" ? value.colors.foreground : DEFAULT_ADVANCED_SETTINGS.colors?.foreground,
+      card: typeof value.colors.card === "string" ? value.colors.card : DEFAULT_ADVANCED_SETTINGS.colors?.card,
+      heritage: typeof value.colors.heritage === "string" ? value.colors.heritage : DEFAULT_ADVANCED_SETTINGS.colors?.heritage,
+    } : DEFAULT_ADVANCED_SETTINGS.colors,
   };
 };
 
@@ -849,7 +876,8 @@ export class AdminService {
           enabled: advanced.tax?.enabled ?? false,
           percent: advanced.tax?.percent ?? 0,
         },
-     };
+        colors: advanced.colors ?? DEFAULT_ADVANCED_SETTINGS.colors,
+      };
    }
 
    /**

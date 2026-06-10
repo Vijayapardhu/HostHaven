@@ -422,6 +422,47 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SettingsIcon className="h-4 w-4 text-slate-500" />
+                Brand Colors
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <p className="text-xs text-slate-500">
+                Customize the website&apos;s color scheme. Enter HSL values (e.g. &quot;38 92% 50%&quot;).
+              </p>
+              {["primary","secondary","accent","background","foreground","card","heritage"].map((key) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-slate-700 capitalize mb-1">{key}</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={(settings.advancedSettings?.colors as any)?.[key] ?? ""}
+                      onChange={(e) =>
+                        updateAdvanced((advanced) => ({
+                          ...advanced,
+                          colors: {
+                            ...(advanced.colors ?? {}),
+                            [key]: e.target.value,
+                          },
+                        }))
+                      }
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono"
+                      placeholder="e.g. 38 92% 50%"
+                    />
+                    <div
+                      className="w-8 h-8 rounded-full border border-slate-200 flex-shrink-0"
+                      style={{ background: `hsl(${(settings.advancedSettings?.colors as any)?.[key] || "0 0% 50%"})` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1380,3 +1421,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
 import { SEOProvider } from "@/contexts/SEOContext";
 import Index from "./pages/Index";
+import { ThemeInjector } from "./components/ThemeInjector";
 import Hotels from "./pages/Hotels";
 import HotelDetails from "./pages/HotelDetails";
 import Homes from "./pages/Homes";
@@ -62,6 +63,7 @@ const App = () => (
             <BrowserRouter>
               <ScrollToTop />
               <PWAInstallPrompt />
+              <ThemeInjector />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/hotels" element={<Hotels />} />
