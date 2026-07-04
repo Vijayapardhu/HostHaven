@@ -46,8 +46,8 @@ const StarRating = ({
           <Star
             className={`${sizes[size]} transition-colors ${
               star <= value
-                ? "fill-amber-400 text-amber-400"
-                : "text-gray-300 hover:text-amber-300"
+                ? "fill-gold text-gold"
+                : "text-gray-300 hover:text-gold/40"
             }`}
           />
         </button>

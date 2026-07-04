@@ -282,7 +282,7 @@ export default function SearchPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           {result.rating && (
-                            <div className="flex items-center gap-1 text-amber-500">
+                            <div className="flex items-center gap-1 text-gold">
                               <Star className="w-4 h-4 fill-current" />
                               <span className="font-medium">{result.rating ? Number(result.rating).toFixed(1) : '-'}</span>
                             </div>

@@ -72,6 +72,9 @@ function applyColors(colors: PublicColorsSettings) {
     root.style.setProperty('--gold', warm);
     root.style.setProperty('--gold-light', adjustL(warm, 14));
     root.style.setProperty('--gold-dark', adjustL(warm, -12));
+    // Other warm brand tokens so nothing stays the old orange.
+    root.style.setProperty('--saffron', warm);
+    root.style.setProperty('--temple-orange', adjustL(warm, -4));
     root.style.setProperty('--ring', warm);
     root.style.setProperty('--sidebar-ring', warm);
     root.style.setProperty('--shadow-gold', `0 4px 20px -2px hsl(${warm} / 0.35)`);

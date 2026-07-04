@@ -96,8 +96,8 @@ export function PWAInstallPrompt() {
                             </p>
                             {isIOS ? (
                                 <p className="text-gray-500 text-xs mt-1 leading-relaxed">
-                                    Tap <span className="text-orange-500 font-medium">Share ↑</span> then{" "}
-                                    <span className="text-orange-500 font-medium">"Add to Home Screen"</span>
+                                    Tap <span className="text-gold font-medium">Share ↑</span> then{" "}
+                                    <span className="text-gold font-medium">"Add to Home Screen"</span>
                                 </p>
                             ) : (
                                 <p className="text-gray-500 text-xs mt-1 leading-relaxed">
@@ -108,7 +108,7 @@ export function PWAInstallPrompt() {
                             {!isIOS && (
                                 <button
                                     onClick={handleInstall}
-                                    className="mt-2.5 inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                                    className="mt-2.5 inline-flex items-center gap-1.5 bg-gradient-to-r from-gold to-gold-dark hover:from-gold-dark hover:to-gold text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
                                 >
                                     <Download className="w-3 h-3" />
                                     Install Now

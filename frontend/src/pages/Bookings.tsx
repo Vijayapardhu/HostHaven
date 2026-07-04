@@ -314,7 +314,7 @@ const Bookings = () => {
                         {/* Review Prompt */}
                         {(booking.status === "CHECKED_OUT" || booking.status === "COMPLETED") && !booking.isReviewed && (
                           <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
-                            <div className="flex items-center gap-1 text-amber-500">
+                            <div className="flex items-center gap-1 text-gold">
                               <Star className="w-4 h-4 fill-current" />
                               <span className="text-sm font-medium">Rate this stay</span>
                             </div>

@@ -51,7 +51,7 @@ const StarRating = ({
           key={i}
           className={`${sizes[size]} ${
             i < value
-              ? "fill-amber-400 text-amber-400"
+              ? "fill-gold text-gold"
               : "fill-gray-200 text-gray-200"
           }`}
         />
@@ -75,7 +75,7 @@ const CategoryRating = ({
       <div className="flex items-center gap-2">
         <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-amber-400 rounded-full"
+            className="h-full bg-gold rounded-full"
             style={{ width: `${(value / 5) * 100}%` }}
           />
         </div>
@@ -97,7 +97,7 @@ export function ReviewCard({ review }: ReviewCardProps) {
     reviewStatus === "approved"
       ? "bg-emerald-50 text-emerald-700 border-emerald-100"
       : reviewStatus === "pending"
-        ? "bg-amber-50 text-amber-700 border-amber-100"
+        ? "bg-gold/10 text-gold-dark border-gold/20"
         : "bg-slate-100 text-slate-600 border-slate-200";
 
   const openImageViewer = (index: number) => {

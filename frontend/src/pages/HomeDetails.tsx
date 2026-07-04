@@ -414,7 +414,7 @@ const HomeDetails = () => {
           <div className="p-4 bg-background border-b">
             <div className="flex items-center gap-2 mb-2">
               {home.rating > 0 && (
-                <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                <span className="bg-gold/15 text-gold-dark px-2 py-1 rounded-full text-sm font-medium flex items-center gap-1">
                   <Star className="w-4 h-4 fill-current" />
                   {home.rating} ({home.reviewCount})
                 </span>
@@ -511,7 +511,7 @@ const HomeDetails = () => {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="flex items-center gap-1 bg-amber-100 text-amber-700 rounded-full px-2.5 py-0.5">
+                    <div className="flex items-center gap-1 bg-gold/15 text-gold-dark rounded-full px-2.5 py-0.5">
                       <Star className="w-4 h-4 fill-current" />
                       <span className="font-semibold">{home.rating}</span>
                     </div>

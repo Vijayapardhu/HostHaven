@@ -284,7 +284,7 @@ const BookingDetails = () => {
                       </h3>
                       {(booking.property?.rating || booking.property?.reviewCount) && (
                         <div className="flex items-center gap-1 mt-1">
-                          <div className="flex items-center gap-0.5 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                          <div className="flex items-center gap-0.5 bg-gold/15 text-gold-dark px-2 py-0.5 rounded-full">
                             <Star className="w-3 h-3 fill-current" />
                             <span className="text-xs font-medium">{typeof booking.property?.rating === 'number' ? booking.property.rating.toFixed(1) : "N/A"}</span>
                           </div>
@@ -585,7 +585,7 @@ const BookingDetails = () => {
                 <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Star className="w-5 h-5 text-amber-500" />
+                      <Star className="w-5 h-5 text-gold" />
                       Rate Your Stay
                     </CardTitle>
                   </CardHeader>
@@ -637,7 +637,7 @@ const BookingDetails = () => {
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Star className="w-5 h-5 text-amber-500" />
+                  <Star className="w-5 h-5 text-gold" />
                   What Others Say
                 </CardTitle>
               </CardHeader>

@@ -122,7 +122,7 @@ export function PushNotificationBanner() {
               <div className="mt-4 space-y-2">
                 {["Booking confirmations", "Special offers & discounts", "Price drop alerts"].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-white/90 text-sm">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-yellow-300 to-orange-400" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-gold-light to-gold" />
                     <span>{item}</span>
                   </div>
                 ))}

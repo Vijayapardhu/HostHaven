@@ -159,7 +159,7 @@ const OffersSection = () => {
             Best price guaranteed
           </div>
           <div className="flex items-center gap-1.5">
-            <Star aria-hidden="true" className="w-3.5 h-3.5 text-amber-500" />
+            <Star aria-hidden="true" className="w-3.5 h-3.5 text-gold" />
             Member exclusive deals
           </div>
           <div className="flex items-center gap-1.5">

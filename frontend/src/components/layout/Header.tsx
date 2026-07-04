@@ -68,7 +68,7 @@ const Header = () => {
   const getNotificationIcon = (type: string) => {
     if (type?.includes("BOOKING")) return <Calendar className="w-4 h-4 text-blue-500" />;
     if (type?.includes("PAYMENT")) return <CreditCard className="w-4 h-4 text-green-500" />;
-    if (type?.includes("REVIEW")) return <Star className="w-4 h-4 text-amber-500" />;
+    if (type?.includes("REVIEW")) return <Star className="w-4 h-4 text-gold" />;
     return <Bell className="w-4 h-4 text-gray-500" />;
   };
 

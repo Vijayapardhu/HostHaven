@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => ({
         name: "HostHaven",
         short_name: "HostHaven",
         description: "Find and book hotels, homes and unique stays in Andhra Pradesh",
-        theme_color: "#f97316",
+        theme_color: "#10334c",
         background_color: "#0a0a0f",
         display: "standalone",
         orientation: "portrait-primary",

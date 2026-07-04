@@ -120,8 +120,8 @@ const Profile = () => {
     { icon: MapPin, label: "Saved Addresses", value: "Manage delivery addresses", path: "/profile/edit", color: "text-green-500" },
     { icon: Heart, label: "My Wishlist", value: `${items.length} temples saved`, path: "/wishlist", color: "text-rose-500" },
     { icon: Calendar, label: "My Bookings", value: `${bookingCount !== null ? bookingCount : '...'} bookings`, path: "/bookings", color: "text-blue-500" },
-    { icon: Star, label: "My Reviews", value: "Reviews you wrote", path: "/profile/reviews", color: "text-amber-500" },
-    { icon: Bell, label: "Notifications", value: notificationsEnabled ? "Enabled" : "Enable push notifications", path: "/profile/notifications", color: "text-orange-500", badge: notificationsEnabled ? "Enabled" : null },
+    { icon: Star, label: "My Reviews", value: "Reviews you wrote", path: "/profile/reviews", color: "text-gold" },
+    { icon: Bell, label: "Notifications", value: notificationsEnabled ? "Enabled" : "Enable push notifications", path: "/profile/notifications", color: "text-gold", badge: notificationsEnabled ? "Enabled" : null },
     { icon: Shield, label: "Privacy & Security", value: "Password, 2FA", path: "/profile/security", color: "text-purple-500" },
     { icon: MessageSquare, label: "Support", value: "Help center", path: "/profile/support", color: "text-cyan-500" },
   ];

@@ -65,8 +65,8 @@ const ReviewsPage = () => {
             </div>
           ) : reviews.length === 0 ? (
             <div className="bg-card rounded-2xl shadow-card p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="w-8 h-8 text-amber-600" />
+              <div className="w-16 h-16 rounded-full bg-gold/15 flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="w-8 h-8 text-gold-dark" />
               </div>
               <h2 className="text-lg font-semibold text-foreground mb-2">No Reviews Yet</h2>
               <p className="text-muted-foreground mb-6">
