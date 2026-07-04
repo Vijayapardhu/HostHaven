@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Tag, Copy, Check, Gift, Percent, Star, ArrowRight } from "lucide-react";
+import { api } from "@/lib/api";
 
 interface Offer {
   code: string;
@@ -11,32 +12,17 @@ interface Offer {
   color: string;
 }
 
-const offers: Offer[] = [
-  {
-    code: "WELCOME50",
-    title: "First Booking Offer",
-    description: "Get 50% off on your first hotel booking with HostHaven",
-    discount: "50% OFF",
-    validUntil: "Valid until Jun 30",
-    color: "from-primary to-gold",
-  },
-  {
-    code: "STAY3PAY2",
-    title: "Extended Stay Deal",
-    description: "Book 3 nights and pay for only 2 across all properties",
-    discount: "1 NIGHT FREE",
-    validUntil: "Valid until Jul 15",
-    color: "from-green-500 to-emerald-600",
-  },
-  {
-    code: "TEMPLE10",
-    title: "Temple Town Special",
-    description: "Extra 10% off on temple town properties in Tirupati & Vijayawada",
-    discount: "10% EXTRA",
-    validUntil: "Valid until Aug 31",
-    color: "from-purple-500 to-purple-700",
-  },
+const CARD_COLORS = [
+  "from-primary to-gold",
+  "from-green-500 to-emerald-600",
+  "from-purple-500 to-purple-700",
+  "from-amber-500 to-orange-600",
+  "from-sky-500 to-blue-600",
+  "from-rose-500 to-pink-600",
 ];
+
+const titleCase = (code: string) =>
+  code.replace(/[_-]+/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
 
 const OfferCard = ({ offer }: { offer: Offer }) => {
   const [copied, setCopied] = useState(false);
@@ -92,6 +78,56 @@ const OfferCard = ({ offer }: { offer: Offer }) => {
 };
 
 const OffersSection = () => {
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.coupons
+      .listPublic()
+      .then((coupons) => {
+        if (cancelled) return;
+        const mapped: Offer[] = (coupons || []).map((c, i) => {
+          const discount =
+            c.discountType === "PERCENTAGE"
+              ? `${c.discountValue}% OFF`
+              : `₹${c.discountValue} OFF`;
+          const cityNote =
+            c.applicableCities && c.applicableCities.length > 0
+              ? ` in ${c.applicableCities.map(titleCase).join(", ")}`
+              : "";
+          return {
+            code: c.code,
+            title: titleCase(c.code),
+            description:
+              c.description ||
+              `Save${cityNote} on your next booking${
+                c.minBookingAmount ? ` above ₹${c.minBookingAmount}` : ""
+              }.`,
+            discount,
+            validUntil: `Valid until ${new Date(c.validUntil).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+            })}`,
+            color: CARD_COLORS[i % CARD_COLORS.length],
+          };
+        });
+        setOffers(mapped);
+      })
+      .catch(() => {
+        if (!cancelled) setOffers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Hide the section entirely when there are no live offers.
+  if (!isLoading && offers.length === 0) return null;
+
   return (
     <section id="offers" className="py-8 bg-gradient-to-b from-background to-primary/5">
       <div className="container mx-auto px-4">
@@ -110,9 +146,11 @@ const OffersSection = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {offers.map((offer) => (
-            <OfferCard key={offer.code} offer={offer} />
-          ))}
+          {isLoading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-40 rounded-xl bg-muted animate-pulse" />
+              ))
+            : offers.map((offer) => <OfferCard key={offer.code} offer={offer} />)}
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">

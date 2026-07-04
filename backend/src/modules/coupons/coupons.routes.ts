@@ -3,6 +3,8 @@ import { couponsController } from "./coupons.controller";
 import { requireRole } from "../../middleware/auth.middleware";
 
 export default async function couponsRoutes(fastify: FastifyInstance) {
+  fastify.get("/public", couponsController.getPublicCoupons);
+
   fastify.post("/validate", couponsController.validateCoupon);
   
   fastify.post(

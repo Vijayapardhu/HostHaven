@@ -69,6 +69,40 @@ export class CouponsController {
     }
   }
 
+  async getPublicCoupons(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const now = new Date();
+      const coupons = await prisma.coupon.findMany({
+        where: {
+          isActive: true,
+          validFrom: { lte: now },
+          validUntil: { gte: now },
+        },
+        orderBy: { discountValue: "desc" },
+        take: 12,
+      });
+
+      // Hide fully-exhausted coupons and expose only safe display fields.
+      const available = coupons
+        .filter((c) => !c.usageLimit || c.usageCount < c.usageLimit)
+        .map((c) => ({
+          code: c.code,
+          description: c.description,
+          discountType: c.discountType,
+          discountValue: Number(c.discountValue),
+          minBookingAmount: c.minBookingAmount ? Number(c.minBookingAmount) : null,
+          maxDiscountAmount: c.maxDiscountAmount ? Number(c.maxDiscountAmount) : null,
+          validUntil: c.validUntil,
+          applicableCities: c.applicableCities,
+        }));
+
+      return sendSuccess(reply, available);
+    } catch (error: any) {
+      logger.error({ error }, "Get public coupons failed");
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to fetch offers", 500);
+    }
+  }
+
   async getCoupons(request: FastifyRequest, reply: FastifyReply) {
     try {
       const { search, isActive } = request.query as { search?: string; isActive?: string };

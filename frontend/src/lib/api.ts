@@ -555,6 +555,17 @@ class ApiService {
       discountValue: number;
       description?: string;
     }>("/coupons/validate", data, false),
+
+    listPublic: () => this.get<Array<{
+      code: string;
+      description?: string;
+      discountType: "PERCENTAGE" | "FIXED";
+      discountValue: number;
+      minBookingAmount?: number | null;
+      maxDiscountAmount?: number | null;
+      validUntil: string;
+      applicableCities: string[];
+    }>>("/coupons/public", false),
   };
 
   bookings = {
