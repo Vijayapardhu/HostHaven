@@ -502,46 +502,66 @@ export class VendorService {
 
   async requestPayout(vendorId: string, amount?: number) {
     const { Prisma } = await import('@prisma/client');
-    const unpaidEntries = await prisma.commissionLedger.findMany({
-      where: { vendorId, payoutId: null },
-    });
 
-    if (unpaidEntries.length === 0) {
-      const error = new Error("No unpaid earnings available");
+    const fail = (message: string): never => {
+      const error = new Error(message);
       (error as any).code = ERROR_CODES.VALIDATION_ERROR;
       throw error;
-    }
+    };
 
-    const totalEarning = unpaidEntries.reduce(
-      (acc, entry) => acc.add(entry.vendorEarning),
-      new Prisma.Decimal(0),
-    );
-
-    const payoutAmount = amount ? new Prisma.Decimal(amount) : totalEarning;
-
-    if (payoutAmount.gt(totalEarning)) {
-      const error = new Error("Payout amount exceeds available earnings");
-      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
-      throw error;
-    }
-
-    const payout = await prisma.payout.create({
-      data: {
-        vendorId,
-        amount: payoutAmount,
-        status: "PENDING",
-        bookingIds: unpaidEntries.slice(0, amount ? undefined : unpaidEntries.length).map((e) => e.bookingId),
-        periodStart: unpaidEntries[unpaidEntries.length - 1]?.createdAt || new Date(),
-        periodEnd: new Date(),
-      },
-    });
-
-    if (!amount) {
-      await prisma.commissionLedger.updateMany({
-        where: { id: { in: unpaidEntries.map((e) => e.id) } },
-        data: { payoutId: payout.id },
+    // Atomically select unpaid commission entries and link them to the new
+    // payout, so earnings can never be paid out twice (previously a partial
+    // `amount` created a payout without linking any entries → double-spend).
+    const payout = await prisma.$transaction(async (tx) => {
+      const unpaidEntries = await tx.commissionLedger.findMany({
+        where: { vendorId, payoutId: null },
+        orderBy: { createdAt: 'asc' },
       });
-    }
+
+      if (unpaidEntries.length === 0) fail("No unpaid earnings available");
+
+      const totalEarning = unpaidEntries.reduce(
+        (acc, entry) => acc.add(entry.vendorEarning),
+        new Prisma.Decimal(0),
+      );
+
+      const payoutAmount = amount ? new Prisma.Decimal(amount) : totalEarning;
+
+      if (payoutAmount.lte(0)) fail("Payout amount must be greater than 0");
+      if (payoutAmount.gt(totalEarning)) fail("Payout amount exceeds available earnings");
+
+      // Greedily allocate whole entries until the requested amount is covered.
+      const selected: typeof unpaidEntries = [];
+      let allocated = new Prisma.Decimal(0);
+      for (const entry of unpaidEntries) {
+        const next = allocated.add(entry.vendorEarning);
+        if (next.gt(payoutAmount)) break;
+        selected.push(entry);
+        allocated = next;
+      }
+
+      if (allocated.lt(payoutAmount)) {
+        fail("Requested amount does not match a whole set of earnings; request the full amount instead");
+      }
+
+      const created = await tx.payout.create({
+        data: {
+          vendorId,
+          amount: payoutAmount,
+          status: "PENDING",
+          bookingIds: selected.map((e) => e.bookingId),
+          periodStart: selected[0].createdAt,
+          periodEnd: selected[selected.length - 1].createdAt,
+        },
+      });
+
+      await tx.commissionLedger.updateMany({
+        where: { id: { in: selected.map((e) => e.id) } },
+        data: { payoutId: created.id },
+      });
+
+      return created;
+    });
 
     logger.info({ vendorId, payoutId: payout.id }, "Vendor requested payout");
 

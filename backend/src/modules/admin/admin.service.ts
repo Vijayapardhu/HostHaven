@@ -3424,10 +3424,18 @@ Crawl-delay: 1
         },
       });
     } else {
-      await prisma.payout.update({
-        where: { id: payoutId },
-        data: { status: "REJECTED" },
-      });
+      // Reject: release the linked commission entries back to the unpaid pool
+      // so the vendor can be paid for them in a future payout.
+      await prisma.$transaction([
+        prisma.payout.update({
+          where: { id: payoutId },
+          data: { status: "REJECTED" },
+        }),
+        prisma.commissionLedger.updateMany({
+          where: { payoutId },
+          data: { payoutId: null },
+        }),
+      ]);
     }
 
     logger.info({ payoutId, action, adminId: adminInfo?.id }, "Payout processed by admin");
