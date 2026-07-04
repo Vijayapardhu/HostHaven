@@ -31,7 +31,12 @@ export class TemplesService {
     }
 
     if (filters.city) {
-      where.city = filters.city as any;
+      const requestedCity = filters.city.trim().toUpperCase();
+      const variants =
+        requestedCity === 'VETAPALEM' || requestedCity === 'VETLAPALEM'
+          ? ['VETAPALEM', 'VETLAPALEM']
+          : [requestedCity];
+      where.city = { in: variants, mode: 'insensitive' } as any;
     }
 
     if (filters.search) {

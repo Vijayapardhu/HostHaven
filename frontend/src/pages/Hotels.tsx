@@ -336,7 +336,7 @@ const Hotels = () => {
                             <span className="text-muted-foreground font-normal text-sm">/night</span>
                           </p>
                         </div>
-                        <Button variant="gold" size="sm">
+                        <Button variant="default" size="sm">
                           View Details
                         </Button>
                       </div>

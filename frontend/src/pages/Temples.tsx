@@ -199,7 +199,7 @@ const Temples = () => {
                       <span className="line-clamp-1">{temple.fullAddress || temple.landmark || formatCity(temple.city)}</span>
                     </p>
 
-                    <Button variant="goldOutline" className="w-full mt-2">
+                    <Button variant="default" className="w-full mt-2">
                       View Details
                       <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </Button>

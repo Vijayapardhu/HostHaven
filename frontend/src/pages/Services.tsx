@@ -674,7 +674,7 @@ const Services = () => {
                             </span>
                           ) : null}
                         </div>
-                        <Button variant="gold" className="w-full mt-4 group-hover:scale-[1.02] transition-transform" onClick={(event) => { event.stopPropagation(); handleServiceClick(service); }}>
+                        <Button variant="default" className="w-full mt-4 group-hover:scale-[1.02] transition-transform" onClick={(event) => { event.stopPropagation(); handleServiceClick(service); }}>
                           View & Book
                         </Button>
                       </div>

@@ -59,23 +59,15 @@ export class PropertiesService {
 
     if (filters.city) {
       const requestedCity = filters.city.trim().toUpperCase();
-      // Normalize common typo for Vetapalem
-      const normalizedCity = requestedCity === 'VETAPALEM' ? 'VETLAPALEM' : requestedCity;
-
-      // Only apply city filter if it exists in platform cities to avoid enum mismatch errors
- try {
-        const activeCities = await getActiveCities();
-        const activeUpper = activeCities.map(c => c.trim().toUpperCase());
-        if (activeUpper.length > 0) {
-          if (activeUpper.includes(normalizedCity)) {
-            where.city = normalizedCity;
-          } else {
-            logger.warn({ requestedCity, normalizedCity, activeCities }, 'Skipping city filter because it is not in active cities');
-          }
-        }
-      } catch (err) {
-        logger.warn({ err, requestedCity }, 'Failed to load active cities, skipping city filter');
-      }
+      // `city` is free-text, so ALWAYS apply the filter — an unknown city
+      // simply returns no results, instead of the old behaviour that dropped
+      // the filter (and returned every property) when the city wasn't in the
+      // active list. Match either spelling of the Vetapalem/Vetlapalem variant.
+      const variants =
+        requestedCity === 'VETAPALEM' || requestedCity === 'VETLAPALEM'
+          ? ['VETAPALEM', 'VETLAPALEM']
+          : [requestedCity];
+      where.city = { in: variants, mode: 'insensitive' } as any;
     }
 
     if (filters.state) {
