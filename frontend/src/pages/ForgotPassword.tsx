@@ -80,7 +80,7 @@ const ForgotPassword = () => {
             </div>
 
             <Link to="/login">
-              <Button variant="hero" className="w-full h-12" size="lg">
+              <Button variant="default" className="w-full h-12" size="lg">
                 <ArrowRight className="w-5 h-5 mr-2 rotate-180" />
                 Back to Login
               </Button>
@@ -176,7 +176,7 @@ const ForgotPassword = () => {
             >
               <Button
                 type="submit"
-                variant="hero"
+                variant="default"
                 className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all"
                 disabled={isLoading}
               >

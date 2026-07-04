@@ -405,7 +405,7 @@ const Signup = () => {
               >
                 <Button
                   type="submit"
-                  variant="hero"
+                  variant="default"
                   className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all"
                   disabled={isLoading}
                 >

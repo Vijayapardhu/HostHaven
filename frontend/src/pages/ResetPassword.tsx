@@ -83,7 +83,7 @@ const ResetPassword = () => {
             Your password has been reset successfully.
           </p>
           <Link to="/login">
-            <Button variant="hero" className="w-full" size="lg">
+            <Button variant="default" className="w-full" size="lg">
               Go to Login
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
@@ -161,7 +161,7 @@ const ResetPassword = () => {
 
           <Button
             type="submit"
-            variant="hero"
+            variant="default"
             className="w-full"
             size="lg"
             disabled={isLoading || !token}

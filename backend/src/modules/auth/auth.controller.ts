@@ -205,8 +205,13 @@ export const AuthController = {
         path: '/v1/auth/refresh',
       });
 
-      // Redirect to frontend with a minimal non-sensitive marker
+      // Redirect to the frontend callback with the tokens so the SPA (which
+      // authenticates via localStorage Bearer tokens) can pick them up. The
+      // callback immediately stores them and clears the URL. Cookies are also
+      // set above as a fallback.
       const frontendUrl = new URL(`${config.app.frontendUrl}/auth/callback`);
+      frontendUrl.searchParams.set('accessToken', loginResult.tokens.accessToken);
+      frontendUrl.searchParams.set('refreshToken', loginResult.tokens.refreshToken);
       frontendUrl.searchParams.set('isNewUser', String(loginResult.isNewUser));
 
       return reply.redirect(frontendUrl.toString());
