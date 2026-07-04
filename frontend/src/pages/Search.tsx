@@ -18,6 +18,7 @@ interface SearchResult {
   image: string;
   rating?: number;
   price?: number;
+  distanceKm?: number;
 }
 
 const categoryConfig = {
@@ -40,6 +41,73 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [nearLocation, setNearLocation] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const latParam = searchParams.get("lat");
+  const lngParam = searchParams.get("lng");
+  const isNearbyMode = latParam != null && lngParam != null;
+
+  // Fetch properties near a coordinate and reverse-geocode the place name.
+  const performNearbySearch = async (lat: number, lng: number) => {
+    setIsLoading(true);
+    setHasSearched(true);
+    try {
+      const res = await api.properties.getAll({
+        lat: String(lat),
+        lng: String(lng),
+        radius: "25",
+        limit: "24",
+      });
+      const mapped: SearchResult[] = (res.data || []).map((p: any) => ({
+        type: (p.type === "HOME" ? "homes" : "hotels") as SearchCategory,
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        location: p.city || p.address?.city || "",
+        image: p.images?.[0]?.url || p.images?.[0] || "",
+        rating: p.rating,
+        price: p.pricePerNight ?? p.basePrice,
+        distanceKm: p.distanceKm,
+      }));
+      setResults(mapped);
+    } catch (error) {
+      handleError(error, "api");
+    } finally {
+      setIsLoading(false);
+    }
+
+    // Best-effort reverse geocode for a friendly "near <place>" label.
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12`,
+      );
+      const d = await r.json();
+      const a = d?.address || {};
+      setNearLocation(
+        a.city || a.town || a.village || a.suburb || a.state_district ||
+          (d?.display_name ? String(d.display_name).split(",")[0] : null),
+      );
+    } catch {
+      /* ignore geocode failure */
+    }
+  };
+
+  // "Use my current location" — resolves the browser position then searches.
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const { latitude, longitude } = pos.coords;
+        setSearchParams({ lat: String(latitude), lng: String(longitude) });
+        performNearbySearch(latitude, longitude);
+      },
+      () => setIsLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
 
   const performSearch = async (searchQuery: string, searchCategory: SearchCategory) => {
     if (!searchQuery.trim()) return;
@@ -146,9 +214,14 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
-    if (initialQuery) {
+    const lat = parseFloat(latParam || "");
+    const lng = parseFloat(lngParam || "");
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      performNearbySearch(lat, lng);
+    } else if (initialQuery) {
       performSearch(initialQuery, initialCategory);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -204,6 +277,22 @@ export default function SearchPage() {
               </Button>
             </form>
 
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handleUseMyLocation}
+                disabled={isLocating}
+                className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
+              >
+                {isLocating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MapPin className="w-4 h-4" />
+                )}
+                {isLocating ? "Locating…" : "Use my current location"}
+              </button>
+            </div>
+
             {/* Category Tabs */}
             <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
               {Object.entries(categoryConfig).map(([key, config]) => {
@@ -236,14 +325,27 @@ export default function SearchPage() {
           ) : hasSearched ? (
             <>
               <p className="text-muted-foreground mb-6">
-                {results.length} results for "{query}"
+                {isNearbyMode ? (
+                  <>
+                    {results.length} stay{results.length === 1 ? "" : "s"} near{" "}
+                    <span className="font-medium text-foreground">{nearLocation || "your location"}</span>
+                  </>
+                ) : (
+                  <>{results.length} results for "{query}"</>
+                )}
               </p>
-              
+
               {results.length === 0 ? (
                 <div className="text-center py-16">
-                  <Search className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-foreground/80 mb-2">No results found</h3>
-                  <p className="text-muted-foreground">Try different keywords or browse categories</p>
+                  <MapPin className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-foreground/80 mb-2">
+                    {isNearbyMode ? "No stays found nearby" : "No results found"}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {isNearbyMode
+                      ? "Try widening your area or search by city name."
+                      : "Try different keywords or browse categories"}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -279,6 +381,9 @@ export default function SearchPage() {
                         <div className="flex items-center gap-1 text-muted-foreground text-sm mb-2">
                           <MapPin className="w-4 h-4" />
                           {result.location || "Location not available"}
+                          {result.distanceKm != null && (
+                            <span className="ml-1 font-medium text-primary">· {result.distanceKm} km away</span>
+                          )}
                         </div>
                         <div className="flex items-center justify-between">
                           {result.rating && (

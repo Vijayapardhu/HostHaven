@@ -130,6 +130,19 @@ export class PropertiesService {
       }
     }
 
+    // Geo "near me" search: filter within a radius and sort by distance when
+    // coordinates are supplied (e.g. /search?lat=..&lng=..).
+    if (filters.lat !== undefined && filters.lng !== undefined) {
+      return this.getNearby(where, {
+        lat: filters.lat,
+        lng: filters.lng,
+        radius: filters.radius,
+        page,
+        limit,
+        type: filters.type,
+      });
+    }
+
     const cacheKey = cacheService.keys.propertyList(JSON.stringify(filters));
     const cached = await cacheService.get<any>(cacheKey);
 
@@ -173,6 +186,60 @@ export class PropertiesService {
     await cacheService.set(cacheKey, result, cacheService.getTTL().PROPERTY_LIST);
 
     return result;
+  }
+
+  private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const R = 6371; // Earth radius in km
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  private async getNearby(
+    where: Prisma.PropertyWhereInput,
+    opts: { lat: number; lng: number; radius?: number; page: number; limit: number; type?: string },
+  ) {
+    const radiusKm = opts.radius && opts.radius > 0 ? opts.radius : 25;
+
+    const candidates = await prisma.property.findMany({
+      where: { ...where, latitude: { not: null }, longitude: { not: null } },
+      include: {
+        rooms: {
+          where: { isActive: true, isDeleted: false },
+          select: { id: true, name: true, pricePerNight: true, capacity: true, images: true },
+        },
+        templeDetails: opts.type === 'TEMPLE',
+      },
+    });
+
+    const withDistance = candidates
+      .map((p) => ({
+        p,
+        distanceKm: this.haversineKm(opts.lat, opts.lng, Number(p.latitude), Number(p.longitude)),
+      }))
+      .filter((x) => x.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    const total = withDistance.length;
+    const skip = (opts.page - 1) * opts.limit;
+    const properties = withDistance.slice(skip, skip + opts.limit).map((x) => ({
+      ...this.sanitizeProperty(x.p),
+      distanceKm: Math.round(x.distanceKm * 10) / 10,
+    }));
+
+    return {
+      properties,
+      meta: {
+        page: opts.page,
+        limit: opts.limit,
+        total,
+        totalPages: Math.ceil(total / opts.limit) || 1,
+      },
+    };
   }
 
   async getById(idOrSlug: string) {
