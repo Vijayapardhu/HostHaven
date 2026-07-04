@@ -1,20 +1,25 @@
 import api from './api'
 
+// Field names mirror the backend Coupon model exactly (uppercase discountType,
+// usageLimit/usageCount, applicableCities) so reads and writes line up.
+export type DiscountType = 'PERCENTAGE' | 'FIXED'
+
 export interface Coupon {
   id: string
   code: string
   description?: string
-  discountType: 'percentage' | 'fixed'
+  discountType: DiscountType
   discountValue: number
   minBookingAmount?: number
   maxDiscountAmount?: number
-  maxUses?: number
-  usedCount: number
+  usageLimit?: number
+  usageCount: number
+  perUserLimit: number
   validFrom: string
   validUntil: string
   isActive: boolean
-  applicableProperties?: string[]
-  applicablePropertyTypes?: string[]
+  applicableProperties: string[]
+  applicableCities: string[]
   createdAt: string
   updatedAt: string
 }
@@ -22,18 +27,25 @@ export interface Coupon {
 const mapCoupon = (coupon: any): Coupon => ({
   id: coupon.id,
   code: coupon.code ?? '',
-  description: coupon.description,
-  discountType: coupon.discountType ?? 'percentage',
+  description: coupon.description ?? undefined,
+  discountType: (coupon.discountType ?? 'PERCENTAGE') as DiscountType,
   discountValue: Number(coupon.discountValue ?? 0),
-  minBookingAmount: coupon.minBookingAmount ? Number(coupon.minBookingAmount) : undefined,
-  maxDiscountAmount: coupon.maxDiscountAmount ? Number(coupon.maxDiscountAmount) : undefined,
-  maxUses: coupon.maxUses,
-  usedCount: Number(coupon.usedCount ?? 0),
+  minBookingAmount:
+    coupon.minBookingAmount != null ? Number(coupon.minBookingAmount) : undefined,
+  maxDiscountAmount:
+    coupon.maxDiscountAmount != null ? Number(coupon.maxDiscountAmount) : undefined,
+  usageLimit: coupon.usageLimit != null ? Number(coupon.usageLimit) : undefined,
+  usageCount: Number(coupon.usageCount ?? 0),
+  perUserLimit: Number(coupon.perUserLimit ?? 1),
   validFrom: coupon.validFrom,
   validUntil: coupon.validUntil,
   isActive: coupon.isActive ?? true,
-  applicableProperties: coupon.applicableProperties,
-  applicablePropertyTypes: coupon.applicablePropertyTypes,
+  applicableProperties: Array.isArray(coupon.applicableProperties)
+    ? coupon.applicableProperties
+    : [],
+  applicableCities: Array.isArray(coupon.applicableCities)
+    ? coupon.applicableCities
+    : [],
   createdAt: coupon.createdAt,
   updatedAt: coupon.updatedAt ?? coupon.createdAt,
 })
@@ -54,19 +66,27 @@ const normalizeListResponse = (payload: any) => {
   }
 }
 
+export interface CouponInput {
+  code: string
+  description?: string
+  discountType: DiscountType
+  discountValue: number
+  minBookingAmount?: number
+  maxDiscountAmount?: number
+  usageLimit?: number
+  perUserLimit?: number
+  validFrom: string
+  validUntil: string
+  applicableProperties?: string[]
+  applicableCities?: string[]
+}
+
 export const couponsService = {
-  getCoupons: async (params?: {
-    page?: number
-    limit?: number
-    search?: string
-    isActive?: boolean
-  }) => {
+  getCoupons: async (params?: { search?: string; isActive?: boolean }) => {
     const response = await api.get('/v1/coupons', {
       params: {
-        page: params?.page,
-        limit: params?.limit,
         search: params?.search || undefined,
-        isActive: params?.isActive?.toString() || undefined,
+        isActive: params?.isActive != null ? String(params.isActive) : undefined,
       },
     })
     return normalizeListResponse(response.data)
@@ -78,37 +98,15 @@ export const couponsService = {
     return mapCoupon(payload)
   },
 
-  createCoupon: async (data: {
-    code: string
-    description?: string
-    discountType: 'percentage' | 'fixed'
-    discountValue: number
-    minBookingAmount?: number
-    maxDiscountAmount?: number
-    maxUses?: number
-    validFrom: string
-    validUntil: string
-    applicableProperties?: string[]
-    applicablePropertyTypes?: string[]
-  }) => {
+  createCoupon: async (data: CouponInput) => {
     const response = await api.post('/v1/coupons', data)
     return response.data?.data ?? response.data
   },
 
-  updateCoupon: async (id: string, data: Partial<{
-    code: string
-    description: string
-    discountType: 'percentage' | 'fixed'
-    discountValue: number
-    minBookingAmount: number
-    maxDiscountAmount: number
-    maxUses: number
-    validFrom: string
-    validUntil: string
-    isActive: boolean
-    applicableProperties: string[]
-    applicablePropertyTypes: string[]
-  }>) => {
+  updateCoupon: async (
+    id: string,
+    data: Partial<CouponInput & { isActive: boolean }>,
+  ) => {
     const response = await api.put(`/v1/coupons/${id}`, data)
     return response.data?.data ?? response.data
   },

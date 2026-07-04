@@ -23,6 +23,7 @@ import {
   Truck,
   MapPin,
   Download,
+  Ticket,
 } from "lucide-react";
 import { useState } from "react";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
@@ -44,6 +45,7 @@ const navigation = [
   { name: "Services", href: "/services", icon: Package },
   { name: "Temples", href: "/temples", icon: MapPin },
   { name: "Payments", href: "/payments", icon: CreditCard },
+  { name: "Coupons & Offers", href: "/coupons", icon: Ticket },
   { name: "Reviews", href: "/reviews", icon: Star },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Support", href: "/support", icon: LifeBuoy },

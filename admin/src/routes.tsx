@@ -74,6 +74,7 @@ const PayoutDetails = PageLoader(lazy(() => import("./pages/PayoutDetails")));
 const VendorEarnings = PageLoader(lazy(() => import("./pages/VendorEarnings")));
 const Amenities = PageLoader(lazy(() => import("./pages/Amenities")));
 const Cities = PageLoader(lazy(() => import("./pages/Cities")));
+const Coupons = PageLoader(lazy(() => import("./pages/Coupons")));
 
 const routes = [
   {
@@ -246,6 +247,10 @@ const routes = [
       {
         path: "/settings/cities",
         element: <Cities />,
+      },
+      {
+        path: "/coupons",
+        element: <Coupons />,
       },
     ],
   },
