@@ -17,6 +17,7 @@ export const createBookingSchema = z.object({
     idProof: z.string().optional(),
   })).optional(),
   guestPhone: z.string().regex(/^\d{10}$/).optional(),
+  couponCode: z.string().trim().min(1).max(40).optional(),
 });
 
 export const cancelBookingSchema = z.object({

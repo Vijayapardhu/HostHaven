@@ -35,6 +35,68 @@ export class BookingsService {
     return result.count;
   }
 
+  /**
+   * Validates a coupon server-side and returns the discount to apply against
+   * the pre-tax booking amount. Throws a VALIDATION_ERROR (surfaced as 400)
+   * when a code was supplied but is not usable. Returns a zero discount when
+   * no code is supplied.
+   */
+  private async resolveCoupon(
+    couponCode: string | undefined,
+    ctx: { userId: string; propertyId: string; city: string; preTaxAmount: number },
+  ): Promise<{ discountAmount: number; appliedCoupon: { id: string; code: string } | null }> {
+    if (!couponCode || !couponCode.trim()) {
+      return { discountAmount: 0, appliedCoupon: null };
+    }
+
+    const fail = (message: string): never => {
+      const error = new Error(message);
+      (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+      throw error;
+    };
+
+    const code = couponCode.trim().toUpperCase();
+    const coupon = await prisma.coupon.findUnique({ where: { code } });
+
+    if (!coupon || !coupon.isActive) fail("Invalid or inactive coupon code");
+    const c = coupon!;
+
+    const now = new Date();
+    if (now < c.validFrom || now > c.validUntil) fail("This coupon has expired");
+    if (c.usageLimit && c.usageCount >= c.usageLimit) {
+      fail("This coupon has reached its usage limit");
+    }
+
+    const minAmount = c.minBookingAmount ? Number(c.minBookingAmount) : null;
+    if (minAmount && ctx.preTaxAmount < minAmount) {
+      fail(`This coupon requires a minimum booking amount of ₹${minAmount}`);
+    }
+
+    if (c.applicableProperties.length > 0 && !c.applicableProperties.includes(ctx.propertyId)) {
+      fail("This coupon is not applicable for this property");
+    }
+    if (c.applicableCities.length > 0 && !c.applicableCities.includes((ctx.city || "").toUpperCase())) {
+      fail("This coupon is not applicable in this city");
+    }
+
+    const existingUsage = await prisma.couponUsage.findUnique({
+      where: { couponId_userId: { couponId: c.id, userId: ctx.userId } },
+    });
+    if (existingUsage) fail("You have already used this coupon");
+
+    const maxDiscount = c.maxDiscountAmount ? Number(c.maxDiscountAmount) : null;
+    let discountAmount = 0;
+    if (c.discountType === "PERCENTAGE") {
+      discountAmount = (ctx.preTaxAmount * Number(c.discountValue)) / 100;
+      if (maxDiscount && discountAmount > maxDiscount) discountAmount = maxDiscount;
+    } else {
+      discountAmount = Number(c.discountValue);
+    }
+    discountAmount = Math.round(Math.min(discountAmount, ctx.preTaxAmount) * 100) / 100;
+
+    return { discountAmount, appliedCoupon: { id: c.id, code: c.code } };
+  }
+
   async create(data: {
     propertyId: string;
     roomId?: string;
@@ -47,6 +109,7 @@ export class BookingsService {
     guestDetails?: any[];
     userId: string;
     guestPhone?: string;
+    couponCode?: string;
   }) {
     const property = await prisma.property.findFirst({
       where: { id: data.propertyId, isDeleted: false },
@@ -106,8 +169,21 @@ export class BookingsService {
     const extraBedAmount = data.extraBeds * 500 * nights;
     const taxableAmount = baseAmount + extraBedAmount;
     const taxRate = taxPercent / 100;
-    const taxAmount = Math.round(taxableAmount * taxRate * 100) / 100;
-    const totalAmount = Math.round((taxableAmount + taxAmount) * 100) / 100;
+
+    // Server-side coupon validation + discount (never trust the client).
+    const { discountAmount, appliedCoupon } = await this.resolveCoupon(
+      data.couponCode,
+      {
+        userId: data.userId,
+        propertyId: data.propertyId,
+        city: property.city,
+        preTaxAmount: taxableAmount,
+      },
+    );
+
+    const discountedTaxable = Math.max(0, taxableAmount - discountAmount);
+    const taxAmount = Math.round(discountedTaxable * taxRate * 100) / 100;
+    const totalAmount = Math.round((discountedTaxable + taxAmount) * 100) / 100;
 
     const roomUnavailableError = new Error("Room not available for selected dates");
     (roomUnavailableError as any).code = ERROR_CODES.ROOM_NOT_AVAILABLE;
@@ -171,7 +247,7 @@ export class BookingsService {
               extraBeds: data.extraBeds,
               baseAmount: new Prisma.Decimal(baseAmount + extraBedAmount),
               taxAmount: new Prisma.Decimal(taxAmount),
-              discountAmount: new Prisma.Decimal(0),
+              discountAmount: new Prisma.Decimal(discountAmount),
               totalAmount: new Prisma.Decimal(totalAmount),
               specialRequests: data.specialRequests,
               guestDetails: data.guestDetails,
@@ -183,6 +259,23 @@ export class BookingsService {
               room: true,
             },
           });
+
+          // Record coupon usage against this booking + bump the usage count,
+          // inside the same transaction so it can never be double-spent.
+          if (appliedCoupon && discountAmount > 0) {
+            await tx.couponUsage.create({
+              data: {
+                couponId: appliedCoupon.id,
+                userId: data.userId,
+                bookingId: createdBooking.id,
+                discountAmount: new Prisma.Decimal(discountAmount),
+              },
+            });
+            await tx.coupon.update({
+              where: { id: appliedCoupon.id },
+              data: { usageCount: { increment: 1 } },
+            });
+          }
 
           // Update user profile with phone number if provided
           if (data.guestPhone) {
@@ -211,6 +304,12 @@ export class BookingsService {
     } catch (error: any) {
       if (error?.code === "P2034") {
         throw roomUnavailableError;
+      }
+      // Unique violation on coupon_usages (couponId, userId) — concurrent reuse.
+      if (error?.code === "P2002") {
+        const couponErr = new Error("You have already used this coupon");
+        (couponErr as any).code = ERROR_CODES.VALIDATION_ERROR;
+        throw couponErr;
       }
       throw error;
     }

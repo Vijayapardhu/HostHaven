@@ -118,6 +118,55 @@ const BookingCheckout = () => {
     : 12;
   const taxEnabled = priceData ? (priceData.taxAmount > 0) : false;
 
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  // Discount applies to the pre-tax room amount; tax is then recomputed on the
+  // discounted base so the displayed total matches what the server charges.
+  const discount = appliedCoupon ? Math.min(appliedCoupon.discountAmount, totalAmount) : 0;
+  const discountedBase = Math.max(0, totalAmount - discount);
+  const effectiveTax = appliedCoupon
+    ? (taxEnabled ? Math.round(discountedBase * (taxPercent / 100)) : 0)
+    : taxAmount;
+  const displayGrand = appliedCoupon ? discountedBase + effectiveTax : grandTotal;
+
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code || isValidatingCoupon) return;
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const res = await api.coupons.validate({
+        code,
+        bookingAmount: totalAmount,
+        propertyId: id,
+      });
+      if (res?.valid) {
+        setAppliedCoupon({ code: code.toUpperCase(), discountAmount: res.discountAmount });
+        toast({
+          title: "Coupon applied",
+          description: `You saved ₹${res.discountAmount.toLocaleString("en-IN")}.`,
+        });
+      } else {
+        setAppliedCoupon(null);
+        setCouponError("This coupon is not valid.");
+      }
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      setCouponError(err?.message || "Invalid or expired coupon code.");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
+  };
+
   const handlePay = async () => {
     if (!id || !property || !selectedRoom?.id || !checkIn || !checkOut || nights <= 0) {
       toast({
@@ -162,6 +211,7 @@ const BookingCheckout = () => {
         children: 0,
         extraBeds: 0,
         guestPhone: phone || undefined,
+        couponCode: appliedCoupon?.code,
       });
 
       bookingId = bookingResponse?.booking?.id || bookingResponse?.id;
@@ -293,32 +343,80 @@ const BookingCheckout = () => {
                         <span>₹{roomPrice.toLocaleString('en-IN')} x {nights} night{nights > 1 ? "s" : ""}</span>
                         <span>₹{totalAmount.toLocaleString('en-IN')}</span>
                       </div>
+                      {appliedCoupon && discount > 0 && (
+                        <div className="flex justify-between text-emerald-600 font-medium">
+                          <span>Coupon ({appliedCoupon.code})</span>
+                          <span>-₹{discount.toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
                       {taxEnabled && (
                         <>
                           <div className="flex justify-between text-muted-foreground">
                             <span>GST ({taxPercent}%)</span>
-                            <span>₹{taxAmount.toLocaleString('en-IN')}</span>
+                            <span>₹{effectiveTax.toLocaleString('en-IN')}</span>
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>CGST ({(taxPercent / 2).toFixed(1)}%)</span>
-                            <span>₹{Math.round(taxAmount / 2).toLocaleString('en-IN')}</span>
+                            <span>₹{Math.round(effectiveTax / 2).toLocaleString('en-IN')}</span>
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>SGST ({(taxPercent / 2).toFixed(1)}%)</span>
-                            <span>₹{Math.round(taxAmount / 2).toLocaleString('en-IN')}</span>
+                            <span>₹{Math.round(effectiveTax / 2).toLocaleString('en-IN')}</span>
                           </div>
                         </>
                       )}
                       <div className="flex justify-between font-semibold text-base pt-1 border-t">
                         <span>Total</span>
-                        <span>₹{grandTotal.toLocaleString('en-IN')}</span>
+                        <span>₹{displayGrand.toLocaleString('en-IN')}</span>
                       </div>
                     </>
                   )}
                 </div>
 
+                {/* Coupon */}
+                <div className="pt-2 border-t space-y-2">
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2">
+                      <div className="text-sm">
+                        <span className="font-semibold text-emerald-700">{appliedCoupon.code}</span>
+                        <span className="text-emerald-600"> applied</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        className="text-xs font-medium text-emerald-700 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="text-sm font-medium">Have a coupon?</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleApplyCoupon(); } }}
+                          placeholder="Enter code"
+                          className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm uppercase tracking-wide focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleApplyCoupon}
+                          disabled={!couponInput.trim() || isValidatingCoupon || isPriceLoading}
+                        >
+                          {isValidatingCoupon ? "Checking..." : "Apply"}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                  {couponError && <p className="text-xs text-destructive">{couponError}</p>}
+                </div>
+
                 <Button className="w-full" size="lg" onClick={handlePay} disabled={isProcessingPayment || nights <= 0 || isPriceLoading}>
-                  {isProcessingPayment ? "Processing payment..." : isPriceLoading ? "Calculating..." : `Pay ₹${grandTotal.toLocaleString('en-IN')} & confirm booking`}
+                  {isProcessingPayment ? "Processing payment..." : isPriceLoading ? "Calculating..." : `Pay ₹${displayGrand.toLocaleString('en-IN')} & confirm booking`}
                 </Button>
               </CardContent>
             </Card>

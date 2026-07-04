@@ -34,6 +34,10 @@ export const BookingsController = {
       if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
         return sendError(reply, error.code, "The property or room you're looking for could not be found.", 404);
       }
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        // e.g. coupon expired / not applicable / already used
+        return sendError(reply, error.code, error.message || "Please check your booking details.", 400);
+      }
       if (error.name === "ZodError") {
         return sendError(
           reply,

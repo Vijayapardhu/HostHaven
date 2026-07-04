@@ -542,6 +542,21 @@ class ApiService {
     }) => this.post<any>("/payments/verify-service", data, true),
   };
 
+  coupons = {
+    validate: (data: {
+      code: string;
+      bookingAmount: number;
+      propertyId?: string;
+      city?: string;
+    }) => this.post<{
+      valid: boolean;
+      discountAmount: number;
+      discountType: "PERCENTAGE" | "FIXED";
+      discountValue: number;
+      description?: string;
+    }>("/coupons/validate", data, false),
+  };
+
   bookings = {
     create: (data: {
       propertyId: string;
@@ -558,6 +573,8 @@ class ApiService {
         gender: "male" | "female" | "other";
         idProof?: string;
       }>;
+      guestPhone?: string;
+      couponCode?: string;
     }) => this.post<any>("/bookings", data, true),
 
     cancel: (bookingId: string, reason?: string) =>
