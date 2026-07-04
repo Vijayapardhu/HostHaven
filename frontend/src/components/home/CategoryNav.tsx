@@ -33,7 +33,7 @@ const CategoryNav = () => {
                 <div
                   className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:-translate-y-0.5 ${
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-gold ring-2 ring-accent/40"
+                      ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/25"
                       : "bg-muted group-hover:bg-accent/15 group-hover:text-accent"
                   }`}
                 >

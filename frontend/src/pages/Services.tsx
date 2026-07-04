@@ -493,7 +493,7 @@ const Services = () => {
                 onClick={() => setSelectedLocation("all")}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   selectedLocation === "all"
-                    ? "gradient-gold text-primary-foreground shadow-gold"
+                    ? "bg-primary text-primary-foreground shadow-md"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
@@ -505,7 +505,7 @@ const Services = () => {
                   onClick={() => setSelectedLocation(location)}
                   className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                     selectedLocation === location
-                      ? "gradient-gold text-primary-foreground shadow-gold"
+                      ? "bg-primary text-primary-foreground shadow-md"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
                 >
@@ -519,7 +519,7 @@ const Services = () => {
                 onClick={() => setSelectedCategory("all")}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   selectedCategory === "all"
-                    ? "gradient-gold text-primary-foreground shadow-gold"
+                    ? "bg-primary text-primary-foreground shadow-md"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
@@ -531,7 +531,7 @@ const Services = () => {
                   onClick={() => setSelectedCategory(category)}
                   className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                     selectedCategory === category
-                      ? "gradient-gold text-primary-foreground shadow-gold"
+                      ? "bg-primary text-primary-foreground shadow-md"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
                 >

@@ -139,7 +139,7 @@ const Temples = () => {
                   onClick={() => setSelectedCity(city)}
                   className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                     selectedCity === city
-                      ? "gradient-gold text-primary-foreground shadow-gold"
+                      ? "bg-primary text-primary-foreground shadow-md"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
                 >

@@ -246,7 +246,7 @@ const Hotels = () => {
                       setSearchParams(newParams);
                     }}
                     className={`text-xs md:text-sm px-2 md:px-3 py-1 rounded-lg md:rounded-xl font-medium transition-all ${selectedLocation === loc
-                        ? "gradient-gold text-primary-foreground shadow-gold"
+                        ? "bg-primary text-primary-foreground shadow-md"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                   >
