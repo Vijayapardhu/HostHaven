@@ -30,12 +30,23 @@ function contrastForeground(hsl?: string): string {
   return parsed.l > 60 ? '30 10% 15%' : '0 0% 100%';
 }
 
+// Return an "H S% L%" triplet with lightness nudged by `delta` (clamped 0-100).
+function adjustL(hsl: string, delta: number): string {
+  const parsed = parseHsl(hsl);
+  if (!parsed) return hsl;
+  const l = Math.max(0, Math.min(100, parsed.l + delta));
+  return `${parsed.h} ${parsed.s}% ${l}%`;
+}
+
 /**
  * Applies the admin-configured brand colors to the document as CSS variables.
- * Beyond the seven base tokens it also cascades to every derived brand
- * variable (gold family, focus ring, sidebar, gradients, shadows) so a single
- * "primary" change re-themes the whole site consistently instead of leaving
- * the old gold accents behind.
+ *
+ * The site is a two-tone brand: `primary` is the main surface/button color
+ * (e.g. navy) while `accent` is the warm "gold" highlight. So the gold family
+ * (gold/gold-light/gold-dark, focus ring, glow, gradients) tracks `accent`,
+ * and the primary color drives buttons plus the sidebar highlight. This keeps
+ * a navy-primary + gold-accent combo intact instead of collapsing both tones
+ * into one.
  */
 function applyColors(colors: PublicColorsSettings) {
   const root = document.documentElement;
@@ -48,33 +59,35 @@ function applyColors(colors: PublicColorsSettings) {
 
   const { primary, secondary, accent } = colors;
 
+  // The warm highlight color drives the whole "gold" family. Fall back to
+  // primary if no accent is configured.
+  const warm = accent || primary;
+
   // Contrast-aware foregrounds so text stays legible on any chosen color.
   if (primary) root.style.setProperty('--primary-foreground', contrastForeground(primary));
   if (accent) root.style.setProperty('--accent-foreground', contrastForeground(accent));
 
-  // Primary drives the gold accent, focus ring and sidebar highlight.
-  if (primary) {
-    root.style.setProperty('--gold', primary);
-    root.style.setProperty('--ring', primary);
-    root.style.setProperty('--sidebar-primary', primary);
-    root.style.setProperty('--sidebar-ring', primary);
-    root.style.setProperty('--shadow-gold', `0 4px 20px -2px hsl(${primary} / 0.35)`);
-    root.style.setProperty('--shadow-glow', `0 0 20px hsl(${primary} / 0.4)`);
-  }
-
-  // Gradients blend primary -> accent for the signature "gold" look.
-  if (primary && accent) {
+  // Gold family + focus ring + glow, all derived from the warm accent.
+  if (warm) {
+    root.style.setProperty('--gold', warm);
+    root.style.setProperty('--gold-light', adjustL(warm, 14));
+    root.style.setProperty('--gold-dark', adjustL(warm, -12));
+    root.style.setProperty('--ring', warm);
+    root.style.setProperty('--sidebar-ring', warm);
+    root.style.setProperty('--shadow-gold', `0 4px 20px -2px hsl(${warm} / 0.35)`);
+    root.style.setProperty('--shadow-glow', `0 0 20px hsl(${warm} / 0.4)`);
     root.style.setProperty(
       '--gradient-gold',
-      `linear-gradient(135deg, hsl(${primary}) 0%, hsl(${accent}) 100%)`,
+      `linear-gradient(135deg, hsl(${warm}) 0%, hsl(${adjustL(warm, 8)}) 100%)`,
     );
     root.style.setProperty(
       '--gradient-gold-soft',
-      `linear-gradient(135deg, hsl(${accent}) 0%, hsl(${primary}) 100%)`,
+      `linear-gradient(135deg, hsl(${adjustL(warm, 14)}) 0%, hsl(${warm}) 100%)`,
     );
   }
 
-  // Secondary tints the sidebar surface.
+  // Primary drives the sidebar highlight; secondary tints the sidebar surface.
+  if (primary) root.style.setProperty('--sidebar-primary', primary);
   if (secondary) root.style.setProperty('--sidebar-accent', secondary);
 }
 

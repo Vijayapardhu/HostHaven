@@ -39,13 +39,13 @@ export interface PublicPlatformSettings {
 }
 
 export const DEFAULT_COLORS: PublicColorsSettings = {
-  primary: "38 92% 50%",
-  secondary: "40 30% 90%",
-  accent: "30 80% 55%",
-  background: "40 25% 94%",
-  foreground: "30 10% 15%",
-  card: "40 40% 98%",
-  heritage: "30 25% 25%",
+  primary: "205 65% 18%", // deep navy — main buttons, header, selected states
+  secondary: "40 30% 90%", // warm cream
+  accent: "36 90% 51%", // heritage gold — highlights, rings, gradients
+  background: "40 25% 94%", // cream page background
+  foreground: "205 45% 16%", // navy ink text
+  card: "40 40% 98%", // ivory card surface
+  heritage: "205 60% 15%", // deep navy overlays
 };
 
 export const DEFAULT_PUBLIC_SETTINGS: PublicPlatformSettings = {

@@ -306,13 +306,13 @@ const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
     supportCompanyName: "HostHaven Travels Pvt. Ltd.",
   },
   colors: {
-    primary: "38 92% 50%",
+    primary: "205 65% 18%",
     secondary: "40 30% 90%",
-    accent: "30 80% 55%",
+    accent: "36 90% 51%",
     background: "40 25% 94%",
-    foreground: "30 10% 15%",
+    foreground: "205 45% 16%",
     card: "40 40% 98%",
-    heritage: "30 25% 25%",
+    heritage: "205 60% 15%",
   },
 };
 
