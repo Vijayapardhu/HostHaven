@@ -117,13 +117,14 @@ export const config = {
   },
 
   rateLimit: {
-    max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
+    max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
-    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '60', 10),
-    apiMax: parseInt(process.env.API_RATE_LIMIT_MAX || '200', 10),
-    writeMax: parseInt(process.env.WRITE_RATE_LIMIT_MAX || '60', 10),
-    searchMax: parseInt(process.env.SEARCH_RATE_LIMIT_MAX || '60', 10),
-    uploadMax: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX || '20', 10),
+    // Auth kept comparatively tight to deter credential brute-force.
+    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '120', 10),
+    apiMax: parseInt(process.env.API_RATE_LIMIT_MAX || '1000', 10),
+    writeMax: parseInt(process.env.WRITE_RATE_LIMIT_MAX || '300', 10),
+    searchMax: parseInt(process.env.SEARCH_RATE_LIMIT_MAX || '600', 10),
+    uploadMax: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX || '60', 10),
   },
 
   logging: {

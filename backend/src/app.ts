@@ -210,8 +210,12 @@ export const buildApp = async () => {
     ],
   });
 
-  // Rate limiting
+  // Rate limiting — opt-in only. Public read/browse/branding endpoints
+  // (settings/public, seo, homepage, featured) are NOT rate limited so a
+  // shared/NAT'd IP can never trip them; sensitive routes (auth, write,
+  // booking, search) still apply their explicit per-route limits below.
   await fastify.register(rateLimit, {
+    global: false,
     max: config.rateLimit.max,
     timeWindow: config.rateLimit.windowMs,
     cache: 10000,
@@ -219,7 +223,8 @@ export const buildApp = async () => {
     keyGenerator: (request) => {
       return request.user?.id || request.ip;
     },
-    skipOnError: false,
+    // If the limiter's store errors, let the request through rather than 429.
+    skipOnError: true,
   });
 
   // Swagger documentation

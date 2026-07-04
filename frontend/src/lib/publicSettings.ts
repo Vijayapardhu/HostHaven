@@ -63,23 +63,40 @@ export const DEFAULT_PUBLIC_SETTINGS: PublicPlatformSettings = {
   colors: DEFAULT_COLORS,
 };
 
-export async function getPublicPlatformSettings(): Promise<PublicPlatformSettings> {
-  try {
-    const response = await fetch(`${BASE_URL}/v1/settings/public`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-      },
-    });
+// Module-level cache so that the many components using this endpoint
+// (ThemeInjector, Header, Footer, Index, …) share a single network request
+// instead of each refetching on mount — which previously flooded the API and
+// tripped rate limiting. Cleared on full page reload, so admin changes still
+// surface without a hard cache.
+let cachedSettings: PublicPlatformSettings | null = null;
+let inflightRequest: Promise<PublicPlatformSettings> | null = null;
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+export async function getPublicPlatformSettings(
+  forceRefresh = false,
+): Promise<PublicPlatformSettings> {
+  if (cachedSettings && !forceRefresh) return cachedSettings;
+  if (inflightRequest && !forceRefresh) return inflightRequest;
+
+  inflightRequest = (async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/v1/settings/public`, {
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const json = await response.json();
+      cachedSettings = json?.data ?? DEFAULT_PUBLIC_SETTINGS;
+      return cachedSettings;
+    } catch {
+      // Reuse a prior good value if we have one; otherwise fall back.
+      return cachedSettings ?? DEFAULT_PUBLIC_SETTINGS;
+    } finally {
+      inflightRequest = null;
     }
+  })();
 
-    const json = await response.json();
-    return json?.data ?? DEFAULT_PUBLIC_SETTINGS;
-  } catch {
-    return DEFAULT_PUBLIC_SETTINGS;
-  }
+  return inflightRequest;
 }
