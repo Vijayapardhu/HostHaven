@@ -39,6 +39,8 @@ import {
 import * as Dialog from "@radix-ui/react-dialog";
 
 const mergeAdvancedSettings = (value?: AdvancedSettings): AdvancedSettings => ({
+  ...DEFAULT_ADVANCED_SETTINGS,
+  ...(value ?? {}),
   booking: {
     ...DEFAULT_ADVANCED_SETTINGS.booking,
     ...(value?.booking ?? {}),
@@ -51,7 +53,71 @@ const mergeAdvancedSettings = (value?: AdvancedSettings): AdvancedSettings => ({
     ...DEFAULT_ADVANCED_SETTINGS.social,
     ...(value?.social ?? {}),
   },
+  contact: {
+    ...DEFAULT_ADVANCED_SETTINGS.contact!,
+    ...(value?.contact ?? {}),
+  },
+  tax: {
+    ...DEFAULT_ADVANCED_SETTINGS.tax!,
+    ...(value?.tax ?? {}),
+  },
+  colors: {
+    ...DEFAULT_ADVANCED_SETTINGS.colors!,
+    ...(value?.colors ?? {}),
+  },
 });
+
+// --- Brand color helpers: convert between the "H S% L%" strings the theme
+//     uses and the hex values a native <input type="color"> expects. ---
+const COLOR_FIELDS: { key: keyof NonNullable<AdvancedSettings["colors"]>; label: string }[] = [
+  { key: "primary", label: "Primary" },
+  { key: "secondary", label: "Secondary" },
+  { key: "accent", label: "Accent" },
+  { key: "background", label: "Background" },
+  { key: "foreground", label: "Foreground (text)" },
+  { key: "card", label: "Card" },
+  { key: "heritage", label: "Heritage" },
+];
+
+const hslStringToHex = (hsl?: string): string => {
+  if (!hsl) return "#808080";
+  const parts = hsl.trim().replace(/%/g, "").split(/\s+/).map(Number);
+  if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return "#808080";
+  const [h, s, l] = [parts[0], parts[1] / 100, parts[2] / 100];
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const to255 = (v: number) =>
+    Math.round((v + m) * 255).toString(16).padStart(2, "0");
+  return `#${to255(r)}${to255(g)}${to255(b)}`;
+};
+
+const hexToHslString = (hex: string): string => {
+  const clean = hex.replace("#", "");
+  const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
+  const r = parseInt(full.slice(0, 2), 16) / 255;
+  const g = parseInt(full.slice(2, 4), 16) / 255;
+  const b = parseInt(full.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0));
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+};
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
@@ -431,35 +497,65 @@ export default function SettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <p className="text-xs text-slate-500">
-                Customize the website&apos;s color scheme. Enter HSL values (e.g. &quot;38 92% 50%&quot;).
-              </p>
-              {["primary","secondary","accent","background","foreground","card","heritage"].map((key) => (
-                <div key={key}>
-                  <label className="block text-sm font-medium text-slate-700 capitalize mb-1">{key}</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      value={(settings.advancedSettings?.colors as any)?.[key] ?? ""}
-                      onChange={(e) =>
-                        updateAdvanced((advanced) => ({
-                          ...advanced,
-                          colors: {
-                            ...(advanced.colors ?? {}),
-                            [key]: e.target.value,
-                          },
-                        }))
-                      }
-                      className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono"
-                      placeholder="e.g. 38 92% 50%"
-                    />
-                    <div
-                      className="w-8 h-8 rounded-full border border-slate-200 flex-shrink-0"
-                      style={{ background: `hsl(${(settings.advancedSettings?.colors as any)?.[key] || "0 0% 50%"})` }}
-                    />
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  Customize the user website&apos;s color scheme. Pick a color with the swatch,
+                  or fine-tune the HSL value (e.g. &quot;38 92% 50%&quot;). Changes apply to the
+                  live site after you save.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateAdvanced((advanced) => ({
+                      ...advanced,
+                      colors: { ...DEFAULT_ADVANCED_SETTINGS.colors! },
+                    }))
+                  }
+                  className="flex-shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Reset to defaults
+                </button>
+              </div>
+              {COLOR_FIELDS.map(({ key, label }) => {
+                const value = settings.advancedSettings?.colors?.[key] ?? "";
+                return (
+                  <div key={key}>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={hslStringToHex(value)}
+                        onChange={(e) =>
+                          updateAdvanced((advanced) => ({
+                            ...advanced,
+                            colors: {
+                              ...(advanced.colors ?? {}),
+                              [key]: hexToHslString(e.target.value),
+                            },
+                          }))
+                        }
+                        className="h-10 w-12 flex-shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                        aria-label={`${label} color picker`}
+                      />
+                      <input
+                        type="text"
+                        value={value}
+                        onChange={(e) =>
+                          updateAdvanced((advanced) => ({
+                            ...advanced,
+                            colors: {
+                              ...(advanced.colors ?? {}),
+                              [key]: e.target.value,
+                            },
+                          }))
+                        }
+                        className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono"
+                        placeholder="e.g. 38 92% 50%"
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
 

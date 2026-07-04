@@ -90,6 +90,15 @@ export const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
     enabled: false,
     percent: 12,
   },
+  colors: {
+    primary: "38 92% 50%",
+    secondary: "40 30% 90%",
+    accent: "30 80% 55%",
+    background: "40 25% 94%",
+    foreground: "30 10% 15%",
+    card: "40 40% 98%",
+    heritage: "30 25% 25%",
+  },
 };
 
 export interface BannerSlide {
