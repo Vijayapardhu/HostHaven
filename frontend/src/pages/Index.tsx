@@ -1,6 +1,6 @@
 import Layout from "@/components/layout/Layout";
-import HeroSection from "@/components/home/HeroSection";
 import SearchBarSection from "@/components/home/SearchBarSection";
+import HomeSkeleton from "@/components/home/HomeSkeleton";
 import FeatureCards from "@/components/home/FeatureCards";
 import WeekendDeviationBanner from "@/components/home/WeekendDeviationBanner";
 import DestinationsSection from "@/components/home/DestinationsSection";
@@ -16,14 +16,13 @@ import SEOHead from "@/components/SEOHead";
 import { usePublicPlatformSettings } from "@/hooks/usePublicPlatformSettings";
 
 const Index = () => {
-  const { config, isSectionVisible } = useHomepageConfig();
+  const { config, isSectionVisible, isLoading } = useHomepageConfig();
   const settings = usePublicPlatformSettings();
   const pageBackground = config?.pageBackground?.trim() || "hsl(var(--background))";
 
   const sortedSections = React.useMemo(() => {
     const availableSections = [
       { key: "banner", render: () => <WeekendDeviationBanner slides={config?.bannerSlides || []} /> },
-      { key: "hero", render: () => <HeroSection /> },
       { key: "search", render: () => <SearchBarSection /> },
       { key: "offers", render: () => <OffersSection /> },
       { key: "promoBanner", render: () => <PromoBanner config={config} /> },
@@ -74,8 +73,13 @@ const Index = () => {
       />
       <Layout>
         <div style={{ background: pageBackground }}>
-          {sortedSections.length === 0 ? (
-            <HeroSection />
+          {/* Hidden but crawlable H1 — preserves the page's primary heading for
+              SEO now that the visible hero has been removed. */}
+          <h1 className="sr-only">
+            HostHaven — Book Hotels, Homestays &amp; Temple Stays in Andhra Pradesh
+          </h1>
+          {isLoading ? (
+            <HomeSkeleton />
           ) : (
             sortedSections.map(({ key, render }) => (
               <React.Fragment key={key}>
