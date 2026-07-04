@@ -9,6 +9,10 @@ git pull origin main
 echo "=== Building Backend ==="
 cd backend
 npm install
+# Keep the Prisma client and the database schema in sync with schema.prisma
+# (prevents "column ... does not exist" runtime errors after schema changes).
+npx prisma generate
+npx prisma db push
 npm run build
 pm2 restart hosthaven-backend
 

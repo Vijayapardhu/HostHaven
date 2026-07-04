@@ -11,13 +11,13 @@ const Footer = ({ className = "" }: FooterProps) => {
   const settings = usePublicPlatformSettings();
 
   return (
-    <footer className={`bg-heritage-brown text-cream-light ${className}`}>
+    <footer className={`bg-heritage-brown text-white ${className}`}>
       <div className="container mx-auto px-4 py-10 md:py-14">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10">
           {/* Brand */}
           <div className="space-y-4 md:space-y-5">
             <img src={logo} alt="HostHaven" className="h-12 md:h-14 w-auto brightness-110" />
-            <p className="text-cream-light/70 text-xs md:text-sm leading-relaxed">
+            <p className="text-white/70 text-xs md:text-sm leading-relaxed">
               Explore the rich heritage of Andhra Pradesh with premium stays, 
               authentic temple experiences, and seamless travel services.
             </p>
@@ -26,7 +26,7 @@ const Footer = ({ className = "" }: FooterProps) => {
                 <a
                   key={i}
                   href="#"
-                  className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-cream-light/10 hover:bg-primary hover:scale-110 transition-all duration-200 flex items-center justify-center"
+                  className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-white/10 hover:bg-gold hover:scale-110 transition-all duration-200 flex items-center justify-center"
                 >
                   <Icon className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 </a>
@@ -42,9 +42,9 @@ const Footer = ({ className = "" }: FooterProps) => {
                 <li key={link.name}>
                   <Link
                     to={link.path}
-                    className="text-cream-light/70 hover:text-gold-light transition-colors text-xs md:text-sm flex items-center gap-2 group"
+                    className="text-white/70 hover:text-gold-light transition-colors text-xs md:text-sm flex items-center gap-2 group"
                   >
-                    <span className="w-1 h-1 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                    <span className="w-1 h-1 rounded-full bg-white/40 group-hover:bg-gold transition-colors" />
                     {link.name}
                   </Link>
                 </li>
@@ -57,18 +57,18 @@ const Footer = ({ className = "" }: FooterProps) => {
             <h4 className="font-serif text-base md:text-lg font-semibold mb-4 md:mb-5 text-gold-light">Contact Us</h4>
             <ul className="space-y-3 md:space-y-4">
               <li className="flex items-start gap-3">
-                <MapPin className="w-4 h-4 md:w-5 md:h-5 text-primary flex-shrink-0 mt-0.5" />
-                <span className="text-cream-light/70 text-xs md:text-sm">{settings.contact.supportAddress || "Andhra Pradesh, India"}</span>
+                <MapPin className="w-4 h-4 md:w-5 md:h-5 text-gold-light flex-shrink-0 mt-0.5" />
+                <span className="text-white/70 text-xs md:text-sm">{settings.contact.supportAddress || "Andhra Pradesh, India"}</span>
               </li>
               <li>
-                <a href={`tel:${settings.contact.supportPhone}`} className="flex items-center gap-3 text-cream-light/70 hover:text-gold-light transition-colors text-xs md:text-sm">
-                  <Phone className="w-4 h-4 md:w-5 md:h-5 text-primary flex-shrink-0" />
+                <a href={`tel:${settings.contact.supportPhone}`} className="flex items-center gap-3 text-white/70 hover:text-gold-light transition-colors text-xs md:text-sm">
+                  <Phone className="w-4 h-4 md:w-5 md:h-5 text-gold-light flex-shrink-0" />
                   {settings.contact.supportPhone || "+91 1234567890"}
                 </a>
               </li>
               <li>
-                <a href={`mailto:${settings.contact.supportEmail}`} className="flex items-center gap-3 text-cream-light/70 hover:text-gold-light transition-colors text-xs md:text-sm">
-                  <Mail className="w-4 h-4 md:w-5 md:h-5 text-primary flex-shrink-0" />
+                <a href={`mailto:${settings.contact.supportEmail}`} className="flex items-center gap-3 text-white/70 hover:text-gold-light transition-colors text-xs md:text-sm">
+                  <Mail className="w-4 h-4 md:w-5 md:h-5 text-gold-light flex-shrink-0" />
                   {settings.contact.supportEmail || "support@hosthaven.in"}
                 </a>
               </li>
@@ -78,18 +78,18 @@ const Footer = ({ className = "" }: FooterProps) => {
           {/* Support Hours */}
           <div>
             <h4 className="font-serif text-base md:text-lg font-semibold mb-4 md:mb-5 text-gold-light">Support Hours</h4>
-            <div className="space-y-2 md:space-y-3 text-cream-light/70 text-xs md:text-sm">
+            <div className="space-y-2 md:space-y-3 text-white/70 text-xs md:text-sm">
               <p>{settings.contact.supportHours || "Mon - Sun: 24/7"}</p>
-              <p className="text-cream-light/50 text-[11px] md:text-xs">We're here to help you anytime</p>
+              <p className="text-white/60 text-[11px] md:text-xs">We're here to help you anytime</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-cream-light/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-cream-light/50 text-xs">
+        <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-white/60 text-xs">
             © 2025 HostHaven. All rights reserved. Explore Andhra's Heritage.
           </p>
-          <div className="flex items-center gap-6 text-xs text-cream-light/50">
+          <div className="flex items-center gap-6 text-xs text-white/60">
             <Link to="/terms" className="hover:text-gold-light transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-gold-light transition-colors">Privacy</Link>
             <Link to="/profile/support" className="hover:text-gold-light transition-colors">Support</Link>
