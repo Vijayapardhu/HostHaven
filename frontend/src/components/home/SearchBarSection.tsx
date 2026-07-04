@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { format, addDays, differenceInDays } from "date-fns";
 import { Search, CalendarDays, MapPin, Users, Minus, Plus, Crosshair, ChevronDown, ShieldCheck, BadgeCheck } from "lucide-react";
 import type { DateRange } from "react-day-picker";
+import { useLocationAutocomplete, type LocationSuggestion } from "@/hooks/useLocationAutocomplete";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -98,6 +99,37 @@ export default function SearchBarSection() {
   const [isRoomGuestOpen, setIsRoomGuestOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
+
+  // Location autocomplete
+  const { suggestions: locSuggestions } = useLocationAutocomplete(location);
+  const [showLocSuggest, setShowLocSuggest] = useState(false);
+
+  const pickLocation = (s: LocationSuggestion) => {
+    setLocation(s.primary);
+    setShowLocSuggest(false);
+    navigate(`/search?lat=${s.lat}&lng=${s.lng}`);
+  };
+
+  const locationDropdown =
+    showLocSuggest && locSuggestions.length > 0 ? (
+      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg overflow-hidden max-h-72 overflow-y-auto text-left">
+        {locSuggestions.map((s, i) => (
+          <button
+            key={`${s.lat}-${s.lng}-${i}`}
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pickLocation(s)}
+            className="w-full text-left px-4 py-2.5 hover:bg-muted flex items-start gap-2.5 transition-colors"
+          >
+            <MapPin className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate text-foreground">{s.primary}</div>
+              <div className="text-xs text-muted-foreground truncate">{s.label}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    ) : null;
 
   const totalNights = dateRange.from && dateRange.to ? differenceInDays(dateRange.to, dateRange.from) : 1;
 
@@ -205,7 +237,7 @@ export default function SearchBarSection() {
             <div className="space-y-3">
               {/* Location + Near Me */}
               <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-3 bg-muted/50 rounded-xl px-4 py-3">
+                <div className="relative flex-1 flex items-center gap-3 bg-muted/50 rounded-xl px-4 py-3">
                   <MapPin className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <input
                     type="text"
@@ -213,13 +245,18 @@ export default function SearchBarSection() {
                     aria-label="Search destination"
                     className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground"
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    autoComplete="off"
+                    onChange={(e) => { setLocation(e.target.value); setShowLocSuggest(true); }}
+                    onFocus={() => setShowLocSuggest(true)}
+                    onBlur={() => setTimeout(() => setShowLocSuggest(false), 150)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && location.trim()) {
+                        setShowLocSuggest(false);
                         navigate(`/search?q=${encodeURIComponent(location.trim())}`);
                       }
                     }}
                   />
+                  {locationDropdown}
                 </div>
                 <button
                   onClick={handleNearMe}
@@ -376,7 +413,7 @@ export default function SearchBarSection() {
               {/* Search row */}
               <div className="flex items-center gap-3">
                 {/* Location */}
-                <div className="flex-1 flex items-center gap-3 bg-muted/50 rounded-xl px-4 py-3 border border-border/30 hover:border-primary/30 transition-colors">
+                <div className="relative flex-1 flex items-center gap-3 bg-muted/50 rounded-xl px-4 py-3 border border-border/30 hover:border-primary/30 transition-colors">
                   <MapPin className="w-5 h-5 text-primary flex-shrink-0" />
                   <input
                     type="text"
@@ -384,9 +421,13 @@ export default function SearchBarSection() {
                     aria-label="Search destination"
                     className="flex-1 bg-transparent border-none outline-none text-sm font-medium placeholder:text-muted-foreground"
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    autoComplete="off"
+                    onChange={(e) => { setLocation(e.target.value); setShowLocSuggest(true); }}
+                    onFocus={() => setShowLocSuggest(true)}
+                    onBlur={() => setTimeout(() => setShowLocSuggest(false), 150)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && location.trim()) {
+                        setShowLocSuggest(false);
                         navigate(`/search?q=${encodeURIComponent(location.trim())}`);
                       }
                     }}
@@ -398,6 +439,7 @@ export default function SearchBarSection() {
                     <Crosshair className="w-4 h-4" />
                     Near Me
                   </button>
+                  {locationDropdown}
                 </div>
 
                 {/* Date picker */}
