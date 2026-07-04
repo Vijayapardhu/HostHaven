@@ -24,22 +24,22 @@ const CategoryNav = () => {
                 key={cat.path}
                 to={cat.path}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
+                className={`group flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-colors active:scale-95 ${
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <div
-                  className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all ${
+                  className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:-translate-y-0.5 ${
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-gold ring-2 ring-primary/30"
-                      : "bg-muted"
+                      ? "bg-primary text-primary-foreground shadow-gold ring-2 ring-accent/40"
+                      : "bg-muted group-hover:bg-accent/15 group-hover:text-accent"
                   }`}
                 >
                   <Icon aria-hidden="true" className="w-5 h-5 md:w-6 md:h-6" />
                 </div>
-                <span className={`text-xs font-medium ${isActive ? "font-bold" : ""}`}>{cat.name}</span>
+                <span className={`text-xs font-medium transition-colors ${isActive ? "font-bold" : ""}`}>{cat.name}</span>
               </Link>
             );
           })}

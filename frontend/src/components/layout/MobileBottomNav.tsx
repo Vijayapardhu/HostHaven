@@ -49,13 +49,17 @@ const MobileBottomNav = () => {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center flex-1 h-full relative ${active ? "text-primary" : "text-muted-foreground"
+              className={`flex flex-col items-center justify-center flex-1 h-full relative transition-colors active:scale-90 ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <div className="relative">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${active ? "bg-primary/10" : ""}`}>
+                <motion.div
+                  animate={active ? { scale: 1 } : { scale: 1 }}
+                  whileTap={{ scale: 0.85 }}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${active ? "bg-primary/10" : ""}`}
+                >
                   <Icon className={`w-5 h-5 ${active ? "text-primary" : ""}`} />
-                </div>
+                </motion.div>
                 {item.badge && (
                   <span className="absolute -top-1 -right-2 min-w-[18px] h-[18px] bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
                     {item.badge > 99 ? "99+" : item.badge}

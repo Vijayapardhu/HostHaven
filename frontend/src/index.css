@@ -15,6 +15,16 @@
     scrollbar-color: hsl(var(--border)) transparent;
     overflow-x: hidden;
     width: 100%;
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
   }
   
   html::-webkit-scrollbar {
@@ -231,6 +241,26 @@
     background-clip: text;
   }
 
+  /* Lift + deepen shadow on hover — for clickable cards/tiles. */
+  .card-hover {
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Thin gold divider flourish for section headings. */
+  .heading-flourish::after {
+    content: "";
+    display: block;
+    width: 2.5rem;
+    height: 3px;
+    margin-top: 0.5rem;
+    border-radius: 9999px;
+    background: var(--gradient-gold);
+  }
+
   .container {
     width: 100%;
     margin-left: auto;
@@ -274,10 +304,10 @@
 
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 15px hsl(38 92% 50% / 0.4);
+    box-shadow: 0 0 15px hsl(var(--gold) / 0.4);
   }
   50% {
-    box-shadow: 0 0 25px hsl(38 92% 50% / 0.6);
+    box-shadow: 0 0 25px hsl(var(--gold) / 0.6);
   }
 }
 
@@ -311,11 +341,11 @@
 @keyframes subtle-pulse {
   0%, 100% {
     opacity: 1;
-    text-shadow: 0 0 8px hsl(40 85% 65% / 0.6);
+    text-shadow: 0 0 8px hsl(var(--gold-light) / 0.6);
   }
   50% {
     opacity: 0.85;
-    text-shadow: 0 0 12px hsl(40 85% 65% / 0.9);
+    text-shadow: 0 0 12px hsl(var(--gold-light) / 0.9);
   }
 }
 

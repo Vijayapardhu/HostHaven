@@ -38,14 +38,14 @@ const DestinationsSection = ({ items }: Props) => {
   return (
     <section className="py-8">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-end justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Top Destinations For You</h2>
-            <p className="text-sm text-muted-foreground mt-1">Explore popular travel destinations across Andhra Pradesh</p>
+            <h2 className="text-2xl font-bold text-foreground heading-flourish">Top Destinations For You</h2>
+            <p className="text-sm text-muted-foreground mt-2">Explore popular travel destinations across Andhra Pradesh</p>
           </div>
           <Link
             to="/hotels"
-            className="hidden md:flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+            className="flex items-center gap-1 text-sm font-medium text-primary hover:text-accent transition-colors whitespace-nowrap active:scale-95"
           >
             View All <ChevronRight aria-hidden="true" className="w-4 h-4" />
           </Link>
@@ -65,7 +65,7 @@ const DestinationsSection = ({ items }: Props) => {
             >
               <Link
                 to={dest.link}
-                className="group relative block rounded-xl overflow-hidden aspect-[4/5] md:aspect-[4/5] shadow-card"
+                className="group card-hover relative block rounded-2xl overflow-hidden aspect-[4/5] md:aspect-[4/5] shadow-card"
               >
                 <img
                   src={dest.image}
