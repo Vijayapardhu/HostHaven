@@ -68,7 +68,7 @@ const propertySchema = z.object({
   description: z.string().min(20, 'Description must be at least 20 characters'),
   shortDesc: z.string().optional(),
   searchText: z.string().optional(),
-  basePrice: z.number().min(1, 'Base price is required'),
+  basePrice: z.number().min(0, 'Base price must be 0 or more'),
   currency: z.string().min(1, 'Currency is required'),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
@@ -730,6 +730,7 @@ export default function AddProperty() {
               <div>
                 <label className="text-sm font-semibold text-slate-600">Base Price</label>
                 <input type="number" min={0} value={formValues.basePrice} onChange={(e) => handleChange('basePrice', Number(e.target.value))} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                {fieldErrors.basePrice ? <p className="mt-1 text-xs text-rose-600">{fieldErrors.basePrice}</p> : null}
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-600">Currency</label>

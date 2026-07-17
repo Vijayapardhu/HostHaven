@@ -460,11 +460,29 @@ export const AdminController = {
     } catch (error: any) {
       logger.error({ error }, "Create property failed");
       if (error.name === "ZodError") {
+        const details: Record<string, string[]> = {};
+        for (const issue of error.issues) {
+          const path = issue.path.join(".") || "body";
+          if (!details[path]) details[path] = [];
+          details[path].push(issue.message);
+        }
         return sendError(
           reply,
           ERROR_CODES.VALIDATION_ERROR,
           "Invalid input data",
           400,
+          details,
+        );
+      }
+      if (error.code === "P2002") {
+        const target = (error.meta?.target || []) as string[];
+        const field = target[0] || "value";
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          `${field} already exists`,
+          400,
+          { [field]: [`${field} already exists`] },
         );
       }
       return sendError(
@@ -503,11 +521,29 @@ export const AdminController = {
         return sendError(reply, error.code, error.message, 404);
       }
       if (error.name === "ZodError") {
+        const details: Record<string, string[]> = {};
+        for (const issue of error.issues) {
+          const path = issue.path.join(".") || "body";
+          if (!details[path]) details[path] = [];
+          details[path].push(issue.message);
+        }
         return sendError(
           reply,
           ERROR_CODES.VALIDATION_ERROR,
           "Invalid property update payload",
           400,
+          details,
+        );
+      }
+      if (error.code === "P2002") {
+        const target = (error.meta?.target || []) as string[];
+        const field = target[0] || "value";
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          `${field} already exists`,
+          400,
+          { [field]: [`${field} already exists`] },
         );
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to update property", 500);
@@ -553,8 +589,8 @@ export const AdminController = {
 
   async softDeleteProperty(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const { id } = request.params as { id: string };
-      const deleted = await adminService.softDeleteProperty(id);
+      const { idOrSlug } = request.params as { idOrSlug: string };
+      const deleted = await adminService.softDeleteProperty(idOrSlug);
       return sendSuccess(reply, deleted, 200);
     } catch (error: any) {
       logger.error({ error }, "Soft delete property failed");
@@ -1994,6 +2030,23 @@ export const AdminController = {
         return sendError(reply, ERROR_CODES.VALIDATION_ERROR, "City already exists", 400);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to create city", 500);
+    }
+  },
+
+  async toggleCity(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const { name, isActive } = request.body as { name: string; isActive: boolean };
+      if (!name) {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, "City name is required", 400);
+      }
+      const city = await adminService.toggleCity(name.toUpperCase().trim(), !!isActive);
+      return sendSuccess(reply, city);
+    } catch (error: any) {
+      logger.error({ error }, "Toggle city failed");
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, ERROR_CODES.RESOURCE_NOT_FOUND, "City not found", 404);
+      }
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, "Failed to toggle city", 500);
     }
   },
 

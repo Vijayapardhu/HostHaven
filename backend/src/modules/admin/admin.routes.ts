@@ -225,6 +225,7 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   // City Management
   fastify.get('/cities', AdminController.getCities);
   fastify.post('/cities', AdminController.createCity);
+  fastify.put('/cities/toggle', AdminController.toggleCity);
   fastify.put('/cities/:id', AdminController.updateCity);
   fastify.delete('/cities/:id', AdminController.deleteCity);
 }

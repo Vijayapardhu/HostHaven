@@ -316,7 +316,7 @@ export const adminCreatePropertySchema = adminUpdatePropertySchema.extend({
   city: z.preprocess(normalizeCityValue, cityEnum),
   state: z.string().min(2).max(100),
   pincode: z.string().regex(/^[1-9][0-9]{5}$/),
-  basePrice: z.coerce.number().positive(),
+  basePrice: z.coerce.number().min(0),
   images: z.array(imageInputSchema).min(1).max(20),
   amenities: z.array(z.string()).default([]),
 });

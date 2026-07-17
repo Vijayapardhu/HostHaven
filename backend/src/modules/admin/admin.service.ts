@@ -2352,10 +2352,15 @@ Crawl-delay: 1
     };
   }
 
-  async softDeleteProperty(propertyId: string) {
-    const property = await prisma.property.findUnique({
-      where: { id: propertyId },
+  async softDeleteProperty(propertyIdOrSlug: string) {
+    let property = await prisma.property.findUnique({
+      where: { id: propertyIdOrSlug },
     });
+    if (!property) {
+      property = await prisma.property.findUnique({
+        where: { slug: propertyIdOrSlug },
+      });
+    }
     if (!property) {
       const error: any = new Error("Property not found");
       error.code = ERROR_CODES.RESOURCE_NOT_FOUND;
@@ -2363,12 +2368,12 @@ Crawl-delay: 1
     }
 
     await prisma.property.update({
-      where: { id: propertyId },
+      where: { id: property.id },
       data: { isDeleted: true, deletedAt: new Date(), status: "INACTIVE" },
     });
 
-    logger.info({ propertyId }, "Property soft deleted by admin");
-    return { id: propertyId, isDeleted: true };
+    logger.info({ propertyId: property.id }, "Property soft deleted by admin");
+    return { id: property.id, isDeleted: true };
   }
 
   async updateVendorStatus(vendorId: string, status: string, reason?: string, adminInfo?: { id: string; name: string; email: string }) {
@@ -5448,6 +5453,22 @@ Crawl-delay: 1
   async createCity(name: string) {
     return prisma.platformCity.create({
       data: { name },
+    });
+  }
+
+  async toggleCity(name: string, isActive: boolean) {
+    const normalized = (name || "").toUpperCase().trim();
+    const city = await prisma.platformCity.findFirst({
+      where: { name: normalized },
+    });
+    if (!city) {
+      const err = new Error("City not found");
+      (err as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw err;
+    }
+    return prisma.platformCity.update({
+      where: { id: city.id },
+      data: { isActive },
     });
   }
 

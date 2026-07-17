@@ -25,9 +25,6 @@ export default async function propertiesRoutes(fastify: FastifyInstance) {
   // Admin management routes - MUST be before /:id route
   fastify.get("/admin/amenities", { preHandler: [fastify.authenticate, requireRole("ADMIN")] }, PropertiesController.getAmenities);
   fastify.put("/admin/amenities", { preHandler: [fastify.authenticate, requireRole("ADMIN")] }, PropertiesController.toggleAmenity);
-  fastify.get("/admin/cities", { preHandler: [fastify.authenticate, requireRole("ADMIN")] }, PropertiesController.getCities);
-  fastify.post("/admin/cities", { preHandler: [fastify.authenticate, requireRole("ADMIN")] }, PropertiesController.createCity);
-  fastify.put("/admin/cities", { preHandler: [fastify.authenticate, requireRole("ADMIN")] }, PropertiesController.toggleCity);
 
   // Dynamic routes - must be LAST
   fastify.get("/:id", PropertiesController.getById);
