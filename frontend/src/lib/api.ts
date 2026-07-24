@@ -12,13 +12,6 @@ const compressImage = async (file: File): Promise<File> => {
   }
   try {
     const compressedFile = await imageCompression(file, imageCompressionOptions);
-    console.log(
-      `[Upload] Compressed ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(
-        compressedFile.size /
-        1024 /
-        1024
-      ).toFixed(2)}MB`
-    );
     return compressedFile;
   } catch (error) {
     console.warn("[Upload] Compression failed, using original file:", error);
@@ -100,15 +93,60 @@ class ApiService {
   }
 
   private isRefreshing = false;
-  private refreshSubscribers: Array<(token: string) => void> = [];
+  private refreshSubscribers: Array<(token: string | null) => void> = [];
 
   private onRefreshed(token: string) {
     this.refreshSubscribers.forEach((cb) => cb(token));
     this.refreshSubscribers = [];
   }
 
-  private addRefreshSubscriber(cb: (token: string) => void) {
+  // Must be called when a refresh fails, otherwise queued requests hang forever.
+  private onRefreshFailed() {
+    this.refreshSubscribers.forEach((cb) => cb(null));
+    this.refreshSubscribers = [];
+  }
+
+  private addRefreshSubscriber(cb: (token: string | null) => void) {
     this.refreshSubscribers.push(cb);
+  }
+
+  private clearSession() {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("vendorToken");
+  }
+
+  // Replays the original request with a fresh token, preserving its method and body.
+  private async retryRequest<T>(
+    endpoint: string,
+    method: string,
+    token: string,
+    originalBody?: any,
+  ): Promise<T> {
+    const retryHeaders: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+    };
+    const retryInit: RequestInit & { headers: Record<string, string> } = {
+      method,
+      headers: retryHeaders,
+    };
+    if (originalBody !== undefined) {
+      retryHeaders["Content-Type"] = "application/json";
+      retryInit.body = JSON.stringify(originalBody);
+    }
+
+    const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, retryInit);
+    const retryData: ApiResponse<T> = await retryResponse.json();
+
+    if (!retryResponse.ok || !retryData.success) {
+      const error = retryData.error || {
+        code: "UNKNOWN_ERROR",
+        message: "An unexpected error occurred",
+      };
+      throw new Error(error.message);
+    }
+
+    return retryData.data as T;
   }
 
   private async refreshAccessToken(): Promise<string | null> {
@@ -133,65 +171,50 @@ class ApiService {
     }
   }
 
-  private async handleResponse<T>(response: Response, endpoint?: string, originalBody?: any): Promise<T> {
-    if (response.status === 401 && endpoint !== "/auth/refresh" && endpoint !== "/auth/login") {
+  private async handleResponse<T>(
+    response: Response,
+    endpoint?: string,
+    originalBody?: any,
+    method: string = "GET",
+  ): Promise<T> {
+    if (
+      response.status === 401 &&
+      endpoint &&
+      endpoint !== "/auth/refresh" &&
+      endpoint !== "/auth/login"
+    ) {
       if (!this.isRefreshing) {
         this.isRefreshing = true;
-        const newToken = await this.refreshAccessToken();
-        this.isRefreshing = false;
+        let newToken: string | null = null;
+        try {
+          newToken = await this.refreshAccessToken();
+        } finally {
+          this.isRefreshing = false;
+        }
 
         if (newToken) {
           this.onRefreshed(newToken);
-          const retryHeaders: Record<string, string> = {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${newToken}`,
-          };
-          const retryInit: RequestInit & { headers: Record<string, string> } = {
-            method: response.method || "GET",
-            headers: retryHeaders,
-          };
-          if (originalBody) {
-            retryInit.body = JSON.stringify(originalBody);
-          }
-          const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, retryInit);
-          const retryData: ApiResponse<T> = await retryResponse.json();
-          if (retryData.success) {
-            return retryData.data as T;
-          }
+          // Errors here are genuine request failures, not auth failures — let them propagate.
+          return this.retryRequest<T>(endpoint, method, newToken, originalBody);
         }
 
         // Refresh failed, clear tokens
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("vendorToken");
+        this.onRefreshFailed();
+        this.clearSession();
         window.location.href = "/login";
         throw new Error("Session expired");
       } else {
         // Another refresh is in progress, queue this request
-        return new Promise((resolve, reject) => {
-          this.addRefreshSubscriber(async (token: string) => {
-            try {
-              const retryHeaders: Record<string, string> = {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              };
-              const retryInit: RequestInit & { headers: Record<string, string> } = {
-                method: response.method || "GET",
-                headers: retryHeaders,
-              };
-              if (originalBody) {
-                retryInit.body = JSON.stringify(originalBody);
-              }
-              const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, retryInit);
-              const retryData: ApiResponse<T> = await retryResponse.json();
-              if (retryData.success) {
-                resolve(retryData.data as T);
-              } else {
-                reject(new Error("Session expired"));
-              }
-            } catch {
+        return new Promise<T>((resolve, reject) => {
+          this.addRefreshSubscriber((token: string | null) => {
+            if (!token) {
               reject(new Error("Session expired"));
+              return;
             }
+            this.retryRequest<T>(endpoint, method, token, originalBody).then(
+              resolve,
+              reject,
+            );
           });
         });
       }
@@ -216,7 +239,7 @@ class ApiService {
       headers: this.getHeaders(includeAuth),
     });
 
-    return this.handleResponse<T>(response, endpoint);
+    return this.handleResponse<T>(response, endpoint, undefined, "GET");
   }
 
   async post<T>(
@@ -230,7 +253,7 @@ class ApiService {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    return this.handleResponse<T>(response, endpoint, body);
+    return this.handleResponse<T>(response, endpoint, body, "POST");
   }
 
   async put<T>(
@@ -247,7 +270,7 @@ class ApiService {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    return this.handleResponse<T>(response, endpoint, body);
+    return this.handleResponse<T>(response, endpoint, body, "PUT");
   }
 
   private async getPage<T>(
@@ -283,7 +306,7 @@ class ApiService {
     }
     const response = await fetch(`${this.baseUrl}${endpoint}`, options);
 
-    return this.handleResponse<T>(response, endpoint, body);
+    return this.handleResponse<T>(response, endpoint, body, "DELETE");
   }
 
   // Auth endpoints
@@ -304,6 +327,14 @@ class ApiService {
           expiresIn: number;
         };
       }>("/auth/login", data),
+
+    // Completes a login for a 2FA-enabled account. Accepts a TOTP code or a
+    // backup code.
+    verifyTwoFactorLogin: (data: { userId: string; code: string }) =>
+      this.post<{
+        user: any;
+        tokens: { accessToken: string; refreshToken: string };
+      }>("/auth/2fa/login-verify", data, false),
 
     loginWithGoogle: (idToken: string) =>
       this.post<{
@@ -468,7 +499,9 @@ class ApiService {
       quantity?: number;
     }) => this.post<any>("/inventory/lock", data, true),
 
-    release: (data: { roomId: string }) =>
+    // Supplying the dates scopes the release to this stay; without them every
+    // lock the guest holds on the room is dropped.
+    release: (data: { roomId: string; checkIn?: string; checkOut?: string }) =>
       this.post<any>("/inventory/release", data, true),
 
     getAvailability: (params: { roomId: string; date: string }) => {
@@ -479,18 +512,14 @@ class ApiService {
 
   // Service booking endpoints
   serviceBookings = {
+    // Pricing and payment state are derived server-side from the service
+    // catalogue — the client sends selections only.
     create: (data: {
-      serviceId?: string;
-      serviceName: string;
-      serviceCategory?: string;
+      serviceId: string;
       serviceDate: string;
       serviceTime: string;
       location: string;
       notes?: string;
-      advanceAmount: number;
-      totalAmount?: number;
-      razorpayPaymentId?: string;
-      razorpayOrderId?: string;
     }) => this.post<any>("/services/bookings", data, true),
 
     getMy: (params?: Record<string, string>) => {
@@ -580,8 +609,8 @@ class ApiService {
       specialRequests?: string;
       guestDetails?: Array<{
         name: string;
-        age: number;
-        gender: "male" | "female" | "other";
+        age?: number;
+        gender?: "male" | "female" | "other";
         idProof?: string;
       }>;
       guestPhone?: string;
@@ -644,6 +673,15 @@ class ApiService {
       message: string;
       attachmentUrl?: string;
     }) => this.post<any>("/support/tickets", data, true),
+
+    // Refunds are handled by an agent rather than self-service: this opens a
+    // refund case against one of the caller's own bookings.
+    requestRefund: (data: { bookingNumber: string; reason: string }) =>
+      this.post<{ id: string; ticketNumber: string }>(
+        "/support/tickets/refund",
+        data,
+        true,
+      ),
 
     getMy: (params?: Record<string, string>) => {
       const query = params ? `?${new URLSearchParams(params)}` : "";

@@ -322,16 +322,16 @@ export function validateField(fieldName: string, value: any): ValidationResult {
 
   // Check password complexity (only for password field)
   if (fieldName === 'password' && strValue.length > 0) {
-    if (rule.uppercase && !/[A-Z]/.test(strValue)) {
+    if ('uppercase' in rule && rule.uppercase && !/[A-Z]/.test(strValue)) {
       errors.push('Must contain at least one uppercase letter');
     }
-    if (rule.lowercase && !/[a-z]/.test(strValue)) {
+    if ('lowercase' in rule && rule.lowercase && !/[a-z]/.test(strValue)) {
       errors.push('Must contain at least one lowercase letter');
     }
-    if (rule.number && !/[0-9]/.test(strValue)) {
+    if ('number' in rule && rule.number && !/[0-9]/.test(strValue)) {
       errors.push('Must contain at least one number');
     }
-    if (rule.special && !/[^A-Za-z0-9]/.test(strValue)) {
+    if ('special' in rule && rule.special && !/[^A-Za-z0-9]/.test(strValue)) {
       errors.push('Must contain at least one special character');
     }
   }

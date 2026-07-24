@@ -1,10 +1,27 @@
 import prisma from '../../config/database';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { logger } from '../../utils/logger.util';
+import { AppError } from '../../utils/app-error';
 import { webPushService } from '../../services/webpush.service';
 import notificationsService from '../notifications/notifications.service';
 
 const generateTicketNumber = () => `SUP-${Date.now().toString(36).toUpperCase()}`;
+
+/**
+ * Refund requests are raised as support tickets under this category rather than
+ * being self-service: an agent reviews the booking and applies the cancellation
+ * policy before any money moves.
+ */
+export const REFUND_CATEGORY = 'Refund';
+
+/** Booking states a guest may request a refund against. */
+const REFUNDABLE_BOOKING_STATUSES = [
+  'PENDING',
+  'CONFIRMED',
+  'CHECKED_IN',
+  'CHECKED_OUT',
+  'CANCELLED',
+] as const;
 
 export class SupportService {
   async create(userId: string | undefined, data: {
@@ -25,6 +42,84 @@ export class SupportService {
       },
     });
     logger.info({ supportTicketId: ticket.id }, 'Support ticket created');
+    return ticket;
+  }
+
+  /**
+   * Raises a refund request against one of the caller's own bookings.
+   *
+   * The booking is resolved by its human-readable booking number and must
+   * belong to the caller, so a guest cannot open a refund case on someone
+   * else's stay. Duplicate open requests are rejected rather than stacked.
+   */
+  async requestRefund(
+    userId: string,
+    data: { bookingNumber: string; reason: string },
+  ) {
+    const booking = await prisma.booking.findFirst({
+      where: { bookingNumber: data.bookingNumber, userId },
+      select: {
+        id: true,
+        bookingNumber: true,
+        status: true,
+        totalAmount: true,
+        payment: { select: { status: true } },
+      },
+    });
+
+    if (!booking) {
+      throw AppError.notFound(
+        'No booking found with that reference on your account',
+      );
+    }
+
+    if (
+      !(REFUNDABLE_BOOKING_STATUSES as readonly string[]).includes(
+        booking.status,
+      )
+    ) {
+      throw AppError.validation(
+        `A refund cannot be requested for a booking that is ${booking.status.toLowerCase()}`,
+      );
+    }
+
+    if (booking.payment?.status === 'REFUNDED') {
+      throw AppError.validation('This booking has already been refunded');
+    }
+
+    const existing = await prisma.supportTicket.findFirst({
+      where: {
+        userId,
+        category: REFUND_CATEGORY,
+        bookingReference: booking.bookingNumber,
+        status: { in: ['OPEN', 'IN_PROGRESS'] },
+        isDeleted: false,
+      },
+      select: { id: true, ticketNumber: true },
+    });
+
+    if (existing) {
+      throw AppError.validation(
+        `A refund request for this booking is already open (${existing.ticketNumber})`,
+      );
+    }
+
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        userId,
+        ticketNumber: generateTicketNumber(),
+        category: REFUND_CATEGORY,
+        bookingReference: booking.bookingNumber,
+        message: data.reason,
+        status: 'OPEN',
+      },
+    });
+
+    logger.info(
+      { supportTicketId: ticket.id, bookingId: booking.id },
+      'Refund requested via support',
+    );
+
     return ticket;
   }
 
@@ -89,10 +184,32 @@ export class SupportService {
     };
   }
 
-  async getAllTickets(filters: { page: number; limit: number; status?: string }) {
+  async getAllTickets(filters: {
+    page: number;
+    limit: number;
+    status?: string;
+    category?: string;
+    search?: string;
+  }) {
     const skip = (filters.page - 1) * filters.limit;
     const where: any = { isDeleted: false };
     if (filters.status) where.status = filters.status;
+    if (filters.category) {
+      where.category = { equals: filters.category, mode: 'insensitive' };
+    }
+
+    // Matched server-side so paging and totals stay consistent — previously
+    // the admin UI filtered one already-paginated page client-side.
+    if (filters.search) {
+      const search = filters.search.trim();
+      where.OR = [
+        { ticketNumber: { contains: search, mode: 'insensitive' } },
+        { bookingReference: { contains: search, mode: 'insensitive' } },
+        { message: { contains: search, mode: 'insensitive' } },
+        { user: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        { user: { is: { email: { contains: search, mode: 'insensitive' } } } },
+      ];
+    }
 
     const [tickets, total] = await Promise.all([
       prisma.supportTicket.findMany({

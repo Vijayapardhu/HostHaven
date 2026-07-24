@@ -3,6 +3,16 @@ import { sendError } from '../utils/response.util';
 import { ERROR_CODES } from '../constants/error-codes';
 import { logger } from '../utils/logger.util';
 import { ZodError } from 'zod';
+import { AppError } from '../utils/app-error';
+
+// Codes the application defines itself. Anything outside this set (Prisma's
+// P-codes, Node's E-codes) is treated as internal and never echoed to clients.
+const APPLICATION_ERROR_CODES: ReadonlySet<string> = new Set(
+  Object.values(ERROR_CODES),
+);
+
+const isApplicationErrorCode = (code: unknown): code is string =>
+  typeof code === 'string' && APPLICATION_ERROR_CODES.has(code);
 
 export const errorHandler = (
   error: FastifyError,
@@ -53,20 +63,47 @@ export const errorHandler = (
     });
   }
 
-  // Handle known error codes
-  if ((error as any).code) {
-    const errorCode = (error as any).code;
-    const statusCode = error.statusCode || 400;
-
-    return reply.status(statusCode).send({
+  // AppError is the canonical expected-failure signal: code, status, and
+  // message all chosen deliberately by application code.
+  if (error instanceof AppError) {
+    return reply.status(error.statusCode).send({
       success: false,
       error: {
-        code: errorCode,
+        code: error.code,
         message: error.message,
       },
       timestamp: new Date().toISOString(),
       requestId,
     });
+  }
+
+  // Handle known application error codes (legacy pattern, migrating to
+  // AppError module by module).
+  //
+  // Only codes the application itself defines may have their message returned.
+  // Prisma errors carry codes like P2002/P2025 and Node system errors carry
+  // ECONNREFUSED — echoing those leaks model and column names to the client,
+  // so anything unrecognised falls through to the generic 500 below.
+  const rawCode = (error as any).code;
+  if (rawCode && isApplicationErrorCode(rawCode)) {
+    const statusCode = error.statusCode || 400;
+
+    return reply.status(statusCode).send({
+      success: false,
+      error: {
+        code: rawCode,
+        message: error.message,
+      },
+      timestamp: new Date().toISOString(),
+      requestId,
+    });
+  }
+
+  if (rawCode) {
+    logger.error(
+      { requestId, code: rawCode, message: error.message },
+      'Internal error with non-application code suppressed from response',
+    );
   }
 
   // Handle Fastify errors

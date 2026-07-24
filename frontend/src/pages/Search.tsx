@@ -221,7 +221,7 @@ export default function SearchPage() {
     } else if (initialQuery) {
       performSearch(initialQuery, initialCategory);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   useEffect(() => {

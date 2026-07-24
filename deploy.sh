@@ -17,10 +17,12 @@ echo "=== Building Backend ==="
 cd backend
 npm install
 fix_bin
-# Keep the Prisma client and the database schema in sync with schema.prisma
-# (prevents "column ... does not exist" runtime errors after schema changes).
 npx prisma generate
-npx prisma db push
+# Schema changes are NOT applied automatically. `prisma db push` used to run
+# here and is exactly how a deploy can silently rewrite or refuse on the
+# production schema (it aborts on any data-loss change, which is also why the
+# schema never actually synced). Apply reviewed SQL instead — see
+# backend/prisma/manual-migrations/ — then deploy.
 npm run build
 pm2 restart hosthaven-backend
 

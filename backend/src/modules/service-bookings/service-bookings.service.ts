@@ -29,50 +29,49 @@ export class ServiceBookingsService {
   async create(
     userId: string,
     data: {
-      serviceId?: string;
-      serviceName: string;
-      serviceCategory?: string;
+      serviceId: string;
       serviceDate: Date;
       serviceTime: string;
       location: string;
       notes?: string;
-      advanceAmount: number;
-      totalAmount?: number;
-      razorpayPaymentId?: string;
-      razorpayOrderId?: string;
     },
   ) {
-    if (data.serviceId) {
-      const service = await prisma.service.findUnique({
-        where: { id: data.serviceId },
-      });
-      if (!service || !service.isActive) {
-        const error = new Error("Service not found or inactive");
-        (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
-        throw error;
-      }
+    const service = await prisma.service.findUnique({
+      where: { id: data.serviceId },
+    });
+    if (!service || !service.isActive) {
+      const error = new Error("Service not found or inactive");
+      (error as any).code = ERROR_CODES.RESOURCE_NOT_FOUND;
+      throw error;
     }
 
-    const totalAmount = data.totalAmount ?? data.advanceAmount;
-    const remainingAmount = Math.max(totalAmount - data.advanceAmount, 0);
+    // Price and advance are derived from the catalogue, never from the request.
+    const totalAmount = Number(service.price);
+    const advanceAmount =
+      service.advanceType === "fixed"
+        ? Math.min(Number(service.advanceValue), totalAmount)
+        : (totalAmount * Number(service.advanceValue)) / 100;
+
+    const roundedAdvance = Math.round(advanceAmount * 100) / 100;
+    const remainingAmount =
+      Math.round((totalAmount - roundedAdvance) * 100) / 100;
 
     const booking = await prisma.serviceBooking.create({
       data: {
         bookingNumber: generateBookingNumber(),
         userId,
-        serviceId: data.serviceId,
-        serviceName: data.serviceName,
-        serviceCategory: data.serviceCategory,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceCategory: service.category,
         serviceDate: data.serviceDate,
         serviceTime: data.serviceTime,
         location: data.location,
         notes: data.notes,
-        advanceAmount: data.advanceAmount,
+        advanceAmount: roundedAdvance,
         totalAmount,
-        remainingAmount,
-        razorpayPaymentId: data.razorpayPaymentId,
-        razorpayOrderId: data.razorpayOrderId,
-        status: data.razorpayPaymentId ? "ADVANCE_PAID" : "PENDING",
+        remainingAmount: Math.max(remainingAmount, 0),
+        // Payment state is set only by verified payment/webhook handlers.
+        status: "PENDING",
       },
     });
 

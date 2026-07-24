@@ -13,6 +13,7 @@ import {
   Star,
   MessageSquare,
   XCircle,
+  LifeBuoy,
 } from "lucide-react";
 import Layout from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { handleError } from "@/lib/errorHandler";
 import ReviewForm from "@/components/review/ReviewForm";
 import { PropertyReviews } from "@/components/review/PropertyReviews";
+import RefundRequestDialog from "@/components/support/RefundRequestDialog";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -571,7 +573,22 @@ const BookingDetails = () => {
                       </AlertDialogContent>
                     </AlertDialog>
                   ) : null}
-                  
+
+                  {/* Refunds are agent-reviewed, so this opens a support case
+                      rather than moving money directly. */}
+                  {booking?.payment?.status === "COMPLETED" && (
+                    <RefundRequestDialog
+                      bookingNumber={booking.bookingNumber}
+                      onSubmitted={fetchBooking}
+                      trigger={
+                        <Button variant="outline" className="w-full">
+                          <LifeBuoy className="w-4 h-4 mr-2" />
+                          Request a Refund
+                        </Button>
+                      }
+                    />
+                  )}
+
                   <Link to="/bookings" className="block">
                     <Button variant="gold" className="w-full">
                       View All Bookings

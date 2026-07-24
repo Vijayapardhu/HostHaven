@@ -56,7 +56,10 @@ describe("notificationsService", () => {
 
       const result = await notificationsService.markAllRead();
 
-      expect(api.put).toHaveBeenCalledWith("/v1/vendor/notifications/read-all");
+      expect(api.put).toHaveBeenCalledWith(
+        "/v1/vendor/notifications/read-all",
+        {},
+      );
       expect(result).toEqual(mockResponse.data);
     });
   });

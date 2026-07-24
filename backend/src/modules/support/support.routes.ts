@@ -15,6 +15,13 @@ export default async function supportRoutes(fastify: FastifyInstance) {
   // Authenticated routes
   fastify.addHook('preHandler', fastify.authenticate);
 
+  // Refund requests are rate-limited like other ticket writes.
+  fastify.post(
+    '/tickets/refund',
+    { config: { rateLimit: writeRateLimit } },
+    SupportController.requestRefund,
+  );
+
   fastify.get('/tickets/my', SupportController.getMyTickets);
   fastify.get('/tickets/my/:id', SupportController.getMyTicketById);
 

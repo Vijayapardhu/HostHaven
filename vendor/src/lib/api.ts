@@ -68,6 +68,19 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // A 401 from the refresh endpoint itself must not trigger another refresh:
+    // the refresh call runs through this same instance, so re-entering here
+    // deadlocked the queue and left isRefreshing stuck true forever. Fail fast
+    // to logout instead.
+    const isRefreshCall = originalRequest?.url?.includes("/auth/refresh");
+    if (error?.response?.status === 401 && isRefreshCall) {
+      isRefreshing = false;
+      processQueue(error as Error, null);
+      removeVendorToken();
+      window.dispatchEvent(new CustomEvent("vendor:unauthorized"));
+      return Promise.reject(error);
+    }
+
     if (error?.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

@@ -7,6 +7,7 @@ import { inventoryLockSchema, inventoryReleaseSchema, inventoryQuerySchema } fro
 import { verifyAccessToken } from '../../utils/token.util';
 import prisma from '../../config/database';
 import { AuthUser } from '../../types';
+import { parseStayDate } from '../../utils/date.util';
 
 export const InventoryController = {
   async getLiveInventory(request: FastifyRequest, reply: FastifyReply) {
@@ -52,6 +53,15 @@ export const InventoryController = {
         email: user.email,
         role: user.role as AuthUser['role'],
       };
+
+      // The snapshot exposes guest PII and is only scoped for VENDOR, so every
+      // other role would receive the whole platform's bookings. Admins see all
+      // by design; nobody else may read this stream.
+      if (requestUser.role !== 'ADMIN' && requestUser.role !== 'VENDOR') {
+        stream.write(`data: ${JSON.stringify({ error: 'Forbidden' })}\n\n`);
+        stream.end();
+        return;
+      }
 
       if (requestUser.role === 'VENDOR') {
         const vendor = await prisma.vendor.findUnique({
@@ -111,8 +121,8 @@ export const InventoryController = {
         payload.roomId,
         userId,
         payload.quantity,
-        new Date(payload.checkIn),
-        new Date(payload.checkOut)
+        parseStayDate(payload.checkIn),
+        parseStayDate(payload.checkOut)
       );
       return sendSuccess(reply, result, 201);
     } catch (error: any) {
@@ -134,7 +144,12 @@ export const InventoryController = {
     try {
       const payload = inventoryReleaseSchema.parse(request.body);
       const userId = (request as any).user?.id;
-      const result = await inventoryService.releaseLock(payload.roomId, userId);
+      const result = await inventoryService.releaseLock(
+        payload.roomId,
+        userId,
+        payload.checkIn ? parseStayDate(payload.checkIn) : undefined,
+        payload.checkOut ? parseStayDate(payload.checkOut) : undefined,
+      );
       return sendSuccess(reply, result);
     } catch (error: any) {
       logger.error({ error }, 'Release inventory lock failed');

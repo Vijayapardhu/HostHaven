@@ -102,8 +102,10 @@ const BookingReview = () => {
       .checkPrice({
         propertyId: id,
         roomId: selectedRoom.id,
-        checkIn: checkIn.toISOString(),
-        checkOut: checkOut.toISOString(),
+        // Plain calendar dates: a timestamp would make the night depend on the
+        // guest's timezone.
+        checkIn: format(checkIn, "yyyy-MM-dd"),
+        checkOut: format(checkOut, "yyyy-MM-dd"),
         guests: guestsCount,
       })
       .then((data) => setPriceData(data))

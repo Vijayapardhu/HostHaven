@@ -77,7 +77,7 @@ export async function getPublicPlatformSettings(
   if (cachedSettings && !forceRefresh) return cachedSettings;
   if (inflightRequest && !forceRefresh) return inflightRequest;
 
-  inflightRequest = (async () => {
+  const request = (async (): Promise<PublicPlatformSettings> => {
     try {
       const response = await fetch(`${BASE_URL}/v1/settings/public`, {
         headers: { 'Cache-Control': 'no-cache' },
@@ -88,8 +88,9 @@ export async function getPublicPlatformSettings(
       }
 
       const json = await response.json();
-      cachedSettings = json?.data ?? DEFAULT_PUBLIC_SETTINGS;
-      return cachedSettings;
+      const next: PublicPlatformSettings = json?.data ?? DEFAULT_PUBLIC_SETTINGS;
+      cachedSettings = next;
+      return next;
     } catch {
       // Reuse a prior good value if we have one; otherwise fall back.
       return cachedSettings ?? DEFAULT_PUBLIC_SETTINGS;
@@ -98,5 +99,6 @@ export async function getPublicPlatformSettings(
     }
   })();
 
-  return inflightRequest;
+  inflightRequest = request;
+  return request;
 }

@@ -512,7 +512,9 @@ export class VendorService {
     // Atomically select unpaid commission entries and link them to the new
     // payout, so earnings can never be paid out twice (previously a partial
     // `amount` created a payout without linking any entries → double-spend).
-    const payout = await prisma.$transaction(async (tx) => {
+    let payout;
+    try {
+      payout = await prisma.$transaction(async (tx) => {
       const unpaidEntries = await tx.commissionLedger.findMany({
         where: { vendorId, payoutId: null },
         orderBy: { createdAt: 'asc' },
@@ -555,13 +557,33 @@ export class VendorService {
         },
       });
 
-      await tx.commissionLedger.updateMany({
-        where: { id: { in: selected.map((e) => e.id) } },
+      // payoutId: null re-asserted so entries claimed by a concurrent payout
+      // (e.g. an admin-initiated one) are never re-linked to this one.
+      const linked = await tx.commissionLedger.updateMany({
+        where: { id: { in: selected.map((e) => e.id) }, payoutId: null },
         data: { payoutId: created.id },
       });
 
+      if (linked.count !== selected.length) {
+        fail("Some earnings were just claimed by another payout — please retry");
+      }
+
       return created;
-    });
+      },
+      {
+        // Read-then-write over shared unpaid entries: at the default level a
+        // concurrent admin payout and this request both read the same rows.
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        fail("A payout request for your account is already open");
+      }
+      if (error?.code === "P2034") {
+        fail("Another payout operation is in progress — please retry");
+      }
+      throw error;
+    }
 
     logger.info({ vendorId, payoutId: payout.id }, "Vendor requested payout");
 

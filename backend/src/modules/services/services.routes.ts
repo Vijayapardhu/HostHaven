@@ -47,27 +47,27 @@ export default async function servicesRoutes(fastify: FastifyInstance) {
   );
   fastify.post(
     "/",
-    { preHandler: [auth, requireRole("ADMIN", "VENDOR")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServicesController.create,
   );
   fastify.put(
     "/:id",
-    { preHandler: [auth, requireRole("ADMIN", "VENDOR")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServicesController.update,
   );
   fastify.delete(
     "/:id",
-    { preHandler: [auth, requireRole("ADMIN", "VENDOR")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServicesController.delete,
   );
   fastify.post(
     "/:id/activate",
-    { preHandler: [auth, requireRole("ADMIN", "VENDOR")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServicesController.activate,
   );
   fastify.post(
     "/:id/deactivate",
-    { preHandler: [auth, requireRole("ADMIN", "VENDOR")] },
+    { preHandler: [auth, requireRole("ADMIN")] },
     ServicesController.deactivate,
   );
 

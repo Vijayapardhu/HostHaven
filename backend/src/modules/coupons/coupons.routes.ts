@@ -5,13 +5,19 @@ import { requireRole } from "../../middleware/auth.middleware";
 export default async function couponsRoutes(fastify: FastifyInstance) {
   fastify.get("/public", couponsController.getPublicCoupons);
 
-  fastify.post("/validate", couponsController.validateCoupon);
-  
+  // Public by design (checkout preview before login), but rate-limited so the
+  // code space cannot be enumerated by brute force.
   fastify.post(
-    "/apply",
-    { preHandler: [fastify.authenticate] },
-    couponsController.applyCoupon
+    "/validate",
+    { config: { rateLimit: { max: 20, timeWindow: 60 * 1000 } } },
+    couponsController.validateCoupon,
   );
+
+  // NOTE: there is deliberately no /apply route. Redemption happens inside the
+  // booking-creation transaction (bookings.service.resolveCoupon), where usage
+  // and the booking commit together. The old /apply handler trusted a
+  // client-supplied userId and burned usage with no booking attached, letting
+  // anyone exhaust another user's per-user eligibility.
 
   fastify.get(
     "/",

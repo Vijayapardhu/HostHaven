@@ -50,6 +50,14 @@ export const config = {
     url: normalizedDatabaseUrl,
   },
 
+  storage: {
+    // Uploaded media lives on the VPS filesystem and is served from
+    // /uploads/*. In production set UPLOAD_DIR outside the git-managed tree
+    // (e.g. /var/www/hosthaven-uploads) and include it in backups — pg_dump
+    // does not cover files.
+    uploadDir: process.env.UPLOAD_DIR || `${process.cwd()}/uploads`,
+  },
+
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     enabled: process.env.DISABLE_REDIS !== 'true',

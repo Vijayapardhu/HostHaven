@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const AUTH_KEY = "hosthaven_auth";
-
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -27,15 +25,13 @@ const AuthCallback = () => {
     }
 
     if (accessToken && refreshToken) {
-      const authData = {
-        accessToken,
-        refreshToken,
-        user: null,
-        expiresAt: Date.now() + (24 * 60 * 60 * 1000),
-      };
-      localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("refreshToken", refreshToken);
+
+      // Scrub the tokens from the URL before anything else, so the
+      // token-bearing address cannot linger in history, Referer headers, or
+      // proxy logs.
+      window.history.replaceState({}, document.title, "/auth/callback");
 
       toast({
         title: isNewUser ? "Welcome!" : "Welcome back!",
@@ -44,8 +40,9 @@ const AuthCallback = () => {
           : "You have been logged in successfully.",
       });
 
-      // Reload so AuthContext picks up the new tokens
-      window.location.href = "/";
+      // replace() rather than href so the token URL is removed from history.
+      // A full navigation lets AuthContext re-initialise from localStorage.
+      window.location.replace("/");
     } else {
       toast({
         title: "Authentication failed",

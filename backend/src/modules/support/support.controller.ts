@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger.util';
 import { sendError, sendSuccess } from '../../utils/response.util';
 import {
   createSupportTicketSchema,
+  requestRefundSchema,
   supportFilterSchema,
   supportTicketIdSchema,
   updateSupportTicketSchema,
@@ -31,6 +32,31 @@ export const SupportController = {
         return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
       }
       return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to create support ticket', 500);
+    }
+  },
+
+  async requestRefund(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const payload = requestRefundSchema.parse(request.body);
+      const userId = (request as any).user.id;
+
+      const ticket = await supportService.requestRefund(userId, payload);
+
+      await supportService.notifyAdmins(ticket);
+
+      return sendSuccess(reply, ticket, 201);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Invalid input data', 400);
+      }
+      if (error.code === ERROR_CODES.RESOURCE_NOT_FOUND) {
+        return sendError(reply, error.code, error.message, 404);
+      }
+      if (error.code === ERROR_CODES.VALIDATION_ERROR) {
+        return sendError(reply, error.code, error.message, 400);
+      }
+      logger.error({ error }, 'Refund request failed');
+      return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to submit refund request', 500);
     }
   },
 

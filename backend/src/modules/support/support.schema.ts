@@ -7,10 +7,17 @@ export const createSupportTicketSchema = z.object({
   attachmentUrl: z.string().url().optional(),
 });
 
+export const requestRefundSchema = z.object({
+  bookingNumber: z.string().min(3).max(80),
+  reason: z.string().min(10).max(3000),
+});
+
 export const supportFilterSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().min(1).max(100).default(10),
   status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']).optional(),
+  category: z.string().min(1).max(80).optional(),
+  search: z.string().min(1).max(120).optional(),
 });
 
 export const supportTicketIdSchema = z.object({

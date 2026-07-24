@@ -275,6 +275,16 @@ export const useAuthStore = create<AuthStore>()(
         const { user, tokens, requiresMfa } = response.data;
         const { accessToken, refreshToken, expiresIn } = tokens;
 
+        // The admin panel is admin-only. The backend 403s the data either way,
+        // but without this check a normal user's valid credentials still render
+        // the entire admin shell. Checked case-insensitively against the
+        // privileged roles.
+        const role = String(user.role || "").toLowerCase();
+        if (role !== "admin" && role !== "super_admin") {
+          set({ isLoading: false });
+          throw new Error("Access denied. Admin accounts only.");
+        }
+
         const mappedUser: User = {
           id: user.id,
           email: user.email,

@@ -17,7 +17,10 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ twoFactorRequired: boolean; userId?: string }>;
   loginWithGoogle: (idToken: string) => Promise<{ isNewUser: boolean }>;
   signup: (name: string, email: string, password: string, confirmPassword: string) => Promise<void>;
   logout: () => void;
@@ -65,8 +68,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const response = await api.auth.login({ email, password });
+
+    // Accounts with 2FA enabled get a challenge instead of tokens; the caller
+    // routes to /login/2fa where the code completes the session.
+    if ((response as any)?.twoFactorRequired) {
+      return {
+        twoFactorRequired: true as const,
+        userId: (response as any).userId as string,
+      };
+    }
+
     storeTokens(response.tokens);
     setUser(response.user);
+    return { twoFactorRequired: false as const };
   };
 
   const loginWithGoogle = async (idToken: string): Promise<{ isNewUser: boolean }> => {

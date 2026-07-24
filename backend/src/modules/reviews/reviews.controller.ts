@@ -19,11 +19,22 @@ export const ReviewsController = {
     try {
       const query = reviewFilterSchema.parse(request.query);
 
+      const userId = request.user?.id;
+      if (!userId) {
+        return sendError(
+          reply,
+          ERROR_CODES.UNAUTHORIZED,
+          "Authentication required",
+          401,
+        );
+      }
+
       const result = await reviewsService.getAll({
         page: query.page,
         limit: query.limit,
         propertyId: query.propertyId,
         rating: query.rating,
+        userId,
       });
 
       return sendSuccess(reply, result.reviews, 200, result.meta);

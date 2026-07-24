@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import { hashPassword } from '../src/utils/password.util'
+import { hashPassword } from '../src/utils/hash.util'
 
 const prisma = new PrismaClient()
 
@@ -10,35 +10,30 @@ async function main() {
 
   console.log(`Creating/updating admin user: ${adminEmail}`)
 
-  const existingUser = await prisma.user.findUnique({
+  const passwordHash = await hashPassword(adminPassword)
+
+  const user = await prisma.user.upsert({
     where: { email: adminEmail },
+    update: {
+      passwordHash,
+      role: 'ADMIN',
+      isActive: true,
+      isDeleted: false,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    },
+    create: {
+      email: adminEmail,
+      name: adminName,
+      passwordHash,
+      role: 'ADMIN',
+      isActive: true,
+      isVerified: true,
+      emailVerifiedAt: new Date(),
+    },
   })
 
-  if (existingUser) {
-    await prisma.user.update({
-      where: { email: adminEmail },
-      data: {
-        role: 'ADMIN',
-        isActive: true,
-      },
-    })
-    console.log(`Updated user ${adminEmail} to ADMIN role`)
-  } else {
-    const passwordHash = await hashPassword(adminPassword)
-    await prisma.user.create({
-      data: {
-        email: adminEmail,
-        name: adminName,
-        passwordHash,
-        role: 'ADMIN',
-        isActive: true,
-        isVerified: true,
-      },
-    })
-    console.log(`Created new admin user: ${adminEmail}`)
-  }
-
-  console.log('\nAdmin user ready!')
+  console.log(`Admin user ready: ${user.email}`)
   console.log(`Email: ${adminEmail}`)
   console.log(`Password: ${adminPassword}`)
   console.log('\nLogin at: https://admin.hosthaven.in/login')

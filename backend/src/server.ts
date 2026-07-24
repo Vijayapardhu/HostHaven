@@ -2,6 +2,7 @@ import buildApp from './app';
 import { config } from './config';
 import prisma from './config/database';
 import { logger } from './utils/logger.util';
+import outboxService from './services/outbox.service';
 import './jobs/email.job';
 
 const start = async () => {
@@ -10,6 +11,10 @@ const start = async () => {
     logger.info('Database connection established');
 
     const app = await buildApp();
+
+    // Retries payment side effects (commission, invoices, emails) that failed
+    // or were interrupted — see services/outbox.service.ts.
+    outboxService.startWorker();
 
     // Start server
     await app.listen({

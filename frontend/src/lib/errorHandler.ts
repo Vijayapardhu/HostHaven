@@ -18,17 +18,47 @@ const DEFAULT_ERROR_MESSAGES: Record<string, string> = {
   'timeout': 'Request timed out. Please try again.',
 }
 
+// Messages containing these read as code, not copy, and are never shown raw.
+const TECHNICAL_MARKERS = [
+  'TypeError',
+  'SyntaxError',
+  'ReferenceError',
+  'Unexpected token',
+  '[object',
+  'is not a function',
+  'undefined',
+  'null',
+]
+
+/**
+ * True when a message is safe to show verbatim. The API client surfaces the
+ * backend's own user-facing copy (e.g. "Sorry, these rooms are no longer
+ * available for your selected dates.") — discarding it for a generic string
+ * hid the actual reason from users on every failure.
+ */
+function isDisplayableMessage(message: string): boolean {
+  const trimmed = message.trim()
+  if (trimmed.length < 4 || trimmed.length > 300) return false
+  return !TECHNICAL_MARKERS.some((marker) => trimmed.includes(marker))
+}
+
 function getFriendlyMessage(error: unknown): string {
   if (!error) return 'An unexpected error occurred.'
-  
+
   const errorStr = error instanceof Error ? error.message : String(error)
-  
+
+  // Transport-level failures get a friendlier translation.
   for (const [key, message] of Object.entries(DEFAULT_ERROR_MESSAGES)) {
     if (errorStr.includes(key)) {
       return message
     }
   }
-  
+
+  // Everything else that reads as human copy is the backend's own message.
+  if (isDisplayableMessage(errorStr)) {
+    return errorStr
+  }
+
   return 'Something went wrong. Please try again.'
 }
 

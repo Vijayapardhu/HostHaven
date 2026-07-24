@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../../config/database';
 import { ERROR_CODES } from '../../constants/error-codes';
 import { AuthUser } from '../../types';
@@ -200,39 +201,58 @@ export class InventoryService {
 
     const lockUntil = new Date(Date.now() + 10 * 60 * 1000);
 
-    const lock = await prisma.$transaction(async (tx) => {
-      const activeLocks = await tx.inventoryLock.aggregate({
-        where: {
-          roomId,
-          lockUntil: { gte: new Date() },
-          OR: [
-            {
-              checkInDate: { lt: checkOut },
-              checkOutDate: { gt: checkIn },
-            },
-          ],
-        },
-        _sum: { quantity: true },
-      });
+    const lock = await prisma.$transaction(
+      async (tx) => {
+        const activeLocks = await tx.inventoryLock.aggregate({
+          where: {
+            roomId,
+            lockUntil: { gte: new Date() },
+            OR: [
+              {
+                checkInDate: { lt: checkOut },
+                checkOutDate: { gt: checkIn },
+              },
+            ],
+          },
+          _sum: { quantity: true },
+        });
 
-      const lockedRooms = activeLocks._sum.quantity || 0;
-      if (lockedRooms + quantity > room.totalRooms) {
-        const error = new Error('Room not available');
-        (error as any).code = ERROR_CODES.ROOM_NOT_AVAILABLE;
-        throw error;
-      }
+        // Existing bookings occupy the room just as locks do. Counting only
+        // locks let a room be locked that was already fully booked, so the
+        // lock check and the booking check disagreed about availability.
+        const overlappingBookings = await tx.booking.count({
+          where: {
+            roomId,
+            status: { in: ['CONFIRMED', 'PENDING', 'CHECKED_IN'] },
+            checkInDate: { lt: checkOut },
+            checkOutDate: { gt: checkIn },
+          },
+        });
 
-      return tx.inventoryLock.create({
-        data: {
-          roomId,
-          userId,
-          quantity,
-          checkInDate: checkIn,
-          checkOutDate: checkOut,
-          lockUntil,
-        },
-      });
-    });
+        const lockedRooms = activeLocks._sum.quantity || 0;
+        if (lockedRooms + overlappingBookings + quantity > room.totalRooms) {
+          const error = new Error('Room not available');
+          (error as any).code = ERROR_CODES.ROOM_NOT_AVAILABLE;
+          throw error;
+        }
+
+        return tx.inventoryLock.create({
+          data: {
+            roomId,
+            userId,
+            quantity,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            lockUntil,
+          },
+        });
+      },
+      {
+        // Read-then-write on shared inventory: at the default isolation level
+        // two concurrent lockers both read the same count and both succeed.
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    );
 
     return {
       id: lock.id,
@@ -242,17 +262,31 @@ export class InventoryService {
     };
   }
 
-  async releaseLock(roomId: string, userId?: string) {
+  /**
+   * Releases a held lock.
+   *
+   * Scoped to the given stay dates when supplied: without them a guest
+   * abandoning one checkout dropped every lock they held on that room,
+   * including one for an unrelated set of dates in another tab.
+   */
+  async releaseLock(
+    roomId: string,
+    userId?: string,
+    checkIn?: Date,
+    checkOut?: Date,
+  ) {
     const where: any = { roomId };
     if (userId) {
       where.userId = userId;
     }
+    if (checkIn && checkOut) {
+      where.checkInDate = { lt: checkOut };
+      where.checkOutDate = { gt: checkIn };
+    }
 
-    await prisma.inventoryLock.deleteMany({
-      where,
-    });
+    const result = await prisma.inventoryLock.deleteMany({ where });
 
-    return { message: 'Inventory lock released' };
+    return { message: 'Inventory lock released', released: result.count };
   }
 }
 

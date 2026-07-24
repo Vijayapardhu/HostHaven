@@ -36,7 +36,15 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const result = await login(email, password);
+
+      if (result.twoFactorRequired) {
+        navigate("/login/2fa", {
+          state: { userId: result.userId, from: redirectTo },
+        });
+        return;
+      }
+
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
