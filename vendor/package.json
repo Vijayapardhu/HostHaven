@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host --port 5174",
-    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "build": "npm run typecheck && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",

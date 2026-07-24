@@ -42,13 +42,16 @@ export class ReviewsService {
     limit?: number;
     propertyId?: string;
     rating?: number;
+    userId: string;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 10;
     const skip = (page - 1) * limit;
 
+    // Scoped to the caller: this endpoint backs the customer "My Reviews" page.
+    // Public per-property listings are served by getPropertyReviews instead.
     const where: Prisma.ReviewWhereInput = {
-      isVisible: true,
+      userId: filters.userId,
     };
 
     if (filters.propertyId) {

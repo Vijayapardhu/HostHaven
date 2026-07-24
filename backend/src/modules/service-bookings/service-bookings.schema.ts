@@ -1,17 +1,14 @@
 import { z } from 'zod';
 
+// The client supplies selections only. Pricing is derived server-side from the
+// Service row, and payment state comes solely from a verified Razorpay
+// signature or webhook — never from the request body.
 export const createServiceBookingSchema = z.object({
-  serviceId: z.string().uuid().optional(),
-  serviceName: z.string().min(2).max(120),
-  serviceCategory: z.string().min(2).max(80).optional(),
+  serviceId: z.string().uuid(),
   serviceDate: z.string().datetime(),
   serviceTime: z.string().min(3).max(20),
   location: z.string().min(5).max(300),
   notes: z.string().max(2000).optional(),
-  advanceAmount: z.coerce.number().positive(),
-  totalAmount: z.coerce.number().positive().optional(),
-  razorpayPaymentId: z.string().min(5).optional(),
-  razorpayOrderId: z.string().min(5).optional(),
 });
 
 export const serviceBookingFilterSchema = z.object({

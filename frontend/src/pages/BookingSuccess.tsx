@@ -11,14 +11,42 @@ const BookingSuccess = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const [property, setProperty] = useState<any>(null);
+  const [booking, setBooking] = useState<any>(null);
 
-  const checkInIso = searchParams.get("checkIn");
-  const checkOutIso = searchParams.get("checkOut");
-  const guestName = searchParams.get("guestName");
+  const bookingId = searchParams.get("bookingId");
+
+  // Query parameters are user-editable, so they are only a fallback for
+  // display while the authoritative booking loads.
+  const checkInIso = booking?.checkInDate ?? searchParams.get("checkIn");
+  const checkOutIso = booking?.checkOutDate ?? searchParams.get("checkOut");
+  const guestName =
+    booking?.guestDetails?.[0]?.name ??
+    booking?.user?.name ??
+    searchParams.get("guestName");
+
+  const paymentStatus = String(booking?.payment?.status || "").toUpperCase();
+  const bookingStatus = String(booking?.status || "").toUpperCase();
+  const isPaid = paymentStatus === "COMPLETED";
+  const statusLabel = !booking
+    ? "Confirming…"
+    : isPaid
+      ? "Fully Paid"
+      : bookingStatus === "CONFIRMED"
+        ? "Confirmed — payment pending"
+        : bookingStatus || "Pending";
 
   useEffect(() => {
     if (!id) return;
     api.properties.getById(id).then(setProperty).catch(() => { });
+
+    if (bookingId) {
+      api.bookings
+        .getById(bookingId)
+        .then(setBooking)
+        .catch((error) => {
+          console.error("Failed to load booking for confirmation", error);
+        });
+    }
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReducedMotion) return;
@@ -55,7 +83,7 @@ const BookingSuccess = () => {
         context.close();
       }
     };
-  }, [id]);
+  }, [id, bookingId]);
 
   return (
     <Layout>
@@ -141,7 +169,12 @@ const BookingSuccess = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Booking Status</p>
-                  <p className="font-medium text-green-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Fully Paid</p>
+                  <p
+                    className={`font-medium flex items-center gap-1 ${isPaid ? "text-green-600" : "text-amber-600"}`}
+                  >
+                    {isPaid ? <CheckCircle2 className="w-3 h-3" /> : null}
+                    {statusLabel}
+                  </p>
                 </div>
               </div>
             </div>

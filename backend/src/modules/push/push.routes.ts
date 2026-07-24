@@ -14,6 +14,10 @@ const subscriptionSchema = z.object({
   }),
 });
 
+const unsubscribeSchema = z.object({
+  endpoint: z.string().url(),
+});
+
 export default async function pushRoutes(fastify: FastifyInstance) {
   fastify.get('/push/vapid-key', async (request, reply) => {
     try {
@@ -52,16 +56,15 @@ export default async function pushRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const userId = (request as any).user.id;
-        const { endpoint } = request.body as { endpoint: string };
-        
-        if (!endpoint) {
-          return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'Endpoint is required', 400);
-        }
-        
+        const { endpoint } = unsubscribeSchema.parse(request.body ?? {});
+
         await webPushService.removeSubscription(userId, endpoint);
-        
+
         return sendSuccess(reply, { message: 'Subscription removed' });
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.name === 'ZodError') {
+          return sendError(reply, ERROR_CODES.VALIDATION_ERROR, 'A valid endpoint is required', 400);
+        }
         logger.error({ error }, 'Failed to remove subscription');
         return sendError(reply, ERROR_CODES.INTERNAL_ERROR, 'Failed to remove subscription', 500);
       }

@@ -10,6 +10,7 @@ import { config } from "../../config";
 import notificationsService from "../notifications/notifications.service";
 import adminService from "../admin/admin.service";
 import { cacheService } from "../../services/cache.service";
+import { eachStayDate } from "../../utils/date.util";
 import { generateInvoicePDF } from "../../services/pdf-invoice.service";
 import { sendEmail } from "../../services/email.service";
 
@@ -44,7 +45,10 @@ export class BookingsService {
   private async resolveCoupon(
     couponCode: string | undefined,
     ctx: { userId: string; propertyId: string; city: string; preTaxAmount: number },
-  ): Promise<{ discountAmount: number; appliedCoupon: { id: string; code: string } | null }> {
+  ): Promise<{
+    discountAmount: number;
+    appliedCoupon: { id: string; code: string; usageLimit: number | null } | null;
+  }> {
     if (!couponCode || !couponCode.trim()) {
       return { discountAmount: 0, appliedCoupon: null };
     }
@@ -94,7 +98,10 @@ export class BookingsService {
     }
     discountAmount = Math.round(Math.min(discountAmount, ctx.preTaxAmount) * 100) / 100;
 
-    return { discountAmount, appliedCoupon: { id: c.id, code: c.code } };
+    return {
+      discountAmount,
+      appliedCoupon: { id: c.id, code: c.code, usageLimit: c.usageLimit },
+    };
   }
 
   async create(data: {
@@ -139,12 +146,7 @@ export class BookingsService {
       throw error;
     }
 
-    const stayDates: Date[] = [];
-    const current = new Date(data.checkInDate);
-    while (current < data.checkOutDate) {
-      stayDates.push(new Date(current));
-      current.setDate(current.getDate() + 1);
-    }
+    const stayDates = eachStayDate(data.checkInDate, data.checkOutDate);
 
     if (stayDates.length === 0) {
       const error = new Error("Invalid stay dates");
@@ -271,10 +273,31 @@ export class BookingsService {
                 discountAmount: new Prisma.Decimal(discountAmount),
               },
             });
-            await tx.coupon.update({
-              where: { id: appliedCoupon.id },
-              data: { usageCount: { increment: 1 } },
-            });
+            // The limit was checked before this transaction opened, so the
+            // increment must re-assert it atomically — otherwise concurrent
+            // redemptions by different users overshoot the cap.
+            if (appliedCoupon.usageLimit !== null) {
+              const claimed = await tx.coupon.updateMany({
+                where: {
+                  id: appliedCoupon.id,
+                  usageCount: { lt: appliedCoupon.usageLimit },
+                },
+                data: { usageCount: { increment: 1 } },
+              });
+
+              if (claimed.count === 0) {
+                const error = new Error(
+                  "This coupon has reached its usage limit",
+                );
+                (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+                throw error;
+              }
+            } else {
+              await tx.coupon.update({
+                where: { id: appliedCoupon.id },
+                data: { usageCount: { increment: 1 } },
+              });
+            }
           }
 
           // Update user profile with phone number if provided
@@ -656,12 +679,10 @@ export class BookingsService {
     });
 
     if (fullBooking.roomId) {
-      const stayDates: Date[] = [];
-      const current = new Date(fullBooking.checkInDate);
-      while (current < fullBooking.checkOutDate) {
-        stayDates.push(new Date(current));
-        current.setDate(current.getDate() + 1);
-      }
+      const stayDates = eachStayDate(
+        fullBooking.checkInDate,
+        fullBooking.checkOutDate,
+      );
 
       const room = await prisma.room.findUnique({
         where: { id: fullBooking.roomId },
@@ -695,50 +716,86 @@ export class BookingsService {
 
     const payRec = fullBooking.payment;
     if (payRec?.status === "COMPLETED" && payRec.razorpayPaymentId) {
-      try {
-        const razorpayClient = new Razorpay({
-          key_id: config.razorpay.keyId,
-          key_secret: config.razorpay.keySecret,
-        });
+      // Refund against what was actually captured, applying the property's
+      // cancellation policy. Previously this refunded 100% of the booking
+      // total regardless of policy or proximity to check-in — and under a
+      // partial-advance model that exceeds the captured amount, which Razorpay
+      // rejects outright.
+      const policy = await prisma.cancellationPolicy.findUnique({
+        where: { propertyId: fullBooking.propertyId },
+      });
 
-        const refundResponse = await razorpayClient.payments.refund(
-          payRec.razorpayPaymentId,
-          {
-            amount: Math.round(Number(fullBooking.totalAmount) * 100),
-            speed: "normal",
-            notes: { reason: reason || "Booking cancelled" },
-          },
+      const hoursUntilCheckIn =
+        (fullBooking.checkInDate.getTime() - Date.now()) / (1000 * 60 * 60);
+
+      const freeBeforeHours = policy?.freeBeforeHours ?? 24;
+      const refundPercent = policy
+        ? hoursUntilCheckIn >= freeBeforeHours
+          ? Number(policy.refundPercentBefore)
+          : Number(policy.refundPercentAfter)
+        : 100;
+
+      const capturedAmount = payRec.amount.toNumber();
+      const refundAmount =
+        Math.round(capturedAmount * (refundPercent / 100) * 100) / 100;
+
+      if (refundAmount <= 0) {
+        logger.info(
+          { bookingId: id, refundPercent, hoursUntilCheckIn },
+          "Cancellation is non-refundable under the property policy",
         );
+      } else {
+        try {
+          const razorpayClient = new Razorpay({
+            key_id: config.razorpay.keyId,
+            key_secret: config.razorpay.keySecret,
+          });
 
-        await prisma.$transaction([
-          prisma.payment.update({
-            where: { id: payRec.id },
-            data: {
-              status: "REFUNDED",
-              refundedAt: new Date(),
-              refundId: refundResponse.id,
+          const refundResponse = await razorpayClient.payments.refund(
+            payRec.razorpayPaymentId,
+            {
+              amount: Math.round(refundAmount * 100),
+              speed: "normal",
+              notes: { reason: reason || "Booking cancelled" },
             },
-          }),
-          prisma.refund.create({
+          );
+
+          const isFullRefund = refundAmount >= capturedAmount;
+
+          await prisma.$transaction([
+            prisma.payment.update({
+              where: { id: payRec.id },
+              data: {
+                status: isFullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED",
+                refundedAt: new Date(),
+                refundId: refundResponse.id,
+              },
+            }),
+            prisma.refund.create({
+              data: {
+                paymentId: payRec.id,
+                amount: new Prisma.Decimal(refundAmount),
+                razorpayRefundId: refundResponse.id,
+                reason,
+                status: "processed",
+              },
+            }),
+          ]);
+
+          // The guest has been refunded, so the vendor must not be paid for
+          // this booking in the next payout run.
+          await adminService.reverseCommission({ bookingId: id });
+        } catch (refundError) {
+          logger.error({ error: refundError, bookingId: id }, "Razorpay refund failed during cancellation");
+          await prisma.refund.create({
             data: {
               paymentId: payRec.id,
-              amount: fullBooking.totalAmount,
-              razorpayRefundId: refundResponse.id,
+              amount: new Prisma.Decimal(refundAmount),
               reason,
-              status: "processed",
+              status: "initiated",
             },
-          }),
-        ]);
-      } catch (refundError) {
-        logger.error({ error: refundError, bookingId: id }, "Razorpay refund failed during cancellation");
-        await prisma.refund.create({
-          data: {
-            paymentId: payRec.id,
-            amount: fullBooking.totalAmount,
-            reason,
-            status: "initiated",
-          },
-        });
+          });
+        }
       }
     }
 
@@ -828,11 +885,11 @@ export class BookingsService {
     const pricePerNight = Number(bookingAny.pricePerNight || booking.room?.pricePerNight || 0);
     const weekendPrice = bookingAny.weekendPrice ? Number(bookingAny.weekendPrice) : pricePerNight;
     
+    // Stay dates are UTC-anchored, so the weekday must be read in UTC too.
     let newTotal = 0;
-    for (let i = 0; i < nightsNew; i++) {
-      const date = new Date(checkIn);
-      date.setDate(date.getDate() + i);
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    for (const date of eachStayDate(checkIn, checkOut)) {
+      const dayOfWeek = date.getUTCDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       newTotal += isWeekend ? weekendPrice : pricePerNight;
     }
 
@@ -845,18 +902,8 @@ export class BookingsService {
     const grandTotal = Math.round((newTotal + taxAmount) * 100) / 100;
 
     if (booking.roomId && booking.room) {
-      const oldDates: Date[] = [];
-      const oldCur = new Date(booking.checkInDate);
-      while (oldCur < booking.checkOutDate) {
-        oldDates.push(new Date(oldCur));
-        oldCur.setDate(oldCur.getDate() + 1);
-      }
-      const newDates: Date[] = [];
-      const newCur = new Date(checkIn);
-      while (newCur < checkOut) {
-        newDates.push(new Date(newCur));
-        newCur.setDate(newCur.getDate() + 1);
-      }
+      const oldDates = eachStayDate(booking.checkInDate, booking.checkOutDate);
+      const newDates = eachStayDate(checkIn, checkOut);
       const roomId = booking.roomId as string;
       const totalRooms = Number((booking.room as any)?.totalRooms ?? 1);
       await prisma.$transaction([
@@ -892,13 +939,42 @@ export class BookingsService {
       },
     });
 
+    const priceDifference = grandTotal - Number(booking.totalAmount);
+
+    // A pending Razorpay order still quotes the old total, and createOrder
+    // short-circuits on any existing order id — so the guest would pay the
+    // pre-reschedule price. Clear it so a fresh order is issued.
+    if (priceDifference !== 0) {
+      const payment = await prisma.payment.findUnique({
+        where: { bookingId: id },
+      });
+
+      if (payment && ["PENDING", "PROCESSING"].includes(payment.status)) {
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            amount: new Prisma.Decimal(grandTotal),
+            razorpayOrderId: null,
+            status: "PENDING",
+          },
+        });
+      } else if (payment?.status === "COMPLETED") {
+        // Already paid: the difference has to be settled out of band rather
+        // than by reissuing the order.
+        logger.warn(
+          { bookingId: id, priceDifference },
+          "Booking rescheduled after payment — price difference requires manual settlement",
+        );
+      }
+    }
+
     await this.sendBookingNotifications(updated, booking.property, "RESCHEDULED");
 
     logger.info({ bookingId: id, newCheckIn: checkIn, newCheckOut: checkOut }, "Booking rescheduled");
 
     return {
       booking: this.sanitizeBooking(updated),
-      priceDifference: grandTotal - Number(booking.totalAmount),
+      priceDifference,
     };
   }
 
@@ -1279,7 +1355,6 @@ export class BookingsService {
     checkOutDate: Date;
     adults: number;
     children?: number;
-    totalAmount: number;
     paymentMethod: "CASH" | "CARD" | "UPI" | "RAZORPAY";
     isOnline?: boolean;
     vendorId: string;
@@ -1332,9 +1407,13 @@ export class BookingsService {
         (1000 * 60 * 60 * 24),
     );
 
+    // Derived from the room's nightly rate — never from the request, which
+    // would let a vendor set the value of a booking they are paid out for.
+    const baseAmount =
+      Math.round(Number(room.pricePerNight) * Math.max(nights, 1) * 100) / 100;
+
     const taxRate = taxPercent / 100;
-    const taxableAmount = data.totalAmount;
-    const taxAmount = Math.round(taxableAmount * taxRate * 100) / 100;
+    const taxAmount = Math.round(baseAmount * taxRate * 100) / 100;
 
     let user = await prisma.user.findFirst({
       where: { phone: data.guestPhone },
@@ -1364,10 +1443,10 @@ export class BookingsService {
         checkOutDate: data.checkOutDate,
         adults: data.adults,
         children: data.children || 0,
-        baseAmount: new Prisma.Decimal(data.totalAmount),
+        baseAmount: new Prisma.Decimal(baseAmount),
         taxAmount: new Prisma.Decimal(taxAmount),
         discountAmount: new Prisma.Decimal(0),
-        totalAmount: new Prisma.Decimal(data.totalAmount + taxAmount),
+        totalAmount: new Prisma.Decimal(baseAmount + taxAmount),
         status: "PENDING",
       },
       include: {
@@ -1399,7 +1478,11 @@ export class BookingsService {
       });
     }
 
-    await adminService.calculateCommission(booking.id);
+    // A cash walk-in is collected by the vendor at the property, so the
+    // platform owes them nothing — only the commission is recorded.
+    await adminService.calculateCommission(booking.id, undefined, {
+      vendorCollectedFunds: data.paymentMethod === "CASH",
+    });
 
     await this.sendBookingNotifications(
       { ...booking, user, payment },

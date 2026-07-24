@@ -9,7 +9,9 @@ import {
   bookingFilterSchema,
   bookingIdSchema,
   checkPriceSchema,
+  quickBookingSchema,
 } from "./bookings.schema";
+import { parseStayDate } from "../../utils/date.util";
 
 export const BookingsController = {
   async create(request: FastifyRequest, reply: FastifyReply) {
@@ -19,8 +21,8 @@ export const BookingsController = {
 
       const result = await bookingsService.create({
         ...data,
-        checkInDate: new Date(data.checkInDate),
-        checkOutDate: new Date(data.checkOutDate),
+        checkInDate: parseStayDate(data.checkInDate),
+        checkOutDate: parseStayDate(data.checkOutDate),
         userId,
       });
 
@@ -145,8 +147,8 @@ export const BookingsController = {
 
       const result = await bookingsService.checkPrice({
         ...data,
-        checkIn: new Date(data.checkIn),
-        checkOut: new Date(data.checkOut),
+        checkIn: parseStayDate(data.checkIn),
+        checkOut: parseStayDate(data.checkOut),
       });
 
       return sendSuccess(reply, result);
@@ -342,25 +344,12 @@ export const BookingsController = {
   async quickBooking(request: FastifyRequest, reply: FastifyReply) {
     try {
       const user = (request as any).user;
-      const data = request.body as {
-        propertyId: string;
-        roomId: string;
-        guestName: string;
-        guestPhone: string;
-        guestEmail?: string;
-        checkInDate: string;
-        checkOutDate: string;
-        adults: number;
-        children?: number;
-        totalAmount: number;
-        paymentMethod: "CASH" | "CARD" | "UPI" | "RAZORPAY";
-        isOnline?: boolean;
-      };
+      const data = quickBookingSchema.parse(request.body);
 
       const result = await bookingsService.quickBooking({
         ...data,
-        checkInDate: new Date(data.checkInDate),
-        checkOutDate: new Date(data.checkOutDate),
+        checkInDate: parseStayDate(data.checkInDate),
+        checkOutDate: parseStayDate(data.checkOutDate),
         vendorId: user.vendorId,
       });
 

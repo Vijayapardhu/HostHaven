@@ -219,7 +219,7 @@ export default function UserDetails() {
             <CardContent>
               <div className="space-y-4">
                 <MetricRow icon={BookOpen} label="Total Bookings" value={user._count?.bookings ?? 0} />
-                <MetricRow icon={CreditCard} label="Total Spent" value={`₹${(Number(user.totalSpent) ?? 0).toLocaleString()}`} />
+                <MetricRow icon={CreditCard} label="Total Spent" value={`₹${Number(user.totalSpent ?? 0).toLocaleString()}`} />
                 <MetricRow icon={Star} label="Reviews Given" value={user._count?.reviews ?? 0} />
                 <MetricRow icon={Heart} label="Wishlist Items" value={user._count?.wishlistItems ?? 0} />
                 <MetricRow icon={Wrench} label="Service Bookings" value={user._count?.serviceBookings ?? 0} />

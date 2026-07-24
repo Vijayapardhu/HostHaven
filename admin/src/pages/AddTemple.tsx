@@ -966,7 +966,8 @@ export default function AddTemple() {
             .filter((item) => Boolean(item && String(item).trim()))
             .join(' | ') || undefined,
         forceComplete: false,
-      }, aiAbortRef.current.signal)
+        signal: aiAbortRef.current.signal,
+      })
 
       const draft = (result?.draft || {}) as Record<string, unknown>
 

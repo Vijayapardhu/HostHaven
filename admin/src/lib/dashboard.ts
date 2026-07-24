@@ -128,7 +128,10 @@ export const dashboardService = {
             description: 'Vendor approval pending',
           })
         })
-      } catch {}
+      } catch (error) {
+        // One failing source should not blank the whole approvals panel.
+        console.error('Failed to load pending vendor approvals', error)
+      }
 
       try {
         const propertiesResponse = await api.get('/v1/admin/properties', { 
@@ -148,7 +151,10 @@ export const dashboardService = {
             description: 'Property approval pending',
           })
         })
-      } catch {}
+      } catch (error) {
+        // One failing source should not blank the whole approvals panel.
+        console.error('Failed to load pending property approvals', error)
+      }
 
       return approvals.slice(0, limit)
     })

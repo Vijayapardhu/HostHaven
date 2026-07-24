@@ -19,6 +19,14 @@ export interface Vendor {
   aadhaarNumber?: string
   passportPhoto?: string
   companyLogo?: string
+  // Stored as JSON on the vendor record; each value is a document URL.
+  businessDocuments?: {
+    gstCertificate?: string
+    panCard?: string
+    aadhaarCard?: string
+    bankPassbook?: string
+    businessProof?: string
+  }
   rejectionReason?: string
   totalEarnings?: number
   user?: {

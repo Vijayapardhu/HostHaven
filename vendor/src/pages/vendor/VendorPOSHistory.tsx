@@ -93,9 +93,9 @@ const VendorPOSHistory = () => {
         const response = await bookingsService.getBookings(params);
         bookings = response?.data || [];
       } catch (e) {
-        console.log("Bookings API error");
+        console.error("Bookings API error, falling back to dashboard", e);
       }
-      
+
       // If empty, get from dashboard
       if (bookings.length === 0) {
         try {
@@ -105,11 +105,9 @@ const VendorPOSHistory = () => {
             bookings = dashboard.recentBookings;
           }
         } catch (e) {
-          console.log("Dashboard API error");
+          console.error("Dashboard API error", e);
         }
       }
-      
-      console.log("POS History fetchInvoices bookings:", bookings);
 
       const invoiceData = bookings.map((b: any) => ({
         id: b.id,
@@ -151,9 +149,9 @@ const VendorPOSHistory = () => {
         });
         bookings = response?.data || [];
       } catch (e) {
-        console.log("Bookings API failed, trying dashboard");
+        console.error("Bookings API failed, trying dashboard", e);
       }
-      
+
       // If empty, get from dashboard
       if (bookings.length === 0) {
         try {
@@ -163,11 +161,10 @@ const VendorPOSHistory = () => {
             bookings = dashboard.recentBookings;
           }
         } catch (e) {
-          console.log("Dashboard API failed");
+          console.error("Dashboard API failed", e);
         }
       }
       
-      console.log("POS History bookings:", bookings);
       
       const summary: Record<string, DailySummary> = {};
       

@@ -118,7 +118,7 @@ export const bookingsService = {
       return getData(response.data);
     }
     if (status === "CANCELLED") {
-      const response = await api.put(`/v1/bookings/${id}/cancel`);
+      const response = await api.put(`/v1/bookings/vendor/${id}/cancel`);
       return getData(response.data);
     }
     throw new Error(`Unsupported status transition: ${status}`);

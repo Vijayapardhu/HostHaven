@@ -529,6 +529,7 @@ export default function SettingsPage() {
                           updateAdvanced((advanced) => ({
                             ...advanced,
                             colors: {
+                              ...DEFAULT_ADVANCED_SETTINGS.colors!,
                               ...(advanced.colors ?? {}),
                               [key]: hexToHslString(e.target.value),
                             },
@@ -544,6 +545,7 @@ export default function SettingsPage() {
                           updateAdvanced((advanced) => ({
                             ...advanced,
                             colors: {
+                              ...DEFAULT_ADVANCED_SETTINGS.colors!,
                               ...(advanced.colors ?? {}),
                               [key]: e.target.value,
                             },

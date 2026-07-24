@@ -3513,6 +3513,8 @@ Crawl-delay: 1
       }),
     ]);
 
+    await this.reverseCommission({ bookingId });
+
     logger.info({ bookingId, refundAmount }, "Booking refunded by admin");
 
     return {
@@ -3627,6 +3629,19 @@ Crawl-delay: 1
         },
       }),
     ]);
+
+    if (payment.booking) {
+      if (shouldMarkBookingRefunded) {
+        await this.reverseCommission({ bookingId: payment.booking.id });
+      } else {
+        // Partial refunds leave the commission entry intact: apportioning it
+        // correctly needs a reversal model the ledger does not yet have.
+        logger.warn(
+          { paymentId, bookingId: payment.booking.id, refundAmount },
+          "Partial refund issued — commission entry not adjusted, review manually",
+        );
+      }
+    }
 
     logger.info({ paymentId, refundAmount, adminId: adminInfo?.id }, "Payment refunded by admin");
 
@@ -3777,7 +3792,19 @@ Crawl-delay: 1
     };
   }
 
-  async calculateCommission(bookingId?: string, serviceBookingId?: string) {
+  /**
+   * Records the commission split for a booking.
+   *
+   * `vendorCollectedFunds` is set when the vendor took payment directly (a cash
+   * walk-in): the money never passed through the platform, so there is nothing
+   * to pay out and the vendor's earning is recorded as zero. The commission is
+   * still recorded, because the platform is owed it.
+   */
+  async calculateCommission(
+    bookingId?: string,
+    serviceBookingId?: string,
+    options?: { vendorCollectedFunds?: boolean },
+  ) {
     if (serviceBookingId) {
       const serviceBooking = await prisma.serviceBooking.findUnique({
         where: { id: serviceBookingId },
@@ -3831,9 +3858,39 @@ Crawl-delay: 1
 
     const vendor = booking.property.vendor;
     const commissionRate = vendor.commissionRate;
-    const bookingAmount = booking.totalAmount;
-    const commissionAmount = bookingAmount.mul(commissionRate).div(100);
-    const vendorEarning = bookingAmount.sub(commissionAmount);
+
+    // Commission is charged on the pre-tax amount: the tax portion is remitted
+    // to the government, not earned by either party.
+    const bookingAmount = booking.totalAmount.sub(booking.taxAmount ?? 0);
+
+    // Rounded to the stored scale so commission + earning always reconciles to
+    // the booking amount. Rounding each independently at write time left a
+    // paisa unaccounted for on some bookings.
+    const commissionAmount = bookingAmount
+      .mul(commissionRate)
+      .div(100)
+      .toDecimalPlaces(2);
+
+    // When the vendor collected the money themselves there is nothing to pay
+    // out; crediting an earning here would pay them a second time.
+    const vendorEarning = options?.vendorCollectedFunds
+      ? new Prisma.Decimal(0)
+      : bookingAmount.sub(commissionAmount);
+
+    // Never restate an entry that has already been paid out: doing so silently
+    // rewrites financial history if the vendor's rate changed in between.
+    const existing = await prisma.commissionLedger.findUnique({
+      where: { bookingId },
+      select: { id: true, payoutId: true },
+    });
+
+    if (existing?.payoutId) {
+      logger.warn(
+        { bookingId, ledgerId: existing.id, payoutId: existing.payoutId },
+        "Commission recalculation skipped — entry already paid out",
+      );
+      return;
+    }
 
     await prisma.commissionLedger.upsert({
       where: { bookingId },
@@ -3854,6 +3911,46 @@ Crawl-delay: 1
     });
 
     logger.info({ bookingId, vendorId: vendor.id }, "Commission calculated");
+  }
+
+  /**
+   * Reverses the commission entry for a refunded booking so the vendor is not
+   * paid for money that was returned to the guest.
+   *
+   * The ledger has no reversal/status column and is uniquely keyed per booking,
+   * so an already-paid entry cannot be corrected here without clawing back a
+   * settled payout. Those are left intact and logged at error level for manual
+   * reconciliation rather than silently altered.
+   */
+  async reverseCommission(ref: { bookingId?: string; serviceBookingId?: string }) {
+    const where = ref.bookingId
+      ? { bookingId: ref.bookingId }
+      : ref.serviceBookingId
+        ? { serviceBookingId: ref.serviceBookingId }
+        : null;
+
+    if (!where) return;
+
+    const entry = await prisma.commissionLedger.findFirst({ where });
+    if (!entry) return;
+
+    if (entry.payoutId) {
+      logger.error(
+        { ...ref, ledgerId: entry.id, payoutId: entry.payoutId },
+        "Refund on a booking whose commission was already paid out — manual reconciliation required",
+      );
+      return;
+    }
+
+    await prisma.commissionLedger.update({
+      where: { id: entry.id },
+      data: {
+        commissionAmount: new Prisma.Decimal(0),
+        vendorEarning: new Prisma.Decimal(0),
+      },
+    });
+
+    logger.info({ ...ref, ledgerId: entry.id }, "Commission reversed after refund");
   }
 
   async getVendorEarnings(filters?: { vendorId?: string; search?: string }) {
@@ -3912,7 +4009,9 @@ Crawl-delay: 1
       throw error;
     }
 
-    const payout = await prisma.$transaction(async (tx) => {
+    let payout;
+    try {
+      payout = await prisma.$transaction(async (tx) => {
       const unpaidEntries = await tx.commissionLedger.findMany({
         where: { vendorId, payoutId: null },
         orderBy: { createdAt: "asc" },
@@ -3980,13 +4079,48 @@ Crawl-delay: 1
         },
       });
 
-      await tx.commissionLedger.updateMany({
-        where: { id: { in: selectedEntries.map((entry) => entry.id) } },
+      // payoutId: null re-asserted here so entries claimed by a concurrent
+      // payout are never silently re-linked to this one.
+      const linked = await tx.commissionLedger.updateMany({
+        where: {
+          id: { in: selectedEntries.map((entry) => entry.id) },
+          payoutId: null,
+        },
         data: { payoutId: createdPayout.id },
       });
 
+      if (linked.count !== selectedEntries.length) {
+        const error = new Error(
+          "Some earnings were just claimed by another payout — please retry",
+        );
+        (error as any).code = ERROR_CODES.VALIDATION_ERROR;
+        throw error;
+      }
+
       return createdPayout;
-    });
+      },
+      {
+        // Read-then-write over shared unpaid entries: at the default level two
+        // concurrent payout creations both read the same rows and double-pay.
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error: any) {
+      // P2002: the one-open-payout-per-vendor partial unique index.
+      // P2034: serialization conflict with a concurrent payout transaction.
+      if (error?.code === "P2002") {
+        const conflict = new Error("A payout for this vendor is already open");
+        (conflict as any).code = ERROR_CODES.VALIDATION_ERROR;
+        throw conflict;
+      }
+      if (error?.code === "P2034") {
+        const conflict = new Error(
+          "Another payout operation is in progress for this vendor — please retry",
+        );
+        (conflict as any).code = ERROR_CODES.VALIDATION_ERROR;
+        throw conflict;
+      }
+      throw error;
+    }
 
     logger.info({ vendorId, payoutId: payout.id }, "Payout created");
 

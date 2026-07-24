@@ -55,9 +55,12 @@ export const isTokenExpired = (token?: string | null): boolean => {
     return true;
   }
 
+  // Fail closed: a token we cannot parse (or that carries no expiry) is not
+  // proof of a session. Real backend tokens are JWTs with exp — anything else
+  // is garbage and must not render the dashboard.
   const payload = parseJwtPayload(token);
   if (!payload?.exp) {
-    return false;
+    return true;
   }
 
   const currentEpochSeconds = Math.floor(Date.now() / 1000);

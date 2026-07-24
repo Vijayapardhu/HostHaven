@@ -18,6 +18,7 @@ import DeviationTemples from "./pages/DeviationTemples";
 import Services from "./pages/Services";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
+import TwoFactorVerify from "./pages/TwoFactorVerify";
 import Signup from "./pages/Signup";
 import Wishlist from "./pages/Wishlist";
 import Profile from "./pages/Profile";
@@ -78,6 +79,7 @@ const App = () => (
                 <Route path="/search" element={<Search />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/login/2fa" element={<TwoFactorVerify />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -21,3 +21,6 @@ lint_output.txt
 supabase_dump.sql
 supabase_dump_help.txt
 *.dump.sql
+
+# Uploaded media (served from /uploads; set UPLOAD_DIR outside the repo in prod)
+uploads/

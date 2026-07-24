@@ -1,6 +1,12 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { cloudinaryService } from "../../services/cloudinary.service";
 import { r2StorageService } from "../../services/r2.service";
+import { localStorageService } from "../../services/local-storage.service";
+import {
+  uploadQuerySchema,
+  deleteFileSchema,
+  deleteFilesSchema,
+} from "./uploads.schema";
 import { imageCompressService } from "../../services/image-compress.service";
 import { config } from "../../config";
 import { sendSuccess, sendError } from "../../utils/response.util";
@@ -23,21 +29,65 @@ const hasR2Config = () =>
       config.r2.publicUrl,
   );
 
-const getPreferredProvider = (): "r2" | "cloudinary" => {
+type StorageProvider = "local" | "r2" | "cloudinary";
+
+// Media is stored on the VPS filesystem. The cloud providers remain only as a
+// legacy fallback while historical URLs still point at them — new uploads
+// never go there unless the local disk write itself fails.
+const getPreferredProvider = (): StorageProvider => "local";
+
+const getLegacyFallbackProvider = (): "r2" | "cloudinary" | null => {
   if (hasR2Config()) return "r2";
-  return "cloudinary";
+  if (hasCloudinaryConfig()) return "cloudinary";
+  return null;
 };
 
-const getFallbackProvider = (
-  provider: "r2" | "cloudinary",
-): "r2" | "cloudinary" | null => {
-  if (provider === "r2" && hasCloudinaryConfig()) return "cloudinary";
-  if (provider === "cloudinary" && hasR2Config()) return "r2";
+// Destination folders are an allowlist, not free text: it previously came
+// straight off the query string, letting any authenticated caller write into
+// the operational folders the admin panel reads from.
+const SHARED_UPLOAD_FOLDERS = [
+  "hosthaven",
+  "hosthaven/avatars",
+  "hosthaven/properties",
+  "hosthaven/properties/videos",
+  "hosthaven/services",
+  "hosthaven/temples/images",
+  "hosthaven/temples/videos",
+  "hosthaven/vendors/logo",
+  "hosthaven/vendors/passport",
+  "rooms",
+] as const;
+
+const ADMIN_ONLY_UPLOAD_FOLDERS = ["payouts", "notifications"] as const;
+
+const DEFAULT_UPLOAD_FOLDER = "hosthaven";
+
+/**
+ * Resolves the destination folder for an upload, or null if the caller may not
+ * write there. Falls back to the default folder when none is supplied.
+ */
+const resolveUploadFolder = (
+  requested: string | undefined,
+  role: string | undefined,
+): string | null => {
+  if (!requested) return DEFAULT_UPLOAD_FOLDER;
+
+  if ((SHARED_UPLOAD_FOLDERS as readonly string[]).includes(requested)) {
+    return requested;
+  }
+
+  if (
+    role === "ADMIN" &&
+    (ADMIN_ONLY_UPLOAD_FOLDERS as readonly string[]).includes(requested)
+  ) {
+    return requested;
+  }
+
   return null;
 };
 
 const uploadWithProvider = async (
-  provider: "r2" | "cloudinary",
+  provider: StorageProvider,
   fileBuffer: Buffer,
   options: {
     folder: string;
@@ -46,6 +96,14 @@ const uploadWithProvider = async (
     resourceType?: "image" | "video" | "raw" | "auto";
   },
 ) => {
+  if (provider === "local") {
+    return localStorageService.upload(fileBuffer, {
+      folder: options.folder,
+      filename: options.filename,
+      contentType: options.contentType,
+    });
+  }
+
   if (provider === "r2") {
     const result = await r2StorageService.upload(fileBuffer, {
       folder: options.folder,
@@ -90,7 +148,10 @@ const uploadWithFallback = async (
   try {
     return await uploadWithProvider(preferredProvider, fileBuffer, options);
   } catch (error) {
-    const fallbackProvider = getFallbackProvider(preferredProvider);
+    // A local disk write should not fail; if it does (disk full, permissions),
+    // fall back to a configured legacy cloud provider rather than losing the
+    // upload entirely.
+    const fallbackProvider = getLegacyFallbackProvider();
 
     logger.error(
       {
@@ -128,8 +189,16 @@ export const UploadsController = {
         );
       }
 
-      const query = request.query as { folder?: string; resourceType?: string; compress?: string };
-      const folder = query.folder || "hosthaven";
+      const query = uploadQuerySchema.parse(request.query);
+      const folder = resolveUploadFolder(query.folder, request.user?.role);
+      if (!folder) {
+        return sendError(
+          reply,
+          ERROR_CODES.FORBIDDEN,
+          "Uploads to this folder are not permitted",
+          403,
+        );
+      }
       const shouldCompress = query.compress !== 'false';
 
       let fileBuffer = await data.toBuffer();
@@ -142,11 +211,8 @@ export const UploadsController = {
         }
       }
 
-      const resourceType = (query.resourceType || "image") as
-        | "image"
-        | "video"
-        | "raw"
-        | "auto";
+      // Already narrowed by the schema — no cast needed.
+      const resourceType = query.resourceType;
       const result = await uploadWithFallback(fileBuffer, {
         folder,
         filename: data.filename,
@@ -156,6 +222,14 @@ export const UploadsController = {
 
       return sendSuccess(reply, result, 201);
     } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "Invalid upload parameters",
+          400,
+        );
+      }
       logger.error({ error, headers: request.headers }, "Upload failed");
       if (error?.statusCode === 406 || error?.code === "FST_INVALID_MULTIPART_CONTENT_TYPE") {
         return sendError(
@@ -204,15 +278,20 @@ export const UploadsController = {
         );
       }
 
-      const query = request.query as { folder?: string; resourceType?: string; compress?: string };
-      const folder = query.folder || "hosthaven";
+      const query = uploadQuerySchema.parse(request.query);
+      const folder = resolveUploadFolder(query.folder, request.user?.role);
+      if (!folder) {
+        return sendError(
+          reply,
+          ERROR_CODES.FORBIDDEN,
+          "Uploads to this folder are not permitted",
+          403,
+        );
+      }
       const shouldCompress = query.compress !== 'false';
 
-      const resourceType = (query.resourceType || "image") as
-        | "image"
-        | "video"
-        | "raw"
-        | "auto";
+      // Already narrowed by the schema — no cast needed.
+      const resourceType = query.resourceType;
 
       const results = await Promise.all(
         fileArray.map(async (file) => {
@@ -237,6 +316,14 @@ export const UploadsController = {
 
       return sendSuccess(reply, results, 201);
     } catch (error: any) {
+      if (error?.name === "ZodError") {
+        return sendError(
+          reply,
+          ERROR_CODES.VALIDATION_ERROR,
+          "Invalid upload parameters",
+          400,
+        );
+      }
       logger.error({ error }, "Multiple upload failed");
       if (error?.statusCode === 406 || error?.code === "FST_INVALID_MULTIPART_CONTENT_TYPE") {
         return sendError(
@@ -265,11 +352,22 @@ export const UploadsController = {
 
   async delete(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const body = request.body as { publicId?: string; key?: string };
-      const publicId = body.publicId;
-      const key = body.key;
+      const { publicId, key } = deleteFileSchema.parse(request.body ?? {});
 
-      if (!publicId && !key) {
+      // Keys refer to local files first; anything not found locally is a
+      // legacy cloud object.
+      if (key) {
+        const removedLocally = await localStorageService.delete(key);
+        if (!removedLocally && hasR2Config()) {
+          await r2StorageService.delete(key);
+        }
+      } else if (publicId) {
+        await cloudinaryService.deleteImage(publicId);
+      }
+
+      return sendSuccess(reply, { message: "File deleted successfully" });
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
         return sendError(
           reply,
           ERROR_CODES.VALIDATION_ERROR,
@@ -277,15 +375,6 @@ export const UploadsController = {
           400,
         );
       }
-
-      if (getPreferredProvider() === "r2" && key) {
-        await r2StorageService.delete(key);
-      } else if (publicId) {
-        await cloudinaryService.deleteImage(publicId);
-      }
-
-      return sendSuccess(reply, { message: "File deleted successfully" });
-    } catch (error: any) {
       logger.error({ error }, "Delete file failed");
       return sendError(
         reply,
@@ -298,14 +387,24 @@ export const UploadsController = {
 
   async deleteMultiple(request: FastifyRequest, reply: FastifyReply) {
     try {
-      const body = request.body as { publicIds?: string[]; keys?: string[] };
-      const publicIds = body.publicIds;
-      const keys = body.keys;
+      const { publicIds, keys } = deleteFilesSchema.parse(request.body ?? {});
 
-      if (
-        (!publicIds || publicIds.length === 0) &&
-        (!keys || keys.length === 0)
-      ) {
+      if (keys && keys.length > 0) {
+        const leftovers: string[] = [];
+        for (const key of keys) {
+          const removedLocally = await localStorageService.delete(key);
+          if (!removedLocally) leftovers.push(key);
+        }
+        if (leftovers.length > 0 && hasR2Config()) {
+          await r2StorageService.deleteMultiple(leftovers);
+        }
+      } else if (publicIds && publicIds.length > 0) {
+        await cloudinaryService.deleteMultiple(publicIds);
+      }
+
+      return sendSuccess(reply, { message: "Files deleted successfully" });
+    } catch (error: any) {
+      if (error?.name === "ZodError") {
         return sendError(
           reply,
           ERROR_CODES.VALIDATION_ERROR,
@@ -313,15 +412,6 @@ export const UploadsController = {
           400,
         );
       }
-
-      if (getPreferredProvider() === "r2" && keys && keys.length > 0) {
-        await r2StorageService.deleteMultiple(keys);
-      } else if (publicIds && publicIds.length > 0) {
-        await cloudinaryService.deleteMultiple(publicIds);
-      }
-
-      return sendSuccess(reply, { message: "Files deleted successfully" });
-    } catch (error: any) {
       logger.error({ error }, "Delete files failed");
       return sendError(
         reply,

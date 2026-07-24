@@ -67,11 +67,8 @@ const ServiceBookingDetail = () => {
         const errorText = await response.text();
         throw new Error(`Failed to generate invoice: ${response.status} - ${errorText}`);
       }
-      const contentType = response.headers.get("content-type");
-      console.log("Invoice content-type:", contentType);
       const blob = await response.blob();
-      console.log("Invoice blob type:", blob.type, "size:", blob.size);
-      
+
       // Check if it's actually a PDF
       if (!blob.type.includes("pdf")) {
         const text = await blob.text();

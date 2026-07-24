@@ -22,7 +22,9 @@ const playNotificationSound = () => {
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.5);
   } catch (e) {
-    console.log('Audio not supported');
+    // Audio alerts are a non-essential enhancement; browsers without
+    // WebAudio (or with autoplay blocked) simply get the visual alert.
+    console.warn('Booking alert sound unavailable', e);
   }
 };
 

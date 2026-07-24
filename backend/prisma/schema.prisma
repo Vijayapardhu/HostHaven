@@ -1217,3 +1217,28 @@ model BroadcastNotification {
   @@index([targetAudience])
   @@map("broadcast_notifications")
 }
+
+// ============================================
+// TRANSACTIONAL OUTBOX
+// ============================================
+
+// Side effects of money operations (commission recording, invoices,
+// confirmation email) are enqueued here inside the same transaction that
+// commits the payment, then executed by a worker with retry. A failed email
+// can never invalidate a captured payment, and a crashed process can never
+// lose the work.
+model OutboxEvent {
+  id          String   @id @default(uuid())
+  type        String
+  payload     Json
+  status      String   @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  lastError   String?
+  availableAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
+}

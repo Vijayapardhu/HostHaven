@@ -6,6 +6,8 @@ import cookie from "@fastify/cookie";
 import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
 import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import { promises as fs } from "fs";
 import { config, isDevelopment, isProduction } from "./config";
 import { logger } from "./utils/logger.util";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
@@ -134,6 +136,21 @@ export const buildApp = async () => {
       }
       : false,
     crossOriginEmbedderPolicy: false,
+  });
+
+  // Uploaded media lives on the VPS filesystem (see local-storage.service.ts).
+  // Stored names are UUIDs, so the content is immutable and can cache hard.
+  // The directory must exist before @fastify/static will register.
+  await fs.mkdir(config.storage.uploadDir, { recursive: true });
+  await fastify.register(fastifyStatic, {
+    root: config.storage.uploadDir,
+    prefix: "/uploads/",
+    decorateReply: false,
+    index: false,
+    list: false,
+    cacheControl: true,
+    maxAge: "30d",
+    immutable: true,
   });
 
   // CORS

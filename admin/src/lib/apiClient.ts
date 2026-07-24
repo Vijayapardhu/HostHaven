@@ -241,20 +241,29 @@ class ApiClient {
           withCredentials: true,
         });
 
-        const { accessToken, refreshToken: newRefreshToken, expiresIn } = response.data;
-        
+        // The backend wraps every response as { success, data, timestamp }, so
+        // the tokens are under `.data.data`. Reading `.data` directly yielded
+        // undefined and wrote the literal string "undefined" as the token,
+        // wedging the session until a manual logout.
+        const payload = response.data?.data ?? response.data;
+        const { accessToken, refreshToken: newRefreshToken, expiresIn } = payload ?? {};
+
+        if (!accessToken) {
+          throw new Error('Token refresh returned no access token');
+        }
+
         this.setAuthToken(accessToken);
-        
+
         if (newRefreshToken) {
           this.setRefreshToken(newRefreshToken);
         }
-        
+
         if (expiresIn) {
           this.setTokenExpiry(expiresIn);
         }
-        
+
         dispatchTokenRefresh(accessToken);
-        
+
         this.isRefreshing = false;
         this.processQueue(null, accessToken);
         

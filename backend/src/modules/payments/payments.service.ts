@@ -10,6 +10,11 @@ import notificationsService from "../notifications/notifications.service";
 import { webPushService } from "../../services/webpush.service";
 import { PaymentMethod } from "@prisma/client";
 import { generateInvoiceId } from "../../utils/crypto.util";
+import { eachStayDate } from "../../utils/date.util";
+import outboxService from "../../services/outbox.service";
+
+/** Outbox event type for everything that follows a captured booking payment. */
+export const BOOKING_POST_PAYMENT_EVENT = "booking.post-payment";
 
 const validPaymentMethods: Record<string, PaymentMethod> = {
   CARD: 'CARD',
@@ -50,6 +55,26 @@ const getRazorpayClient = () => {
   }
 
   return razorpayClient;
+};
+
+/**
+ * Constant-time comparison of two hex signatures.
+ *
+ * `!==` on strings short-circuits at the first differing byte, which leaks how
+ * much of a forged signature was correct. These are money endpoints, so the
+ * comparison must not vary with the input.
+ */
+const signaturesMatch = (expected: string, received: unknown): boolean => {
+  if (typeof received !== "string") return false;
+
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const receivedBuffer = Buffer.from(received, "utf8");
+
+  // timingSafeEqual throws on length mismatch, so compare lengths first. The
+  // expected length is fixed for a given algorithm and is not a secret.
+  if (expectedBuffer.length !== receivedBuffer.length) return false;
+
+  return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
 };
 
 export class PaymentsService {
@@ -281,7 +306,7 @@ export class PaymentsService {
       .update(body.toString())
       .digest("hex");
 
-    if (expectedSignature !== data.razorpay_signature) {
+    if (!signaturesMatch(expectedSignature, data.razorpay_signature)) {
       await prisma.payment.update({
         where: { id: payment.id },
         data: {
@@ -320,126 +345,37 @@ export class PaymentsService {
       };
     }
 
-    const [updatedPayment, updatedBooking] = await prisma.$transaction([
-      prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: "COMPLETED",
-          razorpayPaymentId: data.razorpay_payment_id,
-          razorpaySignature: data.razorpay_signature,
-          method: "RAZORPAY",
-        },
-      }),
-      prisma.booking.update({
-        where: { id: payment.bookingId },
-        data: { status: "CONFIRMED" },
-      }),
-    ]);
+    // The outbox event commits atomically with the payment: side effects
+    // (commission, notifications, invoice, email) exist as durable work if
+    // and only if the payment does. A failure in any of them can never fail
+    // the request or be lost — the worker retries with backoff.
+    const [updatedPayment, updatedBooking, outboxEvent] =
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: "COMPLETED",
+            razorpayPaymentId: data.razorpay_payment_id,
+            razorpaySignature: data.razorpay_signature,
+            method: "RAZORPAY",
+          },
+        }),
+        prisma.booking.update({
+          where: { id: payment.bookingId },
+          data: { status: "CONFIRMED" },
+        }),
+        prisma.outboxEvent.create({
+          data: {
+            type: BOOKING_POST_PAYMENT_EVENT,
+            payload: { paymentId: payment.id },
+          },
+        }),
+      ]);
 
-    await adminService.calculateCommission(updatedBooking.id);
-
-    await bookingsService.notifyBookingConfirmed(updatedBooking.id);
-
-    const nights = Math.ceil(
-      (new Date(updatedBooking.checkOutDate).getTime() -
-        new Date(updatedBooking.checkInDate).getTime()) /
-        (1000 * 60 * 60 * 24),
-    );
-
-    const invoiceData = {
-      invoiceNumber: generateInvoiceId(updatedBooking.bookingNumber),
-      invoiceDate: new Date().toISOString(),
-      bookingDetails: {
-        bookingNumber: updatedBooking.bookingNumber,
-        checkIn: updatedBooking.checkInDate,
-        checkOut: updatedBooking.checkOutDate,
-        nights,
-      },
-      property: {
-        name: payment.booking.property.name,
-        address: `${payment.booking.property.address}, ${payment.booking.property.city}, ${payment.booking.property.state} ${payment.booking.property.pincode}`,
-      },
-      room: {
-        name: payment.booking.room?.name || "Standard Room",
-        type: payment.booking.room?.type || "Standard",
-      },
-      guest: {
-        name: payment.booking.user.name,
-        email: payment.booking.user.email,
-        phone: payment.booking.user.phone || "",
-      },
-      pricing: {
-        baseAmount: Number(updatedBooking.baseAmount),
-        taxAmount: Number(updatedBooking.taxAmount),
-        discountAmount: Number(updatedBooking.discountAmount),
-        totalAmount: Number(updatedBooking.totalAmount),
-      },
-      payment: {
-        status: updatedPayment.status,
-        method: "RAZORPAY",
-        amount: updatedPayment.amount.toNumber(),
-      },
-      vendor: {
-        name: payment.booking.property.vendor?.businessName || "HostHaven",
-        email:
-          payment.booking.property.vendor?.user?.email ||
-          "support@hosthaven.com",
-        phone: payment.booking.property.vendor?.user?.phone || "",
-      },
-    };
-
-    const pdfBuffer = await generateInvoicePDF(invoiceData);
-
-    const invoiceId = generateInvoiceId(updatedBooking.bookingNumber);
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: { invoiceId },
-    });
-
-    const vendorName =
-      payment.booking.property.vendor?.businessName || "HostHaven";
-    const vendorLocation = `${payment.booking.property.city}, ${payment.booking.property.state}`;
-    const vendorPhone = payment.booking.property.vendor?.user?.phone || "";
-    const vendorEmail =
-      payment.booking.property.vendor?.user?.email || "support@hosthaven.com";
-
-    const advancePaid = Number(payment.amount);
-    const payAtProperty = Number(updatedBooking.totalAmount) - advancePaid;
-    
-    await sendEmail({
-      to: payment.booking.user.email,
-      subject: "Booking Confirmed - HostHaven",
-      template: "booking-confirmed",
-      data: {
-        name: payment.booking.user.name,
-        propertyName: payment.booking.property.name,
-        roomName: payment.booking.room?.name || null,
-        checkIn: updatedBooking.checkInDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-        checkOut: updatedBooking.checkOutDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-        bookingId: updatedBooking.bookingNumber,
-        totalAmount: updatedBooking.totalAmount.toNumber(),
-        advancePaid: advancePaid,
-        payAtProperty: payAtProperty,
-        adults: updatedBooking.adults,
-        children: updatedBooking.children,
-        guests: true,
-        vendorName,
-        vendorLocation,
-        vendorPhone,
-        vendorEmail,
-        taxAmount: updatedBooking.taxAmount ? updatedBooking.taxAmount.toNumber() : 0,
-        taxPercent: updatedBooking.taxPercent ? updatedBooking.taxPercent.toNumber() : 0,
-        cgstAmount: updatedBooking.taxAmount ? updatedBooking.taxAmount.toNumber() / 2 : 0,
-        sgstAmount: updatedBooking.taxAmount ? updatedBooking.taxAmount.toNumber() / 2 : 0,
-      },
-      attachments: [
-        {
-          filename: `invoice-${updatedBooking.bookingNumber}.pdf`,
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        },
-      ],
-    });
+    // Run immediately for snappy UX (invoice lands right away); the claim
+    // inside processEvent guarantees the worker never double-runs it, and a
+    // failure here simply leaves the event for the worker to retry.
+    await outboxService.processEvent(outboxEvent.id);
 
     logger.info(
       { paymentId: payment.id, bookingId: payment.bookingId },
@@ -458,6 +394,146 @@ export class PaymentsService {
         bookingNumber: updatedBooking.bookingNumber,
       },
     };
+  }
+
+  /**
+   * Everything that follows a captured booking payment: commission recording,
+   * confirmation notifications, invoice PDF, and the confirmation email.
+   *
+   * Runs as an outbox handler, so a throw here means "retry later", not a
+   * failed payment. Commission recording is an upsert (idempotent); a retry
+   * after a late failure may re-send the notification or email, which is the
+   * accepted trade-off for never losing them.
+   */
+  async runBookingPostPaymentEffects(paymentId: string) {
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        booking: {
+          include: {
+            property: { include: { vendor: { include: { user: true } } } },
+            room: true,
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!payment || !payment.booking) {
+      // Nothing to do and nothing to retry.
+      logger.error({ paymentId }, "Post-payment effects: payment or booking missing");
+      return;
+    }
+    if (payment.status !== "COMPLETED") {
+      logger.warn(
+        { paymentId, status: payment.status },
+        "Post-payment effects skipped: payment not completed",
+      );
+      return;
+    }
+
+    const booking = payment.booking;
+
+    await adminService.calculateCommission(booking.id);
+    await bookingsService.notifyBookingConfirmed(booking.id);
+
+    const nights = Math.ceil(
+      (new Date(booking.checkOutDate).getTime() -
+        new Date(booking.checkInDate).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
+    const invoiceData = {
+      invoiceNumber: generateInvoiceId(booking.bookingNumber),
+      invoiceDate: new Date().toISOString(),
+      bookingDetails: {
+        bookingNumber: booking.bookingNumber,
+        checkIn: booking.checkInDate,
+        checkOut: booking.checkOutDate,
+        nights,
+      },
+      property: {
+        name: booking.property.name,
+        address: `${booking.property.address}, ${booking.property.city}, ${booking.property.state} ${booking.property.pincode}`,
+      },
+      room: {
+        name: booking.room?.name || "Standard Room",
+        type: booking.room?.type || "Standard",
+      },
+      guest: {
+        name: booking.user.name,
+        email: booking.user.email,
+        phone: booking.user.phone || "",
+      },
+      pricing: {
+        baseAmount: Number(booking.baseAmount),
+        taxAmount: Number(booking.taxAmount),
+        discountAmount: Number(booking.discountAmount),
+        totalAmount: Number(booking.totalAmount),
+      },
+      payment: {
+        status: payment.status,
+        method: "RAZORPAY",
+        amount: payment.amount.toNumber(),
+      },
+      vendor: {
+        name: booking.property.vendor?.businessName || "HostHaven",
+        email: booking.property.vendor?.user?.email || "support@hosthaven.com",
+        phone: booking.property.vendor?.user?.phone || "",
+      },
+    };
+
+    const pdfBuffer = await generateInvoicePDF(invoiceData);
+
+    const invoiceId = generateInvoiceId(booking.bookingNumber);
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { invoiceId },
+    });
+
+    const vendorName = booking.property.vendor?.businessName || "HostHaven";
+    const vendorLocation = `${booking.property.city}, ${booking.property.state}`;
+    const vendorPhone = booking.property.vendor?.user?.phone || "";
+    const vendorEmail =
+      booking.property.vendor?.user?.email || "support@hosthaven.com";
+
+    const advancePaid = Number(payment.amount);
+    const payAtProperty = Number(booking.totalAmount) - advancePaid;
+
+    await sendEmail({
+      to: booking.user.email,
+      subject: "Booking Confirmed - HostHaven",
+      template: "booking-confirmed",
+      data: {
+        name: booking.user.name,
+        propertyName: booking.property.name,
+        roomName: booking.room?.name || null,
+        checkIn: booking.checkInDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }),
+        checkOut: booking.checkOutDate.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }),
+        bookingId: booking.bookingNumber,
+        totalAmount: booking.totalAmount.toNumber(),
+        advancePaid,
+        payAtProperty,
+        adults: booking.adults,
+        children: booking.children,
+        guests: true,
+        vendorName,
+        vendorLocation,
+        vendorPhone,
+        vendorEmail,
+        taxAmount: booking.taxAmount ? booking.taxAmount.toNumber() : 0,
+        taxPercent: booking.taxPercent ? booking.taxPercent.toNumber() : 0,
+        cgstAmount: booking.taxAmount ? booking.taxAmount.toNumber() / 2 : 0,
+        sgstAmount: booking.taxAmount ? booking.taxAmount.toNumber() / 2 : 0,
+      },
+      attachments: [
+        {
+          filename: `invoice-${booking.bookingNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
   }
 
   async verifyServicePayment(
@@ -493,7 +569,7 @@ export class PaymentsService {
       .update(body.toString())
       .digest("hex");
 
-    if (expectedSignature !== data.razorpay_signature) {
+    if (!signaturesMatch(expectedSignature, data.razorpay_signature)) {
       const error = new Error("Payment verification failed");
       (error as any).code = ERROR_CODES.PAYMENT_FAILED;
       throw error;
@@ -698,7 +774,7 @@ export class PaymentsService {
       .update(rawBody)
       .digest("hex");
 
-    if (signature !== expectedSignature) {
+    if (!signaturesMatch(expectedSignature, signature)) {
       logger.error({ signature }, "Invalid webhook signature");
       return { success: false };
     }
@@ -787,22 +863,32 @@ export class PaymentsService {
           logger.info({ event, orderId }, "Duplicate payment.captured webhook ignored");
           return { success: true };
         }
-        await prisma.$transaction([
-          prisma.payment.update({
-            where: { id: payment.id },
-            data: {
-              status: "COMPLETED",
-              razorpayPaymentId: paymentEntity.id,
-              method: mapRazorpayMethod(paymentEntity.method),
-            },
-          }),
-          prisma.booking.update({
-            where: { id: payment.bookingId },
-            data: { status: "CONFIRMED" },
-          }),
-        ]);
-        await adminService.calculateCommission(payment.bookingId);
-        await bookingsService.notifyBookingConfirmed(payment.bookingId);
+        {
+          // Same outbox pattern as verifyPayment. Previously this path only
+          // recorded commission — a guest whose client died before verify
+          // never received an invoice or confirmation email.
+          const [, , capturedEvent] = await prisma.$transaction([
+            prisma.payment.update({
+              where: { id: payment.id },
+              data: {
+                status: "COMPLETED",
+                razorpayPaymentId: paymentEntity.id,
+                method: mapRazorpayMethod(paymentEntity.method),
+              },
+            }),
+            prisma.booking.update({
+              where: { id: payment.bookingId },
+              data: { status: "CONFIRMED" },
+            }),
+            prisma.outboxEvent.create({
+              data: {
+                type: BOOKING_POST_PAYMENT_EVENT,
+                payload: { paymentId: payment.id },
+              },
+            }),
+          ]);
+          await outboxService.processEvent(capturedEvent.id);
+        }
         break;
 
       case "payment.failed":
@@ -820,12 +906,10 @@ export class PaymentsService {
         });
         const inventoryOps: any[] = [];
         if (failedBooking?.roomId && failedBooking.room) {
-          const dates: Date[] = [];
-          const cur = new Date(failedBooking.checkInDate);
-          while (cur < failedBooking.checkOutDate) {
-            dates.push(new Date(cur));
-            cur.setDate(cur.getDate() + 1);
-          }
+          const dates = eachStayDate(
+            failedBooking.checkInDate,
+            failedBooking.checkOutDate,
+          );
           for (const date of dates) {
             inventoryOps.push(
               prisma.inventoryDay.upsert({
@@ -920,6 +1004,15 @@ export class PaymentsService {
           }),
         ]);
 
+        if (refundSummary.isFullyRefunded) {
+          await adminService.reverseCommission({ bookingId: payment.bookingId });
+        } else {
+          logger.warn(
+            { paymentId: payment.id, bookingId: payment.bookingId, refundAmount },
+            "Partial refund webhook — commission entry not adjusted, review manually",
+          );
+        }
+
         await this.sendPaymentNotifications(
           updatedPayment,
           updatedBooking,
@@ -936,11 +1029,14 @@ export class PaymentsService {
     return { success: true };
   }
 
-  async getPaymentById(id: string, userId?: string) {
+  /** Owner-scoped read. The userId is mandatory: an optional scope silently
+   *  meant "no filter" when undefined, which is one removed guard away from
+   *  serving anyone's payment. Admin reads use adminService.getPaymentById. */
+  async getPaymentById(id: string, userId: string) {
     const payment = await prisma.payment.findFirst({
       where: {
         id,
-        ...(userId ? { booking: { userId } } : {}),
+        booking: { userId },
       },
       include: {
         booking: {
@@ -989,4 +1085,12 @@ export class PaymentsService {
 }
 
 export const paymentsService = new PaymentsService();
+
+// Registered here rather than imported by the outbox service, so the outbox
+// stays dependency-free of the modules it serves.
+outboxService.register(BOOKING_POST_PAYMENT_EVENT, async (payload) => {
+  const { paymentId } = payload as { paymentId: string };
+  await paymentsService.runBookingPostPaymentEffects(paymentId);
+});
+
 export default paymentsService;

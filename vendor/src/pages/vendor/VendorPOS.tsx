@@ -112,7 +112,6 @@ const VendorPOS = () => {
     checkOutDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     adults: 1,
     children: 0,
-    totalAmount: "",
     paymentMethod: "CASH" as "CASH" | "CARD" | "UPI" | "RAZORPAY",
     isOnline: false,
   });
@@ -149,7 +148,7 @@ const VendorPOS = () => {
 
   const handleQuickBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bookingForm.roomId || !bookingForm.guestName || !bookingForm.guestPhone || !bookingForm.totalAmount) {
+    if (!bookingForm.roomId || !bookingForm.guestName || !bookingForm.guestPhone) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
@@ -166,7 +165,6 @@ const VendorPOS = () => {
         checkOutDate: bookingForm.checkOutDate,
         adults: bookingForm.adults,
         children: bookingForm.children,
-        totalAmount: parseFloat(bookingForm.totalAmount),
         paymentMethod: bookingForm.paymentMethod,
         isOnline: bookingForm.isOnline,
       });
@@ -227,7 +225,6 @@ const VendorPOS = () => {
       checkOutDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       adults: 1,
       children: 0,
-      totalAmount: "",
       paymentMethod: "CASH" as "CASH" | "CARD" | "UPI" | "RAZORPAY",
       isOnline: false,
     });
@@ -570,10 +567,10 @@ const VendorPOS = () => {
                 <div className="space-y-2"><Label>Adults *</Label><Input type="number" min="1" value={bookingForm.adults} onChange={(e) => setBookingForm((p) => ({ ...p, adults: parseInt(e.target.value) }))} required /></div>
                 <div className="space-y-2"><Label>Children</Label><Input type="number" min="0" value={bookingForm.children} onChange={(e) => setBookingForm((p) => ({ ...p, children: parseInt(e.target.value) }))} /></div>
               </div>
-              <div className="space-y-2">
-                <Label>Total Amount (₹) *</Label>
-                <Input type="number" value={bookingForm.totalAmount} onChange={(e) => setBookingForm((p) => ({ ...p, totalAmount: e.target.value }))} required />
-              </div>
+              <p className="text-sm text-muted-foreground">
+                The total is calculated from the room's nightly rate and the
+                selected dates, then shown on the invoice.
+              </p>
               <div className="space-y-2">
                 <Label>Payment Method *</Label>
                 <Select value={bookingForm.paymentMethod} onValueChange={(v: "CASH" | "CARD" | "UPI" | "RAZORPAY") => setBookingForm((p) => ({ ...p, paymentMethod: v }))}>

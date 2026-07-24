@@ -198,7 +198,7 @@ const VendorBookingDetail = () => {
             <XCircle className="w-4 h-4" />Check Out Guest
           </Button>
         )}
-        {booking.status !== "CANCELLED" && booking.status !== "CHECKED_OUT" && (
+        {(booking.status === "PENDING" || booking.status === "CONFIRMED") && (
           <Button variant="destructive" onClick={handleCancel} disabled={isActionLoading} className="gap-2">
             <XCircle className="w-4 h-4" />Cancel Booking
           </Button>

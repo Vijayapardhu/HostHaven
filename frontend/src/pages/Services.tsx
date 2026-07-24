@@ -313,22 +313,16 @@ const Services = () => {
       return;
     }
 
-    const advanceAmount = computeAdvance(selectedService);
-
     try {
       setIsSubmitting(true);
 
       // 1. Create a PENDING service booking
       const booking = await api.serviceBookings.create({
         serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        serviceCategory: selectedService.category,
         serviceDate: `${form.serviceDate}T00:00:00.000Z`,
         serviceTime: form.serviceTime,
         location: form.location,
         notes: form.notes,
-        advanceAmount: advanceAmount,
-        totalAmount: Number(selectedService.price ?? selectedService.basePrice ?? advanceAmount),
       });
 
       // 2. Create Razorpay order on backend

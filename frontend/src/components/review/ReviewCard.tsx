@@ -105,6 +105,8 @@ export function ReviewCard({ review }: ReviewCardProps) {
     setIsImageOpen(true);
   };
 
+  const reviewImages = review.images ?? [];
+
   return (
     <div className="bg-card rounded-xl p-4 md:p-5 shadow-card border w-full min-h-0 overflow-hidden">
       {/* Header */}
@@ -184,9 +186,9 @@ export function ReviewCard({ review }: ReviewCardProps) {
       )}
 
       {/* Images */}
-      {review.images && review.images.length > 0 && (
+      {reviewImages.length > 0 && (
         <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-thin">
-          {review.images.slice(0, 4).map((img, idx) => (
+          {reviewImages.slice(0, 4).map((img, idx) => (
             <div key={idx} className="relative flex-shrink-0">
               <img 
                 src={img} 
@@ -194,13 +196,13 @@ export function ReviewCard({ review }: ReviewCardProps) {
                 className="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => openImageViewer(idx)}
               />
-              {idx === 3 && review.images.length > 4 && (
+              {idx === 3 && reviewImages.length > 4 && (
                 <div 
                   className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center cursor-pointer"
                   onClick={() => openImageViewer(idx)}
                 >
                   <span className="text-white text-sm font-medium">
-                    +{review.images.length - 4}
+                    +{reviewImages.length - 4}
                   </span>
                 </div>
               )}

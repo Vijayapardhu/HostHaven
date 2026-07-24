@@ -46,7 +46,15 @@ export const getFriendlyError = (error: unknown): string => {
   if (errorMessage.includes("password") && errorMessage.length < 50) {
     return "There was an issue with your password. Please check the requirements and try again.";
   }
-  
+
+  // An unmapped message from the API is the backend's own user-facing copy —
+  // show it rather than hiding the real reason behind a generic string.
+  const trimmed = errorMessage.trim();
+  const looksTechnical = /TypeError|SyntaxError|ReferenceError|Unexpected token|\[object|undefined|null/.test(trimmed);
+  if (trimmed.length >= 4 && trimmed.length <= 300 && !looksTechnical) {
+    return trimmed;
+  }
+
   return "Something went wrong. Please try again later.";
 };
 

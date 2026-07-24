@@ -90,38 +90,33 @@ export const supportService = {
     priority?: string
     category?: string
   }) => {
+    // Search and category are applied server-side so paging and totals stay
+    // consistent; filtering one already-paginated page hid matches on later
+    // pages while still reporting the unfiltered total.
     const response = await api.get('/v1/support/tickets/admin', {
       params: {
         page: params?.page,
         limit: params?.limit,
         status: params?.status?.toUpperCase(),
+        category: params?.category,
+        search: params?.search,
       },
     })
     const normalized = normalizeList(response.data)
     let filtered = normalized.data
-    if (params?.search) {
-      const query = params.search.toLowerCase()
-      filtered = filtered.filter((ticket) => {
-        const haystack = [ticket.ticketNumber, ticket.subject, ticket.email, ticket.userName]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-        return haystack.includes(query)
-      })
-    }
+    // Priority has no server-side representation yet, so it stays client-side.
     if (params?.priority) {
       filtered = filtered.filter((ticket) => ticket.priority === params.priority)
-    }
-    if (params?.category) {
-      filtered = filtered.filter((ticket) => ticket.category === params.category)
     }
     return { ...normalized, data: filtered }
   },
 
   getTicketById: async (id: string) => {
-    const response = await api.get(`/v1/support/tickets/admin`, { params: { page: 1, limit: 100 } })
-    const normalized = normalizeList(response.data)
-    return normalized.data.find((item: SupportTicket) => item.id === id)
+    // Fetches the ticket directly. The previous implementation pulled the
+    // first 100 tickets and used .find(), so ticket 101+ silently blanked.
+    const response = await api.get(`/v1/support/tickets/admin/${id}`)
+    const payload = response.data?.data ?? response.data
+    return mapTicket(payload)
   },
 
   updateTicketStatus: async (

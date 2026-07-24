@@ -31,7 +31,13 @@ export default async function reviewsRoutes(fastify: FastifyInstance) {
   );
 
   fastify.get("/:id", ReviewsController.getById);
-  fastify.get("/", ReviewsController.getAll);
+
+  // Returns only the caller's own reviews — must stay authenticated.
+  fastify.get(
+    "/",
+    { preHandler: fastify.authenticate },
+    ReviewsController.getAll,
+  );
 
   fastify.put(
     "/:id",

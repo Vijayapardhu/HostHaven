@@ -40,7 +40,14 @@ export const authService = {
   },
 
   logout: async () => {
-    // No server-side logout endpoint; clear tokens client-side
+    // Revoke the refresh token server-side so it cannot be reused after logout,
+    // then clear local state regardless of the call's outcome.
+    const refreshToken = getRefreshToken();
+    try {
+      await api.post("/v1/auth/logout", refreshToken ? { refreshToken } : {});
+    } catch (error) {
+      console.error("Server-side logout failed; clearing local session anyway", error);
+    }
     localStorage.removeItem("vendor_token");
     localStorage.removeItem("vendor_refresh_token");
     return { success: true };

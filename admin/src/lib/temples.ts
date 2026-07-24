@@ -294,9 +294,7 @@ export const templesService = {
   },
 
   getTempleById: async (id: string) => {
-    console.log("Fetching temple with ID/slug:", id);
     const response = await api.get(`/v1/temples/${id}`);
-    console.log("Temple response:", response.data);
     const payload = response.data?.data ?? response.data;
     return mapTemple(payload);
   },
@@ -313,9 +311,7 @@ export const templesService = {
   },
 
   updateTemple: async (id: string, data: Partial<CreateTempleRequest>) => {
-    console.log("Updating temple:", id, data);
     const response = await api.put(`/v1/temples/${id}`, data);
-    console.log("Update response:", response.data);
     return mapTemple(response.data.data ?? response.data);
   },
 

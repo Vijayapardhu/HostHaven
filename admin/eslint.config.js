@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'dev-dist'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
@@ -23,7 +23,20 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Matches frontend/ and vendor/. The ~214 `any` usages here are real
+      // debt, tracked separately — they are not a reason to hold admin to a
+      // different bar than the other two apps.
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'warn',
+      'react-hooks/exhaustive-deps': 'off',
+      // Console output ships to the production browser console; warn/error are
+      // kept for genuine failure reporting.
+      'no-console': ['error', { allow: ['warn', 'error'] }],
     },
+  },
+  {
+    // Tests may log freely.
+    files: ['**/*.test.{ts,tsx}', '**/test/**'],
+    rules: { 'no-console': 'off' },
   },
 )

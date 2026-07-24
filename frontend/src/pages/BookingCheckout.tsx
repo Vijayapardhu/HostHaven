@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Link, useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -61,8 +61,45 @@ const BookingCheckout = () => {
   const fullName = (location.state as any)?.guestName || "";
   const phone = (location.state as any)?.guestPhone || "";
 
-  const checkIn = checkInIso ? new Date(checkInIso) : undefined;
-  const checkOut = checkOutIso ? new Date(checkOutIso) : undefined;
+  // Memoised so their identity is stable across renders. Constructing these
+  // inline put a new Date object into the price-check effect's dependencies on
+  // every commit, which re-fired the effect forever and rate-limited the
+  // endpoint until the Pay button could never enable.
+  const checkIn = useMemo(
+    () => (checkInIso ? new Date(checkInIso) : undefined),
+    [checkInIso],
+  );
+  const checkOut = useMemo(
+    () => (checkOutIso ? new Date(checkOutIso) : undefined),
+    [checkOutIso],
+  );
+
+  // Stay dates go to the API as plain calendar dates. Sending a timestamp made
+  // the night depend on the guest's timezone, so two guests booking the same
+  // night could write to different inventory rows.
+  const checkInParam = checkIn ? format(checkIn, "yyyy-MM-dd") : "";
+  const checkOutParam = checkOut ? format(checkOut, "yyyy-MM-dd") : "";
+
+  // Tracks a lock held by this page so leaving checkout frees the room
+  // immediately instead of holding it for the full ten-minute expiry.
+  const heldLockRef = useRef<{
+    roomId: string;
+    checkIn: string;
+    checkOut: string;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      const held = heldLockRef.current;
+      if (!held) return;
+      heldLockRef.current = null;
+      // Fire-and-forget: the component is unmounting, and an expiring lock is
+      // a tolerable fallback if this does not land.
+      api.inventory.release(held).catch((error) => {
+        console.error("Failed to release inventory lock on exit", error);
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -93,8 +130,8 @@ const BookingCheckout = () => {
       .checkPrice({
         propertyId: id,
         roomId: selectedRoom.id,
-        checkIn: checkIn.toISOString(),
-        checkOut: checkOut.toISOString(),
+        checkIn: checkInParam,
+        checkOut: checkOutParam,
         guests,
       })
       .then((data) => setPriceData(data))
@@ -192,24 +229,36 @@ const BookingCheckout = () => {
     setIsProcessingPayment(true);
     let bookingId: string | undefined;
     let lockAcquired = false;
+    // Once Razorpay reports a successful capture the guest's money is gone.
+    // Nothing after that point may roll the booking back.
+    let paymentCaptured = false;
 
     try {
       await api.inventory.lock({
         roomId: selectedRoom.id,
-        checkIn: checkIn.toISOString(),
-        checkOut: checkOut.toISOString(),
+        checkIn: checkInParam,
+        checkOut: checkOutParam,
         quantity: 1,
       });
       lockAcquired = true;
+      heldLockRef.current = {
+        roomId: selectedRoom.id,
+        checkIn: checkInParam,
+        checkOut: checkOutParam,
+      };
 
       const bookingResponse = await api.bookings.create({
         propertyId: property.id,
         roomId: selectedRoom.id,
-        checkInDate: checkIn.toISOString(),
-        checkOutDate: checkOut.toISOString(),
+        checkInDate: checkInParam,
+        checkOutDate: checkOutParam,
         adults: guests,
         children: 0,
         extraBeds: 0,
+        // The review step tells the guest this name must match their ID, so it
+        // has to reach the vendor's arrivals list rather than defaulting to
+        // "Guest".
+        guestDetails: fullName ? [{ name: fullName }] : undefined,
         guestPhone: phone || undefined,
         couponCode: appliedCoupon?.code,
       });
@@ -243,14 +292,24 @@ const BookingCheckout = () => {
         throw new Error(result.error || "Payment failed");
       }
 
+      paymentCaptured = true;
+
       const paymentResp = result.response as any;
-      if (paymentResp?.razorpay_order_id && paymentResp?.razorpay_payment_id && paymentResp?.razorpay_signature) {
-        await api.payments.verify({
-          razorpay_order_id: paymentResp.razorpay_order_id,
-          razorpay_payment_id: paymentResp.razorpay_payment_id,
-          razorpay_signature: paymentResp.razorpay_signature,
-        });
+      if (
+        !paymentResp?.razorpay_order_id ||
+        !paymentResp?.razorpay_payment_id ||
+        !paymentResp?.razorpay_signature
+      ) {
+        // Verification is never optional — a missing signature means the
+        // payment cannot be confirmed, so it must not be treated as success.
+        throw new Error("Payment could not be verified.");
       }
+
+      await api.payments.verify({
+        razorpay_order_id: paymentResp.razorpay_order_id,
+        razorpay_payment_id: paymentResp.razorpay_payment_id,
+        razorpay_signature: paymentResp.razorpay_signature,
+      });
 
       toast({
         title: "Booking successful",
@@ -268,8 +327,47 @@ const BookingCheckout = () => {
       }
       navigate(`/booking/${property.id}/processing?${successParams.toString()}`);
     } catch (error: any) {
-      try { if (bookingId) { await api.bookings.cancel(bookingId, "Payment failed"); } } catch {}
-      try { if (lockAcquired) { await api.inventory.release({ roomId: selectedRoom?.id || roomId }); } } catch {}
+      if (paymentCaptured) {
+        // The guest has already been charged. Cancelling here would destroy a
+        // paid booking over a network blip, so hand off to the processing
+        // screen and let the Razorpay webhook reconcile the final state.
+        console.error("Post-capture failure; booking left intact", error);
+        toast({
+          title: "Payment received",
+          description: "We're confirming your booking. This can take a moment.",
+        });
+        const pendingParams = new URLSearchParams({
+          property: property.name,
+          checkIn: checkIn.toISOString(),
+          checkOut: checkOut.toISOString(),
+          guestName: fullName || "Guest",
+        });
+        if (bookingId) {
+          pendingParams.set("bookingId", bookingId);
+        }
+        navigate(`/booking/${property.id}/processing?${pendingParams.toString()}`);
+        return;
+      }
+
+      // Nothing was charged, so roll back. Report cleanup failures rather than
+      // hiding them: a failed rollback leaves a stale booking or a held lock.
+      try {
+        if (bookingId) { await api.bookings.cancel(bookingId, "Payment failed"); }
+      } catch (cleanupError) {
+        console.error("Failed to cancel booking after payment failure", cleanupError);
+      }
+      try {
+        if (lockAcquired) {
+          heldLockRef.current = null;
+          await api.inventory.release({
+            roomId: selectedRoom?.id || roomId,
+            checkIn: checkInParam,
+            checkOut: checkOutParam,
+          });
+        }
+      } catch (cleanupError) {
+        console.error("Failed to release inventory lock", cleanupError);
+      }
       toast({
         title: "Booking failed",
         description: error?.message || "Unable to complete payment.",
